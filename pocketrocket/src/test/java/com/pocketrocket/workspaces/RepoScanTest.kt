@@ -66,4 +66,15 @@ class RepoScanTest {
         repo("work/app")
         assertEquals(emptyList<String>(), scan("work/app"))
     }
+
+    @Test fun linkedWorktreesAreNotOffered() {
+        repo("personal/app")
+        // `git worktree add ../app-feature`: its .git is a file pointing into app's .git/worktrees.
+        dir("personal/app-feature")
+        File(root, "personal/app-feature/.git").writeText("gitdir: ${File(root, "personal/app/.git/worktrees/app-feature").path}\n")
+        // A file .git that isn't a worktree link (a moved repo's gitdir) is still a repo.
+        dir("personal/elsewhere")
+        File(root, "personal/elsewhere/.git").writeText("gitdir: /some/other/place/.git\n")
+        assertEquals(listOf("personal/elsewhere"), scan("personal/app"))
+    }
 }

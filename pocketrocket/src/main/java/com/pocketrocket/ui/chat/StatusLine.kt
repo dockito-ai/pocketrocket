@@ -59,11 +59,11 @@ fun StatusLine(state: SessionState, model: String?, onOpenModel: () -> Unit, onO
         var first = true
         fun gap() { if (!first) withStyle(SpanStyle(color = bar)) { append(" │ ") }; first = false }
         // The model and the branch take their own taps (R17); the rest of the line opens the controls.
-        model?.let { text ->
+        model?.let<String, Unit> { text ->
             gap()
             withLink(LinkAnnotation.Clickable("model") { onOpenModel() }) {
                 withStyle(SpanStyle(color = c.textSoft)) { append(text.substringBefore(" · ")) }
-                text.substringAfter(" · ", "").takeIf { it.isNotEmpty() }?.let {
+                text.substringAfter(" · ", "").takeIf { it.isNotEmpty() }?.let<String, Unit> {
                     withStyle(SpanStyle(color = dim)) { append(" · $it") }
                 }
             }

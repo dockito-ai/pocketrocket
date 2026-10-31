@@ -15,7 +15,7 @@ PocketRocket is Shankar's tool, open source under Dockito's GitHub org (decision
 
 ## How we work
 
-- One agent per subtask, in the order in `docs/BRD.md`. Independent pieces may run in parallel (separate worktree or no overlapping files). Each ends in something visible on the emulator or the phone, a clean commit and a line in `docs/PROGRESS.md`.
+- One agent per subtask, in the order in `docs/BRD.md`. Independent pieces may run in parallel (separate worktree or no overlapping files). Make worktrees under `.claude/worktrees/` in the repo, never as folders beside it in `~/projects` (decision 84). Each ends in something visible on the emulator or the phone, a clean commit and a line in `docs/PROGRESS.md`.
 - Opus for building and design; Sonnet for tests, merges and release tasks.
 - Agents verify on an arm64 Android emulator (API 36). Shankar tests on his phone; ship him a debug APK path and tell him what to try.
 - Clean, modular code: one concern per module (setup, auth, profiles, github, sessions, keepalive, browser, updater), small APIs, no copy-paste. Keep changes to upstream Termux files minimal so merging upstream stays possible.
