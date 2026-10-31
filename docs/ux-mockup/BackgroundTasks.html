@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Background tasks · PocketRocket mockup</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#0F1218;--bar:#141821;--card:#181C24;--raised:#20252F;--tile:#232833;--sheet:#1A1F29;--dialog:#1E2430;
+  --border:#2A303C;--border2:#3A4150;--text:#E8EAF0;--reply:#DCE0E8;--soft:#C9CFDA;--muted:#9AA3B2;--faint:#4A5262;
+  --code:#0B0E13;--accent:#FF8A3D;--amber:#F5B83D;--blue:#7AB4FF;--green:#5BD69A;--red:#FF6B6B;--redB:#5A2A30;
+  --lilac:#C4A8FF;--teal:#5BC8D6;--userB:#263048;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#07090D;color:var(--text);font-family:Inter,system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;gap:16px;padding:12px 0 40px}
+button{font:inherit;color:inherit;cursor:pointer}
+.mono{font-family:var(--mono)}
+.phone{width:min(390px,100vw);height:min(844px,calc(100vh - 24px));min-height:640px;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;position:relative;border-radius:20px;border:1px solid #1E232D}
+.top{padding:14px 12px 8px;display:flex;align-items:center;gap:8px}
+.icon-btn{width:44px;height:44px;background:none;border:0;display:flex;align-items:center;justify-content:center;color:var(--soft)}
+.tabs{display:flex;gap:8px;padding:0 12px 10px;border-bottom:1px solid var(--border)}
+.tab{display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;border:1px solid var(--border);font-size:13px;color:var(--soft);white-space:nowrap}
+.tab.on{background:var(--raised);border:1.5px solid var(--green);color:var(--text);font-weight:600}
+.dot{width:7px;height:7px;border-radius:4px;display:inline-block}
+.chat{flex:1;overflow:auto;padding:14px 14px 8px;display:flex;flex-direction:column;gap:10px}
+.user{align-self:flex-end;max-width:82%;background:var(--userB);padding:10px 14px;border-radius:16px 16px 4px 16px;font-size:14px;line-height:1.45}
+.reply{font-size:14px;line-height:1.5;color:var(--reply)}
+.tool{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 12px;font-size:13px;display:flex;flex-direction:column;gap:6px;cursor:pointer;transition:border-color .3s}
+.tool .row{display:flex;align-items:center;gap:10px}
+.tool .name{font-family:var(--mono);color:var(--muted)}
+.tool .what{flex:1;min-width:0;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tool .tail{font-family:var(--mono);font-size:11.5px;color:var(--muted);padding-left:10px;border-left:2px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tool.bg-running{border-color:#24405F}
+.state{display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap}
+.spin{width:11px;height:11px;border-radius:50%;border:1.6px solid currentColor;border-right-color:transparent;animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.pill{font-size:11px;font-weight:600;padding:3px 7px;border-radius:6px}
+.movebtn{align-self:flex-start;height:32px;padding:0 12px;border-radius:10px;border:1px solid var(--border2);background:none;color:var(--soft);font-size:12.5px;display:flex;align-items:center;gap:6px}
+.composer{padding:8px 12px 10px;border-top:1px solid var(--border);background:var(--bar);display:flex;flex-direction:column;gap:8px}
+.inrow{display:flex;align-items:flex-end;gap:8px}
+.round{width:44px;height:44px;border-radius:22px;border:1px solid var(--border);background:none;color:var(--soft);display:flex;align-items:center;justify-content:center;font-size:22px}
+.input{flex:1;height:44px;border-radius:22px;border:1px solid var(--border);background:var(--bg);color:var(--muted);padding:0 16px;display:flex;align-items:center;font-size:14px}
+.mic{width:44px;height:44px;border-radius:22px;border:0;background:var(--accent);color:#1A1206;display:flex;align-items:center;justify-content:center}
+.status{font-family:var(--mono);font-size:11.5px;line-height:15px;padding:0 4px;display:flex;flex-direction:column;gap:3px}
+.status .l1{display:flex;white-space:nowrap}
+.status .l1 .main{overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.sep{color:var(--faint)}
+.count{cursor:pointer;flex-shrink:0}
+/* sheets */
+.scrim{position:absolute;inset:0;background:rgba(7,9,13,.6);opacity:0;pointer-events:none;transition:opacity .2s;z-index:5}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--sheet);border-radius:20px 20px 0 0;border-top:1px solid var(--border);transform:translateY(105%);transition:transform .25s ease;z-index:6;display:flex;flex-direction:column;max-height:88%}
+.sheet.on{transform:none}
+.grab{width:36px;height:4px;border-radius:2px;background:var(--border2);margin:8px auto 4px}
+.sh-head{padding:6px 20px 12px;display:flex;align-items:center;gap:10px}
+.sh-title{font-size:16px;font-weight:600;flex:1}
+.sec{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:10px 20px 6px}
+.trow{display:flex;align-items:center;gap:12px;padding:10px 20px;cursor:pointer}
+.trow:active{background:var(--raised)}
+.ttile{width:36px;height:36px;border-radius:10px;background:var(--tile);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;flex-shrink:0}
+.tmain{flex:1;min-width:0}
+.tdesc{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tcmd{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.ttime{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right;white-space:nowrap}
+.stop{height:32px;padding:0 12px;border-radius:10px;border:1px solid var(--redB);background:none;color:#FF8F8F;font-size:12.5px;font-weight:500}
+.done-row{opacity:.6}
+.empty{padding:16px 20px 24px;color:var(--muted);font-size:13px}
+/* output view */
+.out{position:absolute;inset:0;background:var(--bg);z-index:7;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease}
+.out.on{transform:none}
+.out-head{padding:14px 12px 10px;display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--border)}
+.term{flex:1;overflow:auto;background:var(--code);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:12px 14px;color:var(--soft);white-space:pre-wrap;word-break:break-all}
+.term .warn{color:var(--amber)}.term .err{color:var(--red)}.term .ok{color:var(--green)}.term .dim{color:var(--faint)}
+.follow{position:absolute;right:16px;bottom:84px;background:var(--raised);border:1px solid var(--border2);border-radius:16px;padding:6px 12px;font-size:12px;color:var(--soft);display:none}
+.out-foot{padding:10px 12px 14px;border-top:1px solid var(--border);background:var(--bar);display:flex;gap:8px;align-items:center}
+.btn{height:44px;border-radius:12px;border:1px solid var(--border2);background:none;color:var(--text);font-size:14px;padding:0 16px}
+.btn.red{border-color:var(--redB);color:#FF8F8F}
+/* dialog */
+.dlg{position:absolute;left:24px;right:24px;top:30%;background:var(--dialog);border:1px solid var(--border);border-radius:20px;padding:20px;z-index:9;display:none;flex-direction:column;gap:12px}
+.dlg.on{display:flex}
+/* notification */
+.notif{width:min(390px,100vw);background:#202530;border-radius:20px;padding:14px 16px;display:flex;gap:12px}
+.panel{width:min(390px,100vw);background:#11141B;border:1px solid var(--border);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.panel h3{margin:0;font-size:13px;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.panel .btns{display:flex;flex-wrap:wrap;gap:8px}
+.panel button{height:36px;border-radius:10px;border:1px solid var(--border2);background:var(--raised);padding:0 12px;font-size:12.5px;color:var(--soft)}
+.note{font-size:12.5px;color:var(--muted);line-height:1.5}
+.toast{position:absolute;left:50%;bottom:120px;transform:translateX(-50%);background:var(--raised);border:1px solid var(--border2);padding:8px 14px;border-radius:12px;font-size:12.5px;z-index:10;opacity:0;transition:opacity .2s;white-space:nowrap}
+.toast.on{opacity:1}
+</style>
+</head>
+<body>
+
+<div class="phone" id="phone">
+  <div class="top">
+    <button class="icon-btn" aria-label="Back"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:16px;font-weight:600">pocketrocket</div>
+      <div style="font-size:12px;color:var(--muted)">2 sessions</div>
+    </div>
+    <span style="height:36px;display:flex;align-items:center;gap:6px;padding:0 10px;border:1px solid var(--border);border-radius:10px;font-size:12px;color:var(--soft)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="9" r="2.5"/><path d="M6 8.5v7M18 11.5c0 3-4 3-9.5 4.5"/></svg>Git</span>
+    <button class="icon-btn" aria-label="Terminal"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-5-6-5M12 19h8"/></svg></button>
+  </div>
+  <div class="tabs">
+    <span class="tab"><span class="dot" style="background:var(--green)"></span>workerd</span>
+    <span class="tab on"><span class="dot" style="background:var(--blue)" id="tabdot"></span>android testing</span>
+    <span class="tab" style="border-style:dashed;color:var(--muted)">+</span>
+  </div>
+
+  <div class="chat" id="chat"></div>
+
+  <div class="composer">
+    <div class="inrow">
+      <button class="round" aria-label="Attach">+</button>
+      <div class="input">Message Claude</div>
+      <button class="mic" aria-label="Dictate"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+    </div>
+    <div class="status">
+      <div class="l1"><span class="main">pocketrocket <span class="sep">│</span> <span style="color:var(--green);text-decoration:underline">main</span> <span class="sep">│</span> Opus <span class="sep">│</span> 47k/1M</span></div>
+      <div class="l1"><span style="color:#7AB4FF;cursor:pointer" onclick="toast('Opens the controls sheet (mode, model…)')">▸▸ auto mode</span><span class="count" id="countSpan" onclick="openSheet()"></span></div>
+    </div>
+  </div>
+
+  <div class="scrim" id="scrim" onclick="closeAll()"></div>
+
+  <div class="sheet" id="sheet">
+    <div class="grab"></div>
+    <div class="sh-head"><div class="sh-title" id="sheetTitle">Background</div></div>
+    <div id="sheetBody" style="overflow:auto;padding-bottom:16px"></div>
+  </div>
+
+  <div class="out" id="out">
+    <div class="out-head">
+      <button class="icon-btn" onclick="closeOut()" aria-label="Back"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="outTitle"></div>
+        <div class="mono" style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="outCmd"></div>
+      </div>
+      <span id="outState" style="padding-right:8px"></span>
+    </div>
+    <div class="term" id="term"></div>
+    <div class="follow" id="follow" onclick="scrollTermEnd()">↓ Follow output</div>
+    <div class="out-foot" id="outFoot"></div>
+  </div>
+
+  <div class="dlg" id="dlg">
+    <div style="font-size:17px;font-weight:600">End "android testing"?</div>
+    <div style="font-size:14px;color:var(--soft);line-height:1.5" id="dlgText"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
+      <button class="btn" onclick="closeAll()">Cancel</button>
+      <button class="btn red" onclick="closeAll();toast('Session ended · background tasks stopped')">End session</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<div class="panel">
+  <h3>Try it</h3>
+  <div class="note">Tap a Bash card, or the <b style="color:var(--lilac)">agent</b> / <b style="color:var(--teal)">shells</b> count next to the mode. Tapping the mode opens the controls sheet. These buttons stand in for Claude Code's events:</div>
+  <div class="btns">
+    <button onclick="finish('build',0)">Build finishes ✓</button>
+    <button onclick="finish('server',1)">Dev server crashes ✗</button>
+    <button onclick="startFg()">Claude runs a slow foreground command</button>
+    <button onclick="showDialog()">End session…</button>
+    <button onclick="location.reload()">Reset</button>
+  </div>
+</div>
+
+<div style="width:min(390px,100vw);font-size:13px;color:var(--muted);padding:0 4px">Service notification (pull-down shade)</div>
+<div class="notif">
+  <div style="width:36px;height:36px;border-radius:18px;background:#0B1E3A;display:flex;align-items:center;justify-content:center;color:var(--accent);flex-shrink:0">🚀</div>
+  <div style="flex:1;min-width:0;font-size:13px;line-height:1.45">
+    <div style="color:var(--muted);font-size:12px">PocketRocket · <span id="nClock">4:12</span></div>
+    <div style="font-weight:600;font-size:14px">android testing working</div>
+    <div><span style="color:var(--blue);font-weight:600">1IP</span> <span style="color:var(--green);font-weight:600">1D</span> · <span style="color:var(--teal)" id="nShells"></span></div>
+    <div style="color:var(--muted);font-size:12px;margin-top:4px">android testing · working · <span id="nShells2"></span></div>
+    <div style="color:var(--muted);font-size:12px">workerd · done</div>
+  </div>
+</div>
+
+<script>
+const now = () => Date.now();
+const t0 = now();
+// Tasks: kind shell|agent. status running|completed|failed|stopped. bg: true when in background.
+const tasks = [
+  {id:'build', kind:'shell', bg:true, desc:'Build debug APK', cmd:'./gradlew :app:assembleDebug --console=plain', started:t0-62000, status:'running', lines:[], feed:'gradle'},
+  {id:'server', kind:'shell', bg:true, desc:'Dev server for web preview', cmd:'npm run dev -- --port 5173', started:t0-305000, status:'running', lines:[], feed:'server'},
+  {id:'agent', kind:'agent', bg:true, desc:'Audit stream-json parser', cmd:'general-purpose', started:t0-140000, status:'running'},
+];
+const seed = {
+  gradle:['> Task :termux-shared:compileDebugKotlin','> Task :pocketrocket:preBuild UP-TO-DATE','> Task :pocketrocket:compileDebugKotlin','w: SessionReducer.kt:121 Parameter \'result\' is never used','> Task :pocketrocket:compileDebugJavaWithJavac NO-SOURCE'],
+  server:['  VITE v7.1.2  ready in 812 ms','','  ➜  Local:   http://localhost:5173/','  ➜  Network: use --host to expose','10:42:03 [vite] page reload src/App.tsx'],
+};
+const more = {
+  gradle:['> Task :app:mergeDebugResources','> Task :app:processDebugManifest','> Task :app:compileDebugKotlin','> Task :app:dexBuilderDebug','> Task :app:mergeDexDebug','> Task :app:packageDebug','> Task :app:assembleDebug'],
+  server:['10:43:11 [vite] hmr update /src/Chat.tsx','10:43:40 [vite] hmr update /src/Chat.tsx','10:44:02 [vite] page reload src/main.tsx','10:45:19 [vite] hmr update /src/Sheet.tsx'],
+};
+tasks.forEach(t=>{ if(t.feed) t.lines = seed[t.feed].slice(); });
+let fg = null;         // the foreground command card, when running
+let openOut = null;    // id of task whose output is open
+let follow = true;
+
+function fmt(ms){ const s=Math.max(0,Math.floor(ms/1000)); const h=Math.floor(s/3600), m=Math.floor(s%3600/60), x=s%60; return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0'); }
+function elapsed(t){ return fmt((t.ended||now())-t.started); }
+function exitOf(t){ return t.status==='completed'?0:t.status==='failed'?t.code:null; }
+
+function stateHtml(t, compact){
+  if(t.status==='running') return `<span class="state" style="color:var(--blue)"><span class="spin"></span>${t.bg?'background · ':''}${elapsed(t)}</span>`;
+  if(t.status==='completed') return `<span class="state" style="color:var(--green)">✓ ${compact?'':'exit 0 · '}${elapsed(t)}</span>`;
+  if(t.status==='failed') return `<span class="state" style="color:var(--red)">✗ exit ${t.code} · ${elapsed(t)}</span>`;
+  return `<span class="state" style="color:var(--muted)">stopped · ${elapsed(t)}</span>`;
+}
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+function lastLine(t){ for(let i=t.lines.length-1;i>=0;i--) if(t.lines[i].trim()) return t.lines[i].trim(); return ''; }
+
+function bashCard(t){
+  const tail = t.status==='running' ? `<div class="tail">${esc(lastLine(t))}</div>` : '';
+  return `<div class="tool ${t.status==='running'&&t.bg?'bg-running':''}" onclick="openOutput('${t.id}')">
+    <div class="row"><span class="name">Bash</span><span class="what">${esc(t.desc)}</span>${stateHtml(t,true)}</div>${tail}</div>`;
+}
+
+function renderChat(){
+  const b = tasks.find(t=>t.id==='build'), s = tasks.find(t=>t.id==='server'), a = tasks.find(t=>t.id==='agent');
+  let h = `
+  <div class="user">Start the web dev server, then build the debug APK and install it on the emulator.</div>
+  <div class="reply">Starting the dev server in the background so it keeps running.</div>
+  ${bashCard(s)}
+  <div class="tool" style="cursor:default"><div class="row"><span class="pill" style="color:var(--lilac);background:rgba(196,168,255,.12)">Agent</span><span style="flex:1;font-weight:500">${a.desc}</span>${a.status==='running'?`<span class="state" style="color:var(--lilac)"><span class="spin"></span>background · ${elapsed(a)}</span>`:stateHtml(a,true)}</div>
+    <div class="tail" style="font-family:var(--mono)">Grep "task_notification" · 4 matches</div></div>
+  <div class="reply">Now the APK build. It takes a few minutes on the phone, so it runs in the background too. I'll install it when it ends.</div>
+  ${bashCard(b)}`;
+  if(b.status==='completed') h += `<div class="reply">Build passed. Installing on the emulator.</div>
+    <div class="tool" style="cursor:default"><div class="row"><span class="name">Bash</span><span class="what">adb install -r app-debug.apk</span><span class="state" style="color:var(--green)">✓</span></div></div>`;
+  if(s.status==='failed') h += `<div class="reply">The dev server exited with code 1 (port 5173 was taken). Want me to restart it on another port?</div>`;
+  if(fg){
+    const long = now()-fg.started > 10000 || fg.forceLong;
+    h += `<div class="tool" onclick="openOutput('${fg.id}')">
+      <div class="row"><span class="name">Bash</span><span class="what">${esc(fg.desc)}</span>${stateHtml(fg,true)}</div>
+      <div class="tail">${esc(lastLine(fg))}</div>
+      ${fg.status==='running'&&!fg.bg&&long?`<button class="movebtn" onclick="event.stopPropagation();moveToBg()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Move to background</button>`:''}
+    </div>`;
+  }
+  const chat = document.getElementById('chat');
+  const atEnd = chat.scrollTop + chat.clientHeight >= chat.scrollHeight - 8;
+  chat.innerHTML = h;
+  if(atEnd) chat.scrollTop = chat.scrollHeight;
+}
+
+function renderCount(){
+  const shells = tasks.filter(t=>t.kind==='shell'&&t.bg&&t.status==='running').length;
+  const agents = tasks.filter(t=>t.kind==='agent'&&t.status==='running').length;
+  let h='';
+  if(agents) h += `&nbsp;<span class="sep">│</span> <span style="color:var(--lilac)">${agents===1?'1 agent':agents+' agents'}</span>`;
+  if(shells) h += `&nbsp;<span class="sep">│</span> <span style="color:var(--teal)">${shells===1?'1 shell':shells+' shells'}</span>`;
+  document.getElementById('countSpan').innerHTML = h;
+  const txt = shells ? (shells===1?'1 shell running':shells+' shells running') : 'no background shells';
+  document.getElementById('nShells').textContent = txt;
+  document.getElementById('nShells2').textContent = txt;
+  document.getElementById('nClock').textContent = fmt(now()-t0+252000);
+}
+
+function renderSheet(){
+  const live = tasks.filter(t=>t.bg&&t.status==='running'), done = tasks.filter(t=>t.bg&&t.status!=='running');
+  document.getElementById('sheetTitle').innerHTML = `Background <span style="color:var(--muted);font-weight:400">· ${live.length} running</span>`;
+  const row = t => `<div class="trow ${t.status!=='running'?'done-row':''}" onclick="${t.kind==='shell'?`openOutput('${t.id}')`:`toast('Scrolls to the agent card in the chat')`}">
+      <div class="ttile" style="color:${t.kind==='shell'?'var(--teal)':'var(--lilac)'}">${t.kind==='shell'?'&gt;_':'A'}</div>
+      <div class="tmain"><div class="tdesc">${esc(t.desc)}</div><div class="tcmd">${esc(t.kind==='agent'?'Agent · '+t.cmd:t.cmd)}</div></div>
+      ${t.status==='running'?`<div class="ttime">${elapsed(t)}</div><button class="stop" onclick="event.stopPropagation();stopTask('${t.id}')">Stop</button>`:`<div class="ttime">${stateHtml(t,false)}</div>`}
+    </div>`;
+  let h = live.length ? `<div class="sec">Running</div>${live.map(row).join('')}` : `<div class="empty">Nothing running in the background.</div>`;
+  if(done.length) h += `<div class="sec">Finished this session</div>${done.map(row).join('')}`;
+  document.getElementById('sheetBody').innerHTML = h;
+}
+
+function colour(l){
+  if(/^w:|warning/i.test(l)) return `<span class="warn">${esc(l)}</span>`;
+  if(/^e:|error|FAILED|EADDRINUSE/i.test(l)) return `<span class="err">${esc(l)}</span>`;
+  if(/BUILD SUCCESSFUL|ready in/.test(l)) return `<span class="ok">${esc(l)}</span>`;
+  if(/^\[exited/.test(l)) return `<span class="dim">${esc(l)}</span>`;
+  return esc(l);
+}
+function renderOut(){
+  if(!openOut) return;
+  const t = all().find(x=>x.id===openOut);
+  document.getElementById('outTitle').textContent = t.desc;
+  document.getElementById('outCmd').textContent = '$ '+t.cmd;
+  document.getElementById('outState').innerHTML = stateHtml(t,false);
+  const term = document.getElementById('term');
+  term.innerHTML = t.lines.map(colour).join('\n');
+  if(follow) term.scrollTop = term.scrollHeight;
+  document.getElementById('outFoot').innerHTML = t.status==='running'
+    ? `<span style="flex:1;font-size:12px;color:var(--muted)">Live · last 200 lines</span><button class="btn" onclick="toast('Copied all output')">Copy all</button><button class="btn red" onclick="stopTask('${t.id}')">Stop</button>`
+    : `<span style="flex:1;font-size:12px;color:var(--muted)">${t.lines.length} lines</span><button class="btn" onclick="toast('Copied all output')">Copy all</button>`;
+}
+function all(){ return fg ? tasks.concat([fg]) : tasks; }
+
+function render(){ renderChat(); renderCount(); renderSheet(); renderOut();
+  const anyLive = all().some(t=>t.status==='running');
+  document.getElementById('tabdot').style.background = anyLive ? 'var(--blue)' : 'var(--green)';
+}
+
+function openSheet(){ document.getElementById('scrim').classList.add('on'); document.getElementById('sheet').classList.add('on'); }
+function closeAll(){ ['scrim','sheet','dlg'].forEach(i=>document.getElementById(i).classList.remove('on')); }
+function openOutput(id){ openOut=id; follow=true; document.getElementById('out').classList.add('on'); renderOut(); }
+function closeOut(){ document.getElementById('out').classList.remove('on'); openOut=null; }
+function scrollTermEnd(){ follow=true; renderOut(); document.getElementById('follow').style.display='none'; }
+document.getElementById('term').addEventListener('scroll', e=>{
+  const el=e.target; const atEnd = el.scrollTop+el.clientHeight >= el.scrollHeight-6;
+  follow = atEnd; document.getElementById('follow').style.display = atEnd?'none':'block';
+});
+
+function end(t, status, code){
+  t.status=status; t.code=code; t.ended=now();
+  if(t.lines){
+    if(t.id==='build' && status==='completed') t.lines.push('','BUILD SUCCESSFUL in 2m 41s','143 actionable tasks: 31 executed, 112 up-to-date');
+    if(t.id==='server' && status==='failed') t.lines.push('Error: listen EADDRINUSE: address already in use :::5173','    at Server.setupListenHandle (node:net:1908:16)');
+    t.lines.push('', status==='stopped'?'[stopped by you]':`[exited with code ${code}]`);
+  }
+  render();
+}
+function finish(id, code){ const t=tasks.find(x=>x.id===id); if(t.status!=='running') return toast('Already ended'); end(t, code===0?'completed':'failed', code); }
+function stopTask(id){ const t=all().find(x=>x.id===id); if(t.status!=='running') return; end(t,'stopped',null); toast('Stopped “'+t.desc+'”'); }
+function startFg(){
+  if(fg && fg.status==='running') return toast('Already running');
+  fg = {id:'fg', kind:'shell', bg:false, desc:'Run connected Android tests', cmd:'./gradlew :app:connectedDebugAndroidTest', started:now()-9000, status:'running', lines:['> Task :app:preBuild UP-TO-DATE','> Task :app:compileDebugAndroidTestKotlin'], feed:'fg'};
+  more.fg = ['> Task :app:packageDebugAndroidTest','> Task :app:connectedDebugAndroidTest','Starting 48 tests on emulator-5554 - 16','SessionReducerTest > backgroundShell[emulator-5554] PASSED','ParserTest > taskNotification[emulator-5554] PASSED'];
+  render(); setTimeout(()=>document.getElementById('chat').scrollTop=1e6,50);
+}
+function moveToBg(){ fg.bg=true; tasks.push(fg); const f=fg; fg=null; renderChat(); toast('Moved to background');
+  // keep the card in the chat, now as a background card
+  bgMoved = f; render(); }
+let bgMoved = null;
+const _renderChat = renderChat;
+renderChat = function(){ _renderChat(); if(bgMoved){ document.getElementById('chat').insertAdjacentHTML('beforeend', bashCard(bgMoved)); } };
+
+function showDialog(){
+  const n = all().filter(t=>t.kind==='shell'&&t.status==='running').length;
+  const a = tasks.filter(t=>t.kind==='agent'&&t.status==='running').length;
+  const parts=[]; if(n) parts.push(n===1?'1 background command':n+' background commands'); if(a) parts.push(a===1?'1 agent':a+' agents');
+  document.getElementById('dlgText').innerHTML = parts.length ? `<b style="color:var(--amber)">${parts.join(' and ')} still running.</b> Ending the session stops ${n+a===1?'it':'them'}.` : 'The conversation is saved; you can resume it later.';
+  document.getElementById('scrim').classList.add('on'); document.getElementById('dlg').classList.add('on');
+}
+let tt; function toast(m){ const el=document.getElementById('toast'); el.textContent=m; el.classList.add('on'); clearTimeout(tt); tt=setTimeout(()=>el.classList.remove('on'),1800); }
+
+// live feed
+setInterval(()=>{
+  all().forEach(t=>{ if(t.status==='running' && t.feed && Math.random()<0.45){ const pool=more[t.feed]; if(pool&&pool.length){ t.lines.push(t.feed==='gradle'||t.feed==='fg'?pool.shift():pool[Math.floor(Math.random()*pool.length)]); } } });
+  render();
+},1000);
+render();
+</script>
+</body>
+</html>

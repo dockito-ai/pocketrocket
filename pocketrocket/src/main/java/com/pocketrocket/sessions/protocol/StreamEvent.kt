@@ -108,6 +108,24 @@ sealed interface StreamEvent {
         val suggestions: JSONArray = JSONArray(),
     ) : StreamEvent
 
+    /** `prompt_suggestion`, after a turn's `result` (`--prompt-suggestions`): the message Claude Code predicts the user sends next. */
+    data class PromptSuggestion(val text: String) : StreamEvent
+
     /** `control_cancel_request`: an earlier control request no longer needs an answer. */
     data class PermissionCancelled(val requestId: String) : StreamEvent
+
+    /**
+     * `system/task_started` with `task_type` `local_bash`: Bash call [toolUseId] runs as shell task [taskId], in the
+     * [background] (`run_in_background`), or in the foreground until it ends or is moved there (2.1.316).
+     */
+    data class ShellStarted(val toolUseId: String, val taskId: String, val background: Boolean) : StreamEvent
+
+    /** `system/task_updated` with `patch.is_backgrounded` true: task [taskId] was moved to the background. */
+    data class TaskBackgrounded(val taskId: String) : StreamEvent
+
+    /**
+     * `system/task_notification`, for a shell: it ended with [status] (`completed`, `failed`, `stopped`). [outputFile]
+     * holds everything it printed (empty for a foreground one); [exitCode] comes from the summary's "(exit code N)".
+     */
+    data class ShellEnded(val toolUseId: String, val status: String?, val exitCode: Int?, val outputFile: String?) : StreamEvent
 }
