@@ -7,11 +7,13 @@
 ![Views](https://komarev.com/ghpvc/?username=ShankarKakumani-pocketrocket&label=Views&color=0e75b6&style=flat)
 <!-- The Views badge counts README loads, not unique visitors. -->
 
-Claude Code on an Android phone, in one app. The phone is the machine: repos, sessions and tools all live on it, and Claude runs there, not in the cloud.
+**The real Claude Code, running on your Android phone.** It's not a cloud session and it's not a remote shell into a laptop. Your repos, sessions, accounts and tools all live on the phone, and Claude works on them right there.
 
-PocketRocket is a fork of [Termux](https://github.com/termux/termux-app) and is licensed under the GNU General Public License v3 (see `LICENSE.md`). It is not affiliated with the Termux project; Termux's original README is kept at `docs/upstream-termux-README.md`, and bundled third-party software is listed in `THIRD_PARTY.md`.
+PocketRocket is a native Android app wrapped around Anthropic's own Claude Code CLI. You get a proper chat screen in place of a terminal. Several sessions run at once, each workspace has its own git and GitHub accounts, and a voice assistant can tell you what your sessions are doing.
 
-> **A personal tool, still under development.** I built PocketRocket for myself, for my own phone and my own way of working. It is not a product, there is no support, and things change or break without notice. You're welcome to look around and try it, but expect rough edges.
+PocketRocket is a fork of [Termux](https://github.com/termux/termux-app), licensed under the GNU GPL v3 (see `LICENSE.md`). It is not affiliated with Anthropic or the Termux project.
+
+> **A personal tool, still under active development.** I built PocketRocket for my own phone and my own way of working, and I use it every day. It is not a product: there is no support, and things change or break without notice. You're welcome to try it, but expect rough edges.
 
 ## Screenshots
 
@@ -23,43 +25,70 @@ PocketRocket is a fork of [Termux](https://github.com/termux/termux-app) and is 
   </tr>
   <tr>
     <td align="center"><img src="docs/screenshots/4-settings.png" width="220" alt="Settings"><br><sub>Settings: accounts, health, tools, updates</sub></td>
-    <td align="center"><img src="docs/screenshots/5-tools.png" width="220" alt="Tools"><br><sub>Tools: built in and optional</sub></td>
+    <td align="center"><img src="docs/screenshots/5-tools.png" width="220" alt="Tools"><br><sub>Tools: built in and add-ons</sub></td>
     <td align="center"><img src="docs/screenshots/6-tool-page.png" width="220" alt="Tool page"><br><sub>A tool page: what it does, size, install</sub></td>
   </tr>
 </table>
 
 ## Why I made it
 
-I do most of my work with Claude Code on a laptop. When I'm away from it, at a stop, travelling, waiting somewhere, I wanted to keep going: hand Claude a task, let it run for an hour, check back, answer a question, review the diff, push.
+I do most of my work with Claude Code on a laptop. When I'm away from it (at a stop, travelling, waiting somewhere) I wanted to keep going: hand Claude a task, let it run for an hour, check back, answer a question, review the diff, push.
 
-The Claude mobile app can run Claude Code, but in Anthropic's cloud, not on my own folders and accounts. Plain Termux stopped running Claude Code once it became a glibc-only binary, and even with the community workaround a raw terminal on a phone is painful to use.
+The Claude mobile app can run Claude Code, but only in Anthropic's cloud, not on my own folders and accounts. Plain Termux stopped running Claude Code once it became a glibc-only binary. Even with the community workaround, a raw terminal on a phone is painful to use.
 
-My phone has 24 GB of RAM and 512 GB of storage. It is a perfectly good machine. So PocketRocket turns it into one: a native app around the real Claude Code CLI, with the parts I use on the laptop (several sessions, workspaces with repos, git, multiple accounts) made for a phone screen.
+My phone has 24 GB of RAM and 512 GB of storage, which makes it a perfectly good computer. PocketRocket treats it like one. The parts of Claude Code I use on the laptop (several sessions, workspaces with repos, git, multiple accounts) are rebuilt for a phone screen.
 
 ## What it does
 
-- **First run sets everything up.** It installs Claude Code (downloaded from Anthropic and checked against their manifest, never bundled), git, gh, node and npm. Claude sign-in is one tap.
-- **Chat with Claude Code, not a terminal.** A native chat drives the real CLI. It has permission cards with Allow, Deny and Always allow, streaming replies, subagent cards, a `/` command picker, attachments and mic dictation.
-- **Many sessions at once.** Home shows every session's state: working, needs you, done, or error. "Needs you" and "Finished" notifications have Allow and Deny right on them. Sessions resume after Android kills the app.
-- **Session controls.** A status line shows `folder │ branch │ model │ context`. You can switch between Manual, Accept edits, Plan and Auto modes, switch models, Compact, Stop, and Rewind to a message.
-- **Workspaces.** Your own folder structure under `~/projects`, with several repos per workspace. You can clone from a URL or from your GitHub repos, and open a terminal in the workspace.
-- **Git without leaving the app.** A git panel shows changes, staging, commits, push and pull, diffs, and GitHub-style file browsing.
-- **Several Claude and GitHub accounts.** Each workspace picks its own Claude account and its own GitHub account. The GitHub account sets the commit identity, SSH key and `gh` login, so personal and work never mix.
-- **Health screen.** It checks every battery, autostart, permission and setup item that can stop sessions in your pocket, with a Fix button for each. It also shows when and why Android last stopped the app.
-- **Updates from Settings.** You can update Claude Code from Settings, and switch back to the previous version.
-- **Raw terminal** whenever you want one. It is still Termux underneath.
+### Sessions and chat
+- **A chat UI, not a terminal.** A native chat drives the real CLI, with streaming replies, tool calls, permission cards (Allow, Deny, Always allow), subagents you can open full screen, background shells, a `/` command picker, attachments (files, camera, screenshots, clipboard) and dictation.
+- **Many sessions at once.** Home shows each session's state: working, needs you, done or error. Notifications let you Allow or Deny without opening the app. Sessions resume after Android kills the app.
+- **The controls you know.** Switch between Manual, Accept edits, Plan and Auto modes, change model and effort, Compact, Stop, Rewind, Edit and Retry. Messages you send while Claude is working wait in a queue.
 
-Android only. iOS doesn't allow an app to run programs like this.
+### Workspaces and git
+- **Workspaces** are your own folders under `~/projects`, each holding one or more repos. Clone from a URL or pick from your GitHub repos. A built-in file manager lets you browse them.
+- **Git without leaving the app.** Changes, staging, commits, push and pull, diffs, branches, a commit graph, pull requests and worktrees.
 
-## Status
+### Accounts
+- **Several Claude and GitHub accounts.** Each workspace picks its own Claude account and its own GitHub account. The GitHub account sets the commit identity, the SSH key and the `gh` login, so personal and work never mix. Logins use the official sign-in pages.
+- **Configure Claude Code per account:** connectors and MCP servers, plugins, skills, `CLAUDE.md`, settings, output style.
 
-Under active development, and used daily on one phone (Poco F7, Android 16). Expect breaking changes. Releases are debug builds for arm64.
+### Rocket, the voice assistant
+- Ask out loud what your sessions are doing, approve or deny a request, or start new work. Rocket answers from the app's real state and hands bigger jobs to Claude Code. Sensitive actions need your fingerprint every time. "Hey Rocket" is off unless you turn it on.
+
+### Tools
+- **Included:** Claude Code, git, gh, Node.js and npm.
+- **Add-ons**, installed from Settings → Tools when you want them: Headless Chrome (so Claude can open and test the pages it builds), Android SDK builds, Android NDK, Flutter & Dart (with FVM), Rust, and Cloudflare Wrangler with local dev. Nothing is bundled. Each add-on is downloaded when you install it, and you can remove it later.
+- **A raw terminal** whenever you want one. It's still Termux underneath, so `pkg install` works.
+
+### Keeping it alive
+- **Health screen.** Android loves to kill background apps. Health checks every battery, autostart, permission and setup setting that can stop a session in your pocket, and each one has a Fix button. It also shows when and why Android last stopped the app.
+- **Usage, Updates, Backup.** See storage, RAM and battery use per session. Update Claude Code and the app from Settings, and roll Claude Code back if a release misbehaves. Back up your setup to one file and restore it after a reinstall.
+
+## How it works
+
+- PocketRocket is a fork of [Termux](https://github.com/termux/termux-app). The terminal, packages and foreground service come from Termux, and the app around them is new, written in Jetpack Compose.
+- On first run it downloads Claude Code's `linux-arm64` build straight from Anthropic, checks it against Anthropic's published SHA-256 manifest, and runs it through a glibc launcher. The Claude Code binary is never shipped in the APK or the repo.
+- Claude runs on the phone itself. The only traffic is what Claude Code, git and your tools send anyway. The app has no analytics or tracking of its own.
+
+## Requirements
+
+- An **arm64 Android phone**. I build and test on Android 16 (Poco F7); older versions may work but aren't tested.
+- A **Claude account** with Claude Code access, such as a Pro or Max plan.
+- A few GB of free space, plus more for any add-on tools.
+- Android only: iOS doesn't let an app run programs like this.
 
 ## Install
 
-Download the APK from [Releases](../../releases) and install it. The first run takes a few minutes while it sets up.
+1. Open [Releases](../../releases) and download `pocketrocket-vX.Y.Z-arm64.apk` from the newest **PocketRocket** release.
+2. Open the APK and allow your browser or file manager to install apps when Android asks.
+3. Open PocketRocket. First run takes a few minutes while it installs Claude Code and the base tools, and shows progress as it goes.
+4. Sign in to Claude (one tap opens Anthropic's sign-in page), then optionally connect GitHub.
+5. Go through Settings → Health and tap Fix on anything red, so Android leaves your sessions alone.
 
-The package id is `app.pocket`, so it installs next to the real Termux app. Termux's prebuilt packages have the `com.termux` path compiled in, so their prefix is rewritten when they are installed.
+After that, the app updates itself from Settings → Updates, so there's no need to come back here.
+
+The package id is `app.pocket`, so it installs next to a regular Termux. It won't be on Google Play: Play doesn't allow apps that download and run native programs, and that's exactly what this app does.
 
 ## Build
 
@@ -69,14 +98,17 @@ You need the Android SDK with NDK, and JDK 17 or newer.
 ./gradlew assembleDebug
 ```
 
-- Docs for contributors and agents: `docs/BRD.md` (what and why), `docs/PROGRESS.md` (where it stands), `docs/decisions.md` (every decision), `AGENTS.md` (rules for coding agents).
+- Docs: `docs/BRD.md` (what and why), `docs/PROGRESS.md` (where it stands), `docs/decisions.md` (every decision), `AGENTS.md` (rules for coding agents).
 - Termux's original README is kept at `docs/upstream-termux-README.md`; third-party notices are in `THIRD_PARTY.md`.
-- Security reports: see `SECURITY.md`.
+
+## Feedback
+
+Bug reports and ideas are welcome in [Issues](../../issues). Since this is a personal tool, I can't promise a fix or a reply. For security problems, see `SECURITY.md`.
 
 ## Credits and licence
 
 - **Termux.** A fork of [Termux](https://github.com/termux/termux-app), licensed GPLv3. The same licence applies here; see `LICENSE.md`.
-- **The glibc launcher.** The way Claude Code's glibc binary is made to run on Termux comes from [claude-code-android](https://github.com/ferrumclaudepilgrim/claude-code-android) (MIT); see `setup/NOTICE`.
+- **The glibc launcher.** The way Claude Code's glibc binary runs on Termux comes from [claude-code-android](https://github.com/ferrumclaudepilgrim/claude-code-android) (MIT); see `setup/NOTICE`.
 - **Claude Code** is Anthropic's software, downloaded from Anthropic at first run under their terms.
 
-PocketRocket is not affiliated with Anthropic or the Termux project.
+PocketRocket is not affiliated with Anthropic, Google, Cloudflare or the Termux project.
