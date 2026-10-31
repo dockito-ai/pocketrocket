@@ -108,6 +108,9 @@ val GitSource = AptSource(UpdateComponent.Git, GitUpdater)
 /** Rust shows only while the tool has it: no installed version otherwise, and Check now skips its apt-get update. */
 val RustSource = AptSource(UpdateComponent.Rust, RustUpdater)
 
+val PythonSource = AptSource(UpdateComponent.Python, PythonUpdater)
+val BunSource = AptSource(UpdateComponent.Bun, BunUpdater)
+
 /**
  * Flutter (decision 75): a newer stable for the default version only. Updating adds it as a new version, makes it the
  * default and removes the old default; other versions stay, and a project's pin is never changed (a project pinning

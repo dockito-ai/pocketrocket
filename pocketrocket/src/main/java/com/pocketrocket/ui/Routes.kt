@@ -18,6 +18,8 @@ object Routes {
     const val TOOL_WRANGLER = "tool-wrangler"
     const val TOOL_FLUTTER = "tool-flutter"
     const val TOOL_RUST = "tool-rust"
+    const val TOOL_PYTHON = "tool-python"
+    const val TOOL_BUN = "tool-bun"
     const val TOOL_GIT = "tool-git"
     /** Settings › Updates › Claude Code: versions, rollback, sessions on the old version (R9). */
     const val CLAUDE_CODE = "claude-code"

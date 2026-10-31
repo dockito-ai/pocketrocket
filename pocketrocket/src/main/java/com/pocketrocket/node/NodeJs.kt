@@ -2,6 +2,7 @@ package com.pocketrocket.node
 
 import android.content.Context
 import com.pocketrocket.profiles.AccountPaths
+import com.pocketrocket.termux.DpkgStatus
 import com.pocketrocket.termux.TermuxCommand
 import com.termux.shared.termux.TermuxConstants
 import kotlinx.coroutines.CoroutineScope
@@ -67,9 +68,5 @@ object NodeJs {
     }
 
     /** A package's Installed-Size (KB) from dpkg's status file, or null when it isn't installed. */
-    internal fun installedKb(statusText: String?, pkg: String): Int? =
-        statusText?.split("\n\n")
-            ?.firstOrNull { block -> block.lineSequence().any { it == "Package: $pkg" } && block.contains("Status: install ok installed") }
-            ?.lineSequence()?.firstOrNull { it.startsWith("Installed-Size:") }
-            ?.substringAfter(':')?.trim()?.toIntOrNull()
+    internal fun installedKb(statusText: String?, pkg: String): Int? = DpkgStatus.parse(statusText, setOf(pkg))[pkg]?.installedKb
 }

@@ -2,6 +2,8 @@ package com.pocketrocket.updates
 
 import android.content.Context
 import com.pocketrocket.fluttertool.FlutterRust
+import com.pocketrocket.pkgtools.PackageTool
+import com.pocketrocket.pkgtools.PackageTools
 import com.pocketrocket.setup.SetupLine
 import com.pocketrocket.setup.SetupPhase
 import com.pocketrocket.setup.SetupScript
@@ -56,6 +58,10 @@ val GitUpdater = AptUpdater("git", "Git")
 
 /** Rust on the Updates screen, once the Rust tool has it (decisions 75 and 87). */
 val RustUpdater = AptUpdater("rust", "Rust") { FlutterRust.rustInstalled() }
+
+/** Python and Bun, while they're on the phone however they got there (decision 92). */
+val PythonUpdater = AptUpdater("python", "Python") { PackageTools.installedNow(PackageTool.Python) }
+val BunUpdater = AptUpdater("bun", "Bun") { PackageTools.installedNow(PackageTool.Bun) }
 
 /**
  * One Termux package on the Updates screen: versions from apt, the update through the setup script's

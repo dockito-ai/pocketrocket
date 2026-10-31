@@ -77,8 +77,9 @@
 <tr><td><code>androidbuild</code></td><td>Optional Android build tool: Java, Gradle and Google's SDK, installed from Settings → Tools once the SDK license is accepted</td><td>AndroidBuild, AndroidBuildTool, SdkLicense</td></tr>
 <tr><td><code>wrangler</code></td><td>Optional Wrangler tool: Cloudflare's CLI from npm at a pinned version, for deploying and managing Workers, with sign-in from its page, and local dev through a workerd built for Android (<code>ports/workerd</code>)</td><td>Wrangler, WranglerTool</td></tr>
 <tr><td><code>fluttertool</code></td><td>Optional Flutter &amp; Rust tool for checking code (decision 75): official Flutter versions in FVM's layout with FVM itself, a <code>flutter</code>/<code>dart</code>/<code>fvm</code> launcher that follows <code>.fvmrc</code>, prepares Flutter's glibc programs, points Flutter's scripts at Termux's bash so FVM's own commands work, and Termux's Rust. No APKs</td><td>FlutterTool, FlutterRust</td></tr>
+<tr><td><code>pkgtools</code></td><td>Add-ons that are only Termux packages (decision 92): Python with pip and uv, Bun, and Rust's wasm target on the Rust page. Installed is read from dpkg's status each time, so terminal installs show; uninstall keeps what other packages need (Python for Headless Chrome)</td><td>PackageTool, PackageTools</td></tr>
 <tr><td><code>dictation</code></td><td>Mic button through Android's SpeechRecognizer</td><td>Dictation</td></tr>
-<tr><td><code>termux</code>, <code>storage</code></td><td>Thin adapters over Termux: bootstrap, running commands, ~/storage links</td><td>Termux, TermuxCommand, BootstrapInstaller</td></tr>
+<tr><td><code>termux</code>, <code>storage</code></td><td>Thin adapters over Termux: bootstrap, running commands, ~/storage links, dpkg's status</td><td>Termux, TermuxCommand, BootstrapInstaller, DpkgStatus</td></tr>
 </table>
 
 <h2>4. A chat session</h2>

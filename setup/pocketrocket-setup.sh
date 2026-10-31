@@ -40,10 +40,12 @@
 #   --only flutter [version]  add a Flutter version (newest stable by default; POCKETROCKET_FLUTTER_VERSION
 #                     also works, POCKETROCKET_FLUTTER_DEFAULT=1 makes it the default)
 #   --only flutter-default <version> / flutter-remove-version <version> / flutter-remove
-#   --only rust / rust-remove  Rust alone, Termux's package
-#   --only git-check / rust-check  refresh the package index and print `apt-cache policy <package>` (its
+#   --only rust / rust-remove  Rust alone, Termux's package (rust-remove takes the wasm target too)
+#   --only python / python-remove, bun / bun-remove, rust-wasm / rust-wasm-remove  the package tools (decision 92):
+#                     Termux packages only, 2 steps; Python's uninstall leaves what Headless Chrome needs
+#   --only git-check / rust-check / python-check / bun-check  refresh the package index and print `apt-cache policy <package>` (its
 #                     Installed and Candidate lines) for the Updates screen; no steps, no lock, no [done]
-#   --only git-update / rust-update  upgrade the package alone (and only what the new version needs) with
+#   --only git-update / rust-update / python-update / bun-update  upgrade the package alone (and only what the new version needs) with
 #                     the apt progress phases; 2 steps (the Updates screen, decision 41)
 # A version that fails the smoke test during --only claude is not made current: the script warns,
 # keeps the old one, and still ends with [done]; the caller compares `current` with what it asked for.
@@ -1826,10 +1828,140 @@ step_rust_remove() {
   step "Removing Rust"
   if [ -f "$RUST_BASELINE_FILE" ]; then packages_record "$RUST_BASELINE_FILE" "$RUST_ADDED_FILE"; fi
   if [ ! -s "$RUST_ADDED_FILE" ] && pkg_installed rust; then info "Rust was on the phone before this tool, so it stays"; fi
+  # Rust's extra targets go with it (the wasm target has no dependency on rust, so apt would leave it).
+  pkg_tool_purge rust-wasm
   android_purge_added "$RUST_ADDED_FILE"
   rm -f "$RUST_ADDED_FILE" "$RUST_BASELINE_FILE"
   rm -rf "$HOME/.cargo"
   ok "Rust removed"
+}
+
+# Package tools (decision 92): add-ons that are only Termux packages, Python (with pip and uv), bun, and Rust's wasm
+# target on the Rust page. PackageTool.kt holds the same lists. The app reads "installed" from dpkg's status, so a
+# `pkg install` or `pkg uninstall` from a terminal shows on the tile too; nothing here writes a marker. Uninstall
+# removes the tool's packages and what its install brought in, except what other packages still need: Headless
+# Chrome (chromium) needs python and python-pip, so those stay while it is installed.
+pkg_tool_packages() {
+  case "$1" in
+    python) printf 'python python-pip uv' ;;
+    bun) printf 'bun' ;;
+    rust-wasm) printf 'rust-std-wasm32-unknown-unknown' ;;
+    *) return 1 ;;
+  esac
+}
+
+# pkg_tool_companions <name>: packages that come with the tool's own (python recommends its ensurepip wheels) and go
+# with it on uninstall.
+pkg_tool_companions() {
+  case "$1" in
+    python) printf 'python-ensurepip-wheels' ;;
+  esac
+}
+
+pkg_tool_title() {
+  case "$1" in
+    python) printf 'Python, pip and uv' ;;
+    bun) printf 'Bun' ;;
+    rust-wasm) printf 'the wasm target' ;;
+  esac
+}
+
+# pkg_tool_check <name>: one line that proves it runs.
+pkg_tool_check() {
+  case "$1" in
+    python) printf '%s, pip %s, %s' "$(python3 --version 2>&1)" "$(pip --version 2>&1 | awk '{print $2}')" "$(uv --version 2>&1)" \
+      && python3 -c 'import ssl, sqlite3' && uv --version >/dev/null ;;
+    bun) printf 'bun %s' "$(bun --version 2>&1)" && bun -e 'process.exit(0)' ;;
+    rust-wasm) rustc --print target-list 2>/dev/null | grep -qx wasm32-unknown-unknown \
+      && [ -d "$PREFIX/lib/rustlib/wasm32-unknown-unknown" ] && printf 'wasm32-unknown-unknown for %s' "$(rustc --version 2>&1)" ;;
+  esac
+}
+
+# uv uses Termux's Python and never downloads its own (those are glibc builds). One block at the top of uv's user
+# config, so it is read before any table and taken out again on uninstall.
+UV_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/uv/uv.toml"
+UV_BEGIN="# >>> PocketRocket Python tool (removed on uninstall)"
+UV_END="# <<< PocketRocket Python tool"
+
+uv_config_add() {
+  grep -qxF "$UV_BEGIN" "$1" 2>/dev/null && return 0
+  mkdir -p "$(dirname "$1")"
+  { printf '%s\n' "$UV_BEGIN" 'python-downloads = "never"' 'python-preference = "only-system"' "$UV_END"
+    if [ -f "$1" ]; then cat "$1"; fi; } >"$1.tmp"
+  mv -f "$1.tmp" "$1"
+}
+
+uv_config_remove() {
+  [ -f "$1" ] || return 0
+  awk -v b="$UV_BEGIN" -v e="$UV_END" '$0 == b { skip = 1; next } $0 == e { skip = 0; next } !skip' "$1" >"$1.tmp"
+  if grep -q '[^[:space:]]' "$1.tmp"; then mv -f "$1.tmp" "$1"; else rm -f "$1.tmp" "$1"; rmdir "$(dirname "$1")" 2>/dev/null || true; fi
+}
+
+# pkg_tool_kept_line <packages>: why a removal left them, said plainly ("kept python python-pip: Headless Chrome needs them").
+pkg_tool_kept_line() {
+  local kept="$1" sim users="" p
+  # shellcheck disable=SC2086
+  for p in $kept; do
+    sim="$(apt-get purge -s "${APT_OPTS[@]}" "$p" 2>/dev/null)" || continue
+    users="$users $(printf '%s\n' "$sim" | awk '$1 == "Purg" || $1 == "Remv" {print $2}' | grep -vxF -e "$p" | tr '\n' ' ')"
+  done
+  case " $users " in
+    *" chromium "*) printf 'kept%s: Headless Chrome needs them' "$kept" ;;
+    *) printf 'kept%s: other packages need them' "$kept" ;;
+  esac
+}
+
+# pkg_tool_purge <name>: purges the tool's packages and what its install brought in, leaving what others need.
+pkg_tool_purge() {
+  local name="$1" added="$PR_HOME/$1.packages" baseline="$PR_HOME/$1.baseline" list="$PR_HOME/$1.remove" p kept="" main sim
+  local companions; companions="$(pkg_tool_companions "$name")"
+  if [ -f "$baseline" ]; then packages_record "$baseline" "$added"; fi
+  # shellcheck disable=SC2046
+  { if [ -f "$added" ]; then cat "$added"; fi; printf '%s\n' $(pkg_tool_packages "$name"); } | sed '/^$/d' | sort -u >"$list"
+  # Companions go only when the main package can go too: python's venvs need its ensurepip wheels while it stays.
+  main="$(pkg_tool_packages "$name" | awk '{print $1}')"
+  if [ -n "$companions" ] && pkg_installed "$main"; then
+    sim="$(apt-get purge -s "${APT_OPTS[@]}" "$main" 2>/dev/null)" || sim=""
+    # shellcheck disable=SC2046,SC2086
+    if [ -n "$sim" ] && android_removable "$sim" $(cat "$list") $companions; then printf '%s\n' $companions >>"$list"; fi
+  fi
+  android_purge_added "$list"
+  for p in $(pkg_tool_packages "$name"); do pkg_installed "$p" && kept="$kept $p"; done
+  rm -f "$added" "$baseline" "$list"
+  PKG_TOOL_KEPT="${kept# }"
+  [ -z "$kept" ] || info "$(pkg_tool_kept_line "$kept")"
+}
+
+step_pkg_tool_install() {
+  local name="$1" out
+  step "Installing $(pkg_tool_title "$name")"
+  if [ "$name" = rust-wasm ] && ! pkg_installed rust; then fail "Rust isn't installed; install Rust first"; fi
+  apt_refresh
+  packages_baseline "$PR_HOME/$name.baseline"
+  # shellcheck disable=SC2046
+  apt_install_progress $(pkg_tool_packages "$name")
+  packages_record "$PR_HOME/$name.baseline" "$PR_HOME/$name.packages"
+  hash -r 2>/dev/null || true
+  [ "$name" != python ] || uv_config_add "$UV_CONFIG"
+  out="$(pkg_tool_check "$name" 2>&1)" || fail "$(pkg_tool_title "$name") does not run: $out"
+  ok "$out"
+}
+
+step_pkg_tool_remove() {
+  local name="$1"
+  step "Removing $(pkg_tool_title "$name")"
+  pkg_tool_purge "$name"
+  [ "$name" != python ] || uv_config_remove "$UV_CONFIG"
+  if [ -n "$PKG_TOOL_KEPT" ]; then ok "removed the rest; $PKG_TOOL_KEPT stayed"; else ok "$(pkg_tool_title "$name") removed"; fi
+}
+
+# --only <name> / <name>-remove for a package tool: 2 steps, its own log.
+main_pkg_tool() {
+  local option="$1" name="${1%-remove}"
+  TOTAL_STEPS=2; PR_LOG="$PR_HOME/$name.log"
+  step "Checking the device"; preflight_checks; ok "Termux on aarch64"
+  if [ "$option" = "$name" ]; then step_pkg_tool_install "$name"; else step_pkg_tool_remove "$name"; fi
+  printf '[done]\n'
 }
 
 # The Flutter & Rust tool's options (decision 75). The version comes as the third argument or in
@@ -1873,13 +2005,18 @@ main() {
       case "${2:-}" in
         claude|dockito|chromium|chromium-remove|android-build|android-build-remove|android-ndk|android-ndk-remove|wrangler|wrangler-remove|git-check|git-update) ;;
         flutter|flutter-default|flutter-remove-version|flutter-remove|rust|rust-remove|flutter-rust|flutter-rust-remove|rust-check|rust-update) ;;
-        *) fail "--only takes: claude, dockito, chromium, chromium-remove, android-build, android-build-remove, android-ndk, android-ndk-remove, wrangler, wrangler-remove, flutter [version], flutter-default <version>, flutter-remove-version <version>, flutter-remove, rust, rust-remove, flutter-rust, flutter-rust-remove, git-check, git-update, rust-check or rust-update" ;;
+        python|python-remove|bun|bun-remove|rust-wasm|rust-wasm-remove|python-check|python-update|bun-check|bun-update) ;;
+        *) fail "--only takes: claude, dockito, chromium, chromium-remove, android-build, android-build-remove, android-ndk, android-ndk-remove, wrangler, wrangler-remove, flutter [version], flutter-default <version>, flutter-remove-version <version>, flutter-remove, rust, rust-remove, flutter-rust, flutter-rust-remove, python, python-remove, bun, bun-remove, rust-wasm, rust-wasm-remove, git-check, git-update, rust-check, rust-update, python-check, python-update, bun-check or bun-update" ;;
       esac
       case "$2" in
         git-check|rust-check) apt_check "${2%-check}"; return 0 ;;
         git-update) main_apt_update Git "git --version" git; return 0 ;;
-        # The standard library has to stay at the compiler's version.
-        rust-update) main_apt_update Rust "rustc --version" rust rust-std-aarch64-linux-android; return 0 ;;
+        # The standard libraries have to stay at the compiler's version, the wasm target's too (not installed: skipped).
+        rust-update) main_apt_update Rust "rustc --version" rust rust-std-aarch64-linux-android rust-std-wasm32-unknown-unknown; return 0 ;;
+        python-check|bun-check) apt_check "${2%-check}"; return 0 ;;
+        python-update) main_apt_update Python "python3 --version" python python-pip uv python-ensurepip-wheels; return 0 ;;
+        bun-update) main_apt_update Bun "bun --version" bun; return 0 ;;
+        python|python-remove|bun|bun-remove|rust-wasm|rust-wasm-remove) main_pkg_tool "$2"; return 0 ;;
       esac
       case "$2" in
         flutter*|rust*)
