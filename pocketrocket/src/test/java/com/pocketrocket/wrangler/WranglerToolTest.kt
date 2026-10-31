@@ -15,7 +15,7 @@ class WranglerToolTest {
     private fun shell(code: String, vararg args: String): Pair<Int, String> {
         val p = ProcessBuilder(
             listOf("bash", "-c", "PREFIX=/tmp/pr-none POCKETROCKET_SETUP_SOURCE_ONLY=1 . \"$1\"; shift; $code", "_", script.path) + args,
-        ).redirectErrorStream(true).start()
+        ).redirectErrorStream(true).apply { environment()["PREFIX"] = "/tmp/pr-none" }.start() // stays set after sourcing
         val out = p.inputStream.bufferedReader().readText()
         return p.waitFor() to out
     }
@@ -25,6 +25,8 @@ class WranglerToolTest {
         assertEquals(WranglerTool.VERSION, shell("printf %s \"\$WRANGLER_VERSION\"").second)
         assertEquals(WranglerTool.INSTALLED_MARKER, shell("printf %s \"\$WRANGLER_MARKER\"").second)
         assertEquals("/tmp/pr-none/${WranglerTool.PACKAGE_RELATIVE}", shell("printf %s \"\$WRANGLER_DIR\"").second)
+        assertEquals(WranglerTool.WORKERD_VERSION, shell("printf %s \"\$WORKERD_VERSION\"").second)
+        assertTrue(shell("printf %s \"\$WORKERD_URL\"").second.contains("/dockito-ai/pocketrocket/releases/download/workerd-v${WranglerTool.WORKERD_VERSION}/"))
     }
 
     @Test fun theSignInAddressIsFoundInWranglersLine() {
@@ -54,16 +56,22 @@ class WranglerToolTest {
         assertNull(WranglerTool.email(listOf("You are not authenticated. Please run `wrangler login`.")))
     }
 
-    @Test fun workerdLoaderIsPointedAtTheStubOnce() {
+    @Test fun workerdLoaderIsPointedAtTheAndroidWrapperOnce() {
         if (!script.exists()) return
         val dir = File.createTempFile("workerd", "").apply { delete(); mkdirs() }
         val main = File(dir, "main.js").apply { writeText("var x = 1;\nfunction generateBinPath() {\n  throw new Error('Unsupported platform');\n}\n") }
         assertEquals(0, shell("wrangler_patch_workerd \"$1\"", main.path).first)
         assertEquals(0, shell("wrangler_patch_workerd \"$1\"", main.path).first) // Retry adds nothing twice
         val patched = main.readText()
-        assertEquals(1, Regex("no-workerd").findAll(patched).count())
+        assertEquals(1, Regex("workerd-android").findAll(patched).count())
         assertTrue(patched.contains("{ binPath:")) // the loader destructures { binPath }
-        assertTrue(File(dir, "no-workerd").canExecute())
+        val wrapper = File(dir, "workerd-android")
+        assertTrue(wrapper.canExecute())
+        val w = wrapper.readText()
+        assertTrue(w.contains("unset LD_PRELOAD"))
+        assertTrue(w.contains("/tmp/pr-none/glibc/lib/ld-linux-aarch64.so.1"))
+        assertTrue(w.contains("\${SSL_CERT_FILE:-/tmp/pr-none/etc/tls/cert.pem}")) // left for the shell, not filled in
+        assertTrue(w.contains("${dir.canonicalPath}/workerd-glibc\" \"\$@\""))
         assertFalse(File(dir, "main.js.orig").exists())
         dir.deleteRecursively()
     }

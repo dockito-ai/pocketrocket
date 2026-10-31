@@ -1,0 +1,107 @@
+name: "Port: workerd"
+
+# Builds Cloudflare's workerd from an upstream tag, unmodified, with one build flag:
+# tcmalloc off. tcmalloc tags memory with address bits that don't exist on Android
+# kernels (39-bit user address space), so the stock linux-arm64 binary aborts there.
+# The result runs on Android through glibc's loader. Why and how: ports/workerd/README.md.
+# Releases are tagged workerd-v<version>; the app's updater only reads vX.Y.Z tags.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'workerd version (npm version, e.g. 1.20261023.1)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 355
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache /usr/local/share/boost || true
+          df -h /
+
+      - name: Check out workerd v${{ inputs.version }}
+        uses: actions/checkout@v4
+        with:
+          repository: cloudflare/workerd
+          ref: v${{ inputs.version }}
+          show-progress: false
+
+      - name: Toolchain (same as upstream setup-runner)
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          wget -q https://apt.llvm.org/llvm.sh
+          sed -i '/apt-get install/d' llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 22
+          sudo apt-get install -y -qq --no-install-recommends \
+            clang-22 lld-22 libunwind-22-dev libc++-22-dev libclang-rt-22-dev llvm-22
+          echo "build:linux --repo_env=CC=/usr/lib/llvm-22/bin/clang" >> .bazelrc
+          echo "build:linux --linkopt=--ld-path=/usr/lib/llvm-22/bin/ld.lld" >> .bazelrc
+          echo "build:linux --host_linkopt=--ld-path=/usr/lib/llvm-22/bin/ld.lld" >> .bazelrc
+          echo "build:linux --repo_env=AR=/usr/lib/llvm-22/bin/llvm-ar" >> .bazelrc
+          git config core.hooksPath githooks
+          if ! command -v bazel >/dev/null; then
+            sudo wget -q -O /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-arm64
+            sudo chmod +x /usr/local/bin/bazel
+          fi
+
+      - name: Restore Bazel disk cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/bazel-disk-cache
+          key: workerd-bazel-${{ inputs.version }}-${{ github.run_id }}
+          restore-keys: |
+            workerd-bazel-${{ inputs.version }}-
+            workerd-bazel-
+
+      - name: Bazel build
+        run: |
+          bazel build \
+            --disk_cache=$HOME/bazel-disk-cache \
+            --config=release_linux \
+            --strip=always \
+            --//src/workerd/server:use_tcmalloc=False \
+            //src/workerd/server:workerd
+
+      - name: Save Bazel disk cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ~/bazel-disk-cache
+          key: workerd-bazel-${{ inputs.version }}-${{ github.run_id }}
+
+      - name: Package
+        run: |
+          mkdir out
+          cp bazel-bin/src/workerd/server/workerd out/workerd
+          file out/workerd
+          ./out/workerd --version
+          cp LICENSE out/LICENSE
+          tar -C out -czf workerd-linux-arm64-notcmalloc-${VERSION}.tar.gz workerd LICENSE
+          sha256sum workerd-linux-arm64-notcmalloc-${VERSION}.tar.gz | tee workerd-linux-arm64-notcmalloc-${VERSION}.tar.gz.sha256
+
+      - name: Keep the build as an artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: workerd-linux-arm64-notcmalloc-${{ inputs.version }}
+          path: workerd-linux-arm64-notcmalloc-${{ inputs.version }}.tar.gz*
+          retention-days: 30
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "workerd-v${VERSION}" --repo "$GITHUB_REPOSITORY" --latest=false \
+            --title "Port: workerd ${VERSION} (linux-arm64, no tcmalloc)" \
+            --notes "Not an app release. Unmodified cloudflare/workerd v${VERSION}, built with --//src/workerd/server:use_tcmalloc=False, for the Wrangler tool. See ports/workerd/README.md. workerd is Apache-2.0 (LICENSE included)." \
+            workerd-linux-arm64-notcmalloc-${VERSION}.tar.gz \
+            workerd-linux-arm64-notcmalloc-${VERSION}.tar.gz.sha256
