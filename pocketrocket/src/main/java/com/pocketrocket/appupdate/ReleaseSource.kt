@@ -20,47 +20,28 @@ interface ReleaseSource {
     fun download(asset: ApkAsset, dest: File, onBytes: (Long) -> Unit)
 
     companion object {
-        /** Where releases come from (decisions 66 and 68): the public code repo in Dockito's org. No login is needed. */
+        /** Where releases come from (decisions 68 and 83): the public code repo in Dockito's org. No login is needed. */
         const val REPO = "dockito-ai/pocketrocket"
-
-        /** The old public releases repo (decision 30), read while [REPO] has no release yet. To be removed. */
-        const val OLD_REPO = "ShankarKakumani/pocketrocket-releases"
         const val RELEASES_URL = "https://github.com/$REPO/releases"
 
         /** The debug folder when it holds a `releases.json` and the build is debuggable, else GitHub. */
         fun pick(context: Context): ReleaseSource = LocalReleaseSource.ifPresent(context) ?: GitHubReleaseSource
-
-        /**
-         * [REPO]'s releases when it answers with a usable one, else [OLD_REPO]'s. Until the first release there, the old
-         * repo is what's read. Returns the repo used and its JSON.
-         */
-        fun firstWithRelease(fetch: (String) -> String): Pair<String, String> {
-            val json = runCatching { fetch(REPO) }.getOrNull()
-            if (json != null && runCatching { AppReleases.latest(json) }.getOrNull() != null) return REPO to json
-            return OLD_REPO to fetch(OLD_REPO)
-        }
     }
 }
 
 /** GitHub's public REST API over plain HTTPS; the APK comes from the asset's `browser_download_url`. */
 object GitHubReleaseSource : ReleaseSource {
-    @Volatile private var repo = ReleaseSource.REPO
-    override val label get() = "github.com/$repo"
+    override val label = "github.com/${ReleaseSource.REPO}"
 
-    override fun releasesJson(): String {
-        val (used, json) = ReleaseSource.firstWithRelease { r ->
-            get("https://api.github.com/repos/$r/releases?per_page=30", json = true, repo = r) { it.bufferedReader().readText() }
-        }
-        repo = used
-        return json
-    }
+    override fun releasesJson(): String =
+        get("https://api.github.com/repos/${ReleaseSource.REPO}/releases?per_page=30", json = true) { it.bufferedReader().readText() }
 
     override fun download(asset: ApkAsset, dest: File, onBytes: (Long) -> Unit) {
         dest.delete()
         get(asset.url, json = false) { input -> dest.outputStream().use { copy(input, it, onBytes) } }
     }
 
-    private fun <T> get(url: String, json: Boolean, repo: String = this.repo, read: (InputStream) -> T): T {
+    private fun <T> get(url: String, json: Boolean, read: (InputStream) -> T): T {
         val connection = try {
             URL(url).openConnection() as HttpURLConnection
         } catch (e: Exception) {
@@ -82,7 +63,7 @@ object GitHubReleaseSource : ReleaseSource {
             }
             when {
                 code == 403 || code == 429 -> throw IOException("GitHub is rate-limiting this network. Try again in a while.")
-                code == 404 -> throw IOException("$repo wasn't found on GitHub.")
+                code == 404 -> throw IOException("${ReleaseSource.REPO} wasn't found on GitHub.")
                 code !in 200..299 -> throw IOException("GitHub answered HTTP $code.")
             }
             return connection.inputStream.use(read)

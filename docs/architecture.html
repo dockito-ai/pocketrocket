@@ -69,7 +69,7 @@
 <tr><td><code>usage</code></td><td>Settings › Usage: the app's storage, memory, CPU time and battery, read only while the screen is open</td><td>StorageUsage, RamUsage, BatteryUsage, ProcessTable</td></tr>
 <tr><td><code>backup</code></td><td>Settings › Backup and Restore: one passphrase-encrypted file of workspaces, repos, Claude/Git/Dockito config and logins; staged restore with identity-based account merge; foreground service with progress</td><td>BackupManager, BackupRunner, BackupAllowlist, BackupScanner, AccountMerge, RestoreInstaller</td></tr>
 <tr><td><code>updater</code></td><td>Claude Code versions: daily check, update, rollback, restarting stale sessions</td><td>ClaudeUpdater, ClaudeVersions</td></tr>
-<tr><td><code>appupdate</code></td><td>PocketRocket's own updates from the public releases repo</td><td>AppUpdater, ReleaseSource, ApkInstaller</td></tr>
+<tr><td><code>appupdate</code></td><td>PocketRocket's own updates from the public code repo's releases</td><td>AppUpdater, ReleaseSource, ApkInstaller</td></tr>
 <tr><td><code>dockito</code></td><td>Dockito CLI install/update through the setup script, its accounts and login</td><td>Dockito, DockitoCli, DockitoFormula</td></tr>
 <tr><td><code>node</code></td><td>Node.js and npm, a built-in tool: their versions (run through Termux's environment, once per app run) and size, for Settings › Tools</td><td>NodeJs</td></tr>
 <tr><td><code>browser</code></td><td>Optional headless Chromium and the Chrome DevTools MCP server for every Claude account</td><td>Chromium, ChromiumMcp</td></tr>
@@ -154,7 +154,7 @@
 <h2>8. Updates</h2>
 <table>
 <tr><th>What</th><th>Source</th><th>How</th></tr>
-<tr><td>PocketRocket</td><td>public <code>pocketrocket-releases</code> on GitHub</td><td>Download, SHA-256, Android installer; only when tapped</td></tr>
+<tr><td>PocketRocket</td><td>public <code>dockito-ai/pocketrocket</code> releases on GitHub</td><td>Download, SHA-256, Android installer; only when tapped</td></tr>
 <tr><td>Claude Code</td><td><code>downloads.claude.ai</code></td><td>Checked daily on open; install or rollback via the setup script</td></tr>
 <tr><td>Git</td><td>Termux apt</td><td><code>apt</code> through the relocation hook</td></tr>
 <tr><td>Dockito</td><td>Homebrew tap formula</td><td>Setup script <code>--only dockito</code></td></tr>
