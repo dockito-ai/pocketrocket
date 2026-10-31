@@ -1,5 +1,6 @@
 package com.pocketrocket.workspaces
 
+import com.pocketrocket.files.FileOps
 import java.io.File
 
 /** Finding repo folders by walking the disk: no git calls, so it stays cheap. */
@@ -24,7 +25,7 @@ object RepoScan {
         val found = mutableListOf<File>()
         fun holdsWorkspace(dir: File) = workspaces.any { it.startsWith(dir.path + "/") }
         fun walk(dir: File, depth: Int) {
-            children(dir).filterNot(::isSymlink).forEach { child ->
+            children(dir).filterNot(FileOps::isSymlink).forEach { child ->
                 when {
                     child.path in workspaces -> Unit
                     isRepo(child) && !holdsWorkspace(child) -> found += child
@@ -35,10 +36,4 @@ object RepoScan {
         walk(root, 1)
         return found
     }
-
-    /** True for a symlink (java.nio's isSymbolicLink needs API 26): its real path isn't its parent's real path plus its name. */
-    private fun isSymlink(f: File) = runCatching {
-        val parent = f.parentFile?.canonicalFile ?: return@runCatching false
-        f.canonicalFile != File(parent, f.name)
-    }.getOrDefault(true)
 }

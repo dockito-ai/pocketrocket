@@ -38,3 +38,6 @@ local.properties
 .swp
 ehthumbs.db
 Thumbs.db
+
+# Agent worktrees
+.claude/worktrees/
