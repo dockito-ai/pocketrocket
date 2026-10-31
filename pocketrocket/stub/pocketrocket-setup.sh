@@ -92,6 +92,60 @@ if [ "${1:-}" = --only ] && [ "${2:-}" = git-update ]; then
   echo "$want" > "$HOME/.pocketrocket/stub-git-installed"
   echo "[ok] git version $want"; echo "[done]"; exit 0
 fi
+# Settings > Tools: the Flutter & Rust tool (decision 75), with fake version folders so the app sees them.
+# The version comes as $3 or POCKETROCKET_FLUTTER_VERSION; without one, 3.47.9. echo 1.99.2 > ~/.pocketrocket/stub-rust-candidate
+# offers a Rust update (the stub's rust is 1.99.1). touch ~/.pocketrocket/stub-flutter-fail-once to fail the Dart SDK download once.
+if [ "${1:-}" = --only ]; then
+  fv="${3:-${POCKETROCKET_FLUTTER_VERSION:-3.47.9}}"; fvm_home="$HOME/fvm"; rust_marker="$HOME/.pocketrocket/rust.packages"
+  pace="$(cat "$HOME/.pocketrocket/stub-pace" 2>/dev/null || echo 0.4)"
+  stub_flutter() {
+    step 2 "Installing FVM and helpers"; printf '[progress 50] Downloading fvm · 10 of 20 MB\n'; sleep "$pace"
+    step 3 "Downloading Flutter $fv"
+    for p in 0 30 60 90; do printf '[progress %s] Downloading Flutter %s · %s MiB\n' "$p" "$fv" $((p * 2)); sleep "$pace"; done
+    step 4 "Downloading the Dart SDK"; printf '[progress 40] Downloading the Dart SDK · 90 of 225 MB\n'; sleep "$pace"
+    if [ -f "$HOME/.pocketrocket/stub-flutter-fail-once" ]; then
+      rm -f "$HOME/.pocketrocket/stub-flutter-fail-once"
+      echo "[error] The Dart SDK download stopped. Check the connection and try again."; exit 1
+    fi
+    step 5 "Setting up Flutter $fv"; sleep "$pace"
+    mkdir -p "$fvm_home/versions/$fv/bin"; printf '#!/bin/sh\n' > "$fvm_home/versions/$fv/bin/flutter"
+    old="$(basename "$(readlink "$fvm_home/default" 2>/dev/null)")"
+    if [ ! -e "$fvm_home/default/bin/flutter" ] || [ "${POCKETROCKET_FLUTTER_DEFAULT:-0}" = 1 ]; then rm -f "$fvm_home/default"; ln -s "versions/$fv" "$fvm_home/default"; fi
+    # Updates replaces the old default.
+    r="${POCKETROCKET_FLUTTER_REPLACE:-}"
+    if [ -n "$r" ] && [ "$r" = "$old" ] && [ "$r" != "$fv" ]; then rm -rf "${fvm_home:?}/versions/$r"; echo "[info] Flutter $r removed"; fi
+    : > "$fvm_home/.pocketrocket-installed"; echo "[ok] Flutter $fv"
+  }
+  stub_rust() { printf '[progress 30] Downloading rust · 40 of 128 MB\n'; sleep "$pace"; mkdir -p "$HOME/.pocketrocket"; printf 'rust\n' > "$rust_marker"; echo "[ok] rustc 1.99.1"; }
+  case "${2:-}" in
+    flutter-rust) TOTAL=6; step 1 "Checking the device"; stub_flutter; step 6 "Installing Rust"; stub_rust; echo "[done]"; exit 0 ;;
+    flutter) TOTAL=5; step 1 "Checking the device"; stub_flutter; echo "[done]"; exit 0 ;;
+    rust) TOTAL=2; step 1 "Checking the device"; step 2 "Installing Rust"; stub_rust; echo "[done]"; exit 0 ;;
+    flutter-default)
+      TOTAL=2; step 1 "Checking the device"; step 2 "Making Flutter $fv the default"
+      rm -f "$fvm_home/default"; ln -s "versions/$fv" "$fvm_home/default"; echo "[done]"; exit 0 ;;
+    flutter-remove-version)
+      TOTAL=2; step 1 "Checking the device"; step 2 "Removing Flutter $fv"; rm -rf "$fvm_home/versions/$fv"; sleep "$pace"
+      if [ ! -e "$fvm_home/default/bin/flutter" ]; then
+        rm -f "$fvm_home/default"; next="$(ls "$fvm_home/versions" 2>/dev/null | sort -V | tail -n 1)"
+        [ -z "$next" ] || ln -s "versions/$next" "$fvm_home/default"
+      fi
+      echo "[done]"; exit 0 ;;
+    flutter-remove|rust-remove|flutter-rust-remove)
+      [ "$2" = flutter-rust-remove ] && TOTAL=3 || TOTAL=2
+      step 1 "Checking the device"; n=2
+      if [ "$2" != rust-remove ]; then step $n "Removing Flutter, Dart and FVM"; rm -rf "$fvm_home"; n=3; sleep "$pace"; fi
+      if [ "$2" != flutter-remove ]; then step $n "Removing Rust"; rm -f "$rust_marker"; sleep "$pace"; fi
+      echo "[done]"; exit 0 ;;
+    rust-check)
+      if [ -f "$rust_marker" ]; then have=1.99.1; else have="(none)"; fi
+      want="$(cat "$HOME/.pocketrocket/stub-rust-candidate" 2>/dev/null || echo 1.99.1)"
+      printf 'rust:\n  Installed: %s\n  Candidate: %s\n' "$have" "$want"; exit 0 ;;
+    rust-update)
+      TOTAL=2; step 1 "Checking the device"; step 2 "Updating Rust"; printf '[progress 40] Downloading rust · 128 of 128 MB\n'; sleep "$pace"
+      echo "[ok] rustc 1.99.2"; echo "[done]"; exit 0 ;;
+  esac
+fi
 if [ "${1:-}" = --only ] && [ "${2:-}" = chromium-remove ]; then
   TOTAL=3
   step 1 "Checking the device"; sleep 0.4

@@ -19,6 +19,10 @@ import com.pocketrocket.browser.ChromiumState
 import com.pocketrocket.dockito.Dockito
 import com.pocketrocket.dockito.DockitoCli
 import com.pocketrocket.dockito.DockitoState
+import com.pocketrocket.fluttertool.FlutterAction
+import com.pocketrocket.fluttertool.FlutterRust
+import com.pocketrocket.fluttertool.FlutterRustState
+import com.pocketrocket.fluttertool.FlutterTool
 import com.pocketrocket.node.NodeJs
 import com.pocketrocket.node.NodeState
 import com.pocketrocket.profiles.DockitoAccounts
@@ -36,7 +40,8 @@ import java.io.File
 
 /**
  * Every tool in Settings → Tools (decision 64): what it declares and how its module's state reads as a
- * [ToolState]. Built in: Node.js and npm, Dockito. Optional: Headless Chrome, Android, Android NDK, Wrangler.
+ * [ToolState]. Built in: Node.js and npm, Dockito. Optional: Headless Chrome, Android, Android NDK, Wrangler,
+ * Flutter & Rust.
  */
 enum class Tool(val spec: ToolSpec, val route: String) {
     Node(ToolSpec("Node.js and npm", ToolKind.BuiltIn, hasVersion = true), Routes.TOOL_NODE),
@@ -51,6 +56,14 @@ enum class Tool(val spec: ToolSpec, val route: String) {
         ToolSpec("Wrangler", ToolKind.Optional, hasVersion = true, needsLogin = true, downloadMb = WranglerTool.DOWNLOAD_MB, installedMb = WranglerTool.INSTALLED_MB),
         Routes.TOOL_WRANGLER,
     ),
+    Flutter(
+        ToolSpec(
+            "Flutter & Rust", ToolKind.Optional,
+            downloadMb = FlutterTool.FLUTTER_DOWNLOAD_MB + FlutterTool.RUST_DOWNLOAD_MB,
+            installedMb = FlutterTool.FLUTTER_INSTALLED_MB + FlutterTool.RUST_INSTALLED_MB,
+        ),
+        Routes.TOOL_FLUTTER,
+    ),
     ;
 
     val icon: ImageVector get() = when (this) {
@@ -59,6 +72,7 @@ enum class Tool(val spec: ToolSpec, val route: String) {
         Chromium -> MockIcons.Globe
         Android, AndroidNdk -> MockIcons.Android
         Wrangler -> MockIcons.Cloud
+        Flutter -> MockIcons.Code
     }
 }
 
@@ -115,6 +129,23 @@ object ToolStates {
         signedIn = if (s.signedIn) s.account ?: "Signed in" else null,
     )
 
+    /**
+     * Installing everything or uninstalling everything is the tool's job; adding a version, setting the default or
+     * Rust alone shows as Updating on the tile and runs inside the page's own cards.
+     */
+    fun flutter(s: FlutterRustState): ToolState {
+        val whole = s.action == FlutterAction.InstallAll || s.action == FlutterAction.UninstallAll
+        val flutterMb = FlutterTool.flutterSizeMb(s.flutterInstalled, s.versions.size, s.flutterBytes)
+        return ToolState(
+            installed = s.installed,
+            checked = s.checked,
+            job = if (whole) ToolModel.job(s.running, s.failed, s.removing) else ToolJob.None,
+            progress = if (whole) s.job?.progress else null,
+            updating = s.running && !whole,
+            sizeMb = (flutterMb + if (s.rustInstalled) FlutterTool.RUST_INSTALLED_MB else 0).takeIf { s.installed },
+        )
+    }
+
     /** The installed CLI's folder, in MB. Blocking. */
     fun dockitoSizeMb(version: String?): Int? {
         val dir = version?.let { File(DockitoCli.dir, it) }?.takeIf { it.isDirectory } ?: return null
@@ -135,6 +166,7 @@ fun rememberTools(): List<Pair<Tool, ToolState>> {
     val android by AndroidBuild.state.collectAsState()
     val ndk by AndroidNdk.state.collectAsState()
     val wrangler by Wrangler.state.collectAsState()
+    val flutter by FlutterRust.state.collectAsState()
     LaunchedEffect(Unit) { refreshAll(context) }
     val dockitoSize by produceState<Int?>(null, dockito.installed) { value = withContext(Dispatchers.IO) { ToolStates.dockitoSizeMb(dockito.installed) } }
     val dockitoRow = updates.rows.firstOrNull { it.component == UpdateComponent.Dockito }
@@ -145,6 +177,7 @@ fun rememberTools(): List<Pair<Tool, ToolState>> {
         Tool.Android to ToolStates.android(android),
         Tool.AndroidNdk to ToolStates.ndk(ndk, android.installed),
         Tool.Wrangler to ToolStates.wrangler(wrangler),
+        Tool.Flutter to ToolStates.flutter(flutter),
     )
 }
 
@@ -157,4 +190,5 @@ fun refreshAll(context: Context) {
     AndroidBuild.refresh()
     AndroidNdk.refresh()
     Wrangler.refresh()
+    FlutterRust.refresh()
 }
