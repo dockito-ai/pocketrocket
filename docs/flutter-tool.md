@@ -1,6 +1,6 @@
 # Flutter & Rust
 
-Decision 74. An optional tool for checking code on the phone, from a terminal or a Claude session: `flutter pub get`, `dart run build_runner build`, `flutter analyze`, `flutter test`, `cargo check` and `cargo clippy`. No APKs on the phone; release builds need a Mac or CI. How it was worked out: `docs/flutter-spike.md`.
+Decision 75. An optional tool for checking code on the phone, from a terminal or a Claude session: `flutter pub get`, `dart run build_runner build`, `flutter analyze`, `flutter test`, `cargo check` and `cargo clippy`. No APKs on the phone; release builds need a Mac or CI. How it was worked out: `docs/flutter-spike.md`.
 
 ## Install and remove
 
@@ -16,7 +16,7 @@ The page then shows:
 
 Every action goes through `setup/pocketrocket-setup.sh` (`setup/README.md` lists the options): `--only flutter-rust` and `flutter-rust-remove` for the whole tool, `flutter [version]`, `flutter-default`, `flutter-remove-version`, `flutter-remove`, `rust`, `rust-remove`. Retry runs the same option again; a Flutter clone that finished is kept, so Retry after a failed Dart download doesn't clone again.
 
-Settings › Updates shows Flutter and Rust only while they are installed. Flutter offers a newer stable for the **default** version only: updating adds it as a new version and makes it the default. The old one stays for projects that pin it (Remove it on the tool page), and no project's `.fvmrc` is ever changed. Rust updates through apt like Git (`--only rust-check`, `rust-update`), with `rust-std-aarch64-linux-android` moved with it.
+Settings › Updates shows Flutter and Rust only while they are installed. Flutter offers a newer stable for the **default** version only: updating installs it, makes it the default and then removes the old default (`POCKETROCKET_FLUTTER_REPLACE`), only once the new one is set up. Other versions stay, and no project's `.fvmrc` is ever changed; a project that pins the old version gets it back with `fvm install <version>` (or Add version). Shankar confirmed this on 31 Oct 2026 (decision 75). Rust updates through apt like Git (`--only rust-check`, `rust-update`), with `rust-std-aarch64-linux-android` moved with it.
 
 ## How Flutter is installed
 
@@ -37,18 +37,26 @@ Why a clone and not Flutter's archive: the Linux archives in `releases_linux.jso
 - Version: the nearest `.fvmrc` up from the current folder (`"flutter": "3.44.1"`; FVM 2's `.fvm/fvm_config.json` too), else FVM's default link `~/fvm/default`. A pinned version that isn't installed stops with "Flutter X isn't installed (… pins it): Settings → Tools → Flutter & Rust, or `fvm install X`."
 - Dart SDK: when `bin/internal/engine.version` and `bin/cache/engine-dart-sdk.stamp` differ (after `fvm install` or `flutter upgrade`), it runs Flutter's own Dart download first, so the new SDK is prepared before its first use.
 - Prepare: every glibc program in that version's `bin/cache` gets Termux's glibc loader (`patchelf`, `LD_PRELOAD` cleared) and becomes `<name>.glibc` behind a three-line bash wrapper with an absolute shebang that unsets `LD_PRELOAD`. A program already done is a script, so preparing again changes nothing. The check is cheap: the names and contents of the stamps Flutter writes in `bin/cache` (`*.stamp`) are saved in `bin/cache/.pocketrocket-prepared`; a new or changed stamp, or an unwrapped `dart`, means Flutter downloaded something.
-- Then it sets Termux's bionic exec helper (Flutter's scripts start with `#!/usr/bin/env bash`) and runs `bash <version>/bin/flutter` or `bin/dart`. It waits rather than `exec`, so that tools Flutter downloads during a run are prepared right after; if that run failed because of them, it says to run the command again.
+- Scripts: the first line of each script in that version's `bin` and `bin/internal` (`#!/usr/bin/env bash`) is pointed at Termux's bash, and git is told to ignore the change (`update-index --assume-unchanged`), so the checkout still looks clean. Programs that start Flutter's scripts without Termux's exec helper, FVM among them, can then run them. Pointing again changes nothing.
+- Git: with that flag git refuses to move the checkout when the new revision changes one of those scripts. So before `flutter upgrade`, `flutter channel <name>` and `flutter downgrade` the launcher puts the scripts back as git has them, and points them again afterwards. When the checkout moved and Flutter's own second half (it starts `bin/flutter` from Dart, which can't run the original first line) failed, the launcher sets up the new Dart SDK and builds the tool itself. In a release folder (`~/fvm/versions/3.47.9`) those commands stop with a message instead: FVM checks that the folder still holds that release and otherwise stops at a question, which a Claude session can't answer. Only channel folders (`fvm install stable`) move.
+- Then it sets Termux's bionic exec helper and runs `bash <version>/bin/flutter` or `bin/dart`. It waits rather than `exec`, so that tools Flutter downloads during a run are prepared right after; if that run failed because of them, it says to run the command again.
+
+## FVM
+
+`$PREFIX/bin/fvm` is a link to the same launcher. It runs FVM 4.3.2 (its Dart prepared by the setup script) and makes the versions it touches ready around it: before `fvm install`, `use`, `global`, `flutter`, `dart`, `spawn` and `exec` every installed version gets its scripts pointed and anything new prepared, and a version with no Dart SDK yet (one FVM cloned) gets it downloaded, prepared and its tool built, which is FVM's own setup step. FVM's setup of a version it just cloned fails first (it runs `bin/flutter` before the launcher has seen the version), so after `install`, `use` and `global` the launcher finishes that version and, if FVM's command had failed, runs it once more. `fvm flutter upgrade` (and `channel`, `downgrade`) goes through the launcher's own path above. Tried on the phone with `LD_PRELOAD` empty: `fvm install 3.47.8`, `fvm flutter --version`, `fvm dart --version`, `fvm use 3.47.8` in a project, then `fvm flutter analyze` and `flutter analyze` there.
+
+`fvm install <version>` clones Flutter's whole history (FVM's git cache is off): about 500 MB and several minutes on the phone, against a 35 MB shallow clone for Add version on the tool page, plus the 225 MB Dart SDK either way.
 
 Sessions need nothing extra: `flutter`, `dart`, `fvm`, `cargo` and `rustc` are all in `$PREFIX/bin`, and the launcher works with `LD_PRELOAD` empty, as in a Claude session. `PUB_CACHE` stays at its default.
 
 ## Limits
 
 - No APKs, no `flutter run`: Flutter starts `gradlew` (`#!/usr/bin/env bash`) from Dart, which runs without the exec helper.
-- `fvm flutter …` and FVM's own setup step run Flutter's scripts from Dart in the same way and can fail; use `flutter` (it reads `.fvmrc`). `fvm install X` clones the version and the launcher finishes it on the first `flutter` run.
+- `flutter upgrade` and `flutter downgrade` only work in a channel folder; a release (the tile's versions, `fvm install 3.47.9`) stays as it is. Updates go through Settings › Updates, or `fvm install` and `fvm use`.
 - `flutter doctor` shows the channel as `[user-branch]` for a tag clone, and no Android toolchain.
 - Rust is one version (Termux's), whatever `rust-toolchain.toml` says.
-- Unzip comes with the Android tool too. If it was there first, the Flutter tool didn't add it, and removing the Android tool takes it; reinstall it with `pkg install unzip` before Flutter's next Dart download.
+- Unzip comes with the Android tool too. Whichever tool added it keeps it on its list; removing that tool while the other is installed moves unzip to the other's list (`packages_hand_over`) instead of removing it.
 
 ## Code
 
-`fluttertool/` (`FlutterTool`: facts, release list, version order, sizes, options; `FlutterRust`: state and jobs), `ui/tools/FlutterToolPage.kt`, `updates/` (`FlutterSource`; `AptUpdater` now serves Git and Rust), `setup/flutter`, and the Flutter & Rust part of `setup/pocketrocket-setup.sh`. The setup stub (`-Ppocketrocket.setupStub`) fakes every option with empty version folders. Tests: `FlutterToolTest` (release list, version order, sizes, removal set, the script's release lookup and removal list, the launcher's `.fvmrc` search and its prepare check).
+`fluttertool/` (`FlutterTool`: facts, release list, version order, sizes, options; `FlutterRust`: state and jobs), `ui/tools/FlutterToolPage.kt`, `updates/` (`FlutterSource`; `AptUpdater` now serves Git and Rust), `setup/flutter`, and the Flutter & Rust part of `setup/pocketrocket-setup.sh`. The setup stub (`-Ppocketrocket.setupStub`) fakes every option with empty version folders. Tests: `FlutterToolTest` (release list, version order in the app and the script, sizes, removal set, the script's release lookup, removal list and package lists, the launcher's `.fvmrc` search, its prepare check, and its script pointing and putting back around git).

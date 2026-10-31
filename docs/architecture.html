@@ -75,7 +75,7 @@
 <tr><td><code>browser</code></td><td>Optional headless Chromium and the Chrome DevTools MCP server for every Claude account</td><td>Chromium, ChromiumMcp</td></tr>
 <tr><td><code>androidbuild</code></td><td>Optional Android build tool: Java, Gradle and Google's SDK, installed from Settings → Tools once the SDK license is accepted</td><td>AndroidBuild, AndroidBuildTool, SdkLicense</td></tr>
 <tr><td><code>wrangler</code></td><td>Optional Wrangler tool: Cloudflare's CLI from npm at a pinned version, for deploying and managing Workers, with sign-in from its page. Local Workers aren't included</td><td>Wrangler, WranglerTool</td></tr>
-<tr><td><code>fluttertool</code></td><td>Optional Flutter &amp; Rust tool for checking code (decision 75): official Flutter versions in FVM's layout with FVM itself, a <code>flutter</code>/<code>dart</code> launcher that follows <code>.fvmrc</code> and prepares Flutter's glibc programs, and Termux's Rust. No APKs</td><td>FlutterTool, FlutterRust</td></tr>
+<tr><td><code>fluttertool</code></td><td>Optional Flutter &amp; Rust tool for checking code (decision 75): official Flutter versions in FVM's layout with FVM itself, a <code>flutter</code>/<code>dart</code>/<code>fvm</code> launcher that follows <code>.fvmrc</code>, prepares Flutter's glibc programs, points Flutter's scripts at Termux's bash so FVM's own commands work, and Termux's Rust. No APKs</td><td>FlutterTool, FlutterRust</td></tr>
 <tr><td><code>dictation</code></td><td>Mic button through Android's SpeechRecognizer</td><td>Dictation</td></tr>
 <tr><td><code>termux</code>, <code>storage</code></td><td>Thin adapters over Termux: bootstrap, running commands, ~/storage links</td><td>Termux, TermuxCommand, BootstrapInstaller</td></tr>
 </table>
@@ -146,6 +146,7 @@
 </ul>
 <div class="flow"><span>FlutterToolPage</span><i>→</i><span>FlutterRust</span><i>ToolScript →</i><span><code>--only flutter-rust</code></span><i>→</i><span>FVM 4.3.2 (SHA-256)</span><i>→</i><span>tag clone, commit checked</span><i>→</i><span>Dart SDK</span><i>→</i><span>prepare glibc programs</span><i>→</i><span><code>rust</code> from apt</span></div>
 <div class="flow"><span><code>flutter</code> in a session</span><i>→</i><span>launcher: nearest <code>.fvmrc</code> or default</span><i>→</i><span>new Dart SDK? new engine tools?</span><i>prepare →</i><span><code>bash &lt;version&gt;/bin/flutter</code></span></div>
+<div class="flow"><span><code>fvm install</code> / <code>use</code> / <code>flutter</code></span><i>→</i><span>launcher as <code>fvm</code>: versions' scripts pointed, new ones prepared</span><i>→</i><span>FVM's own Dart</span><i>→</i><span>a version FVM cloned: Dart SDK, prepare, tool built</span></div>
 <ul>
   <li>The setup script is also the updater's engine. <code>--only claude</code>, <code>--switch X.Y.Z</code> and <code>--only dockito</code> reuse the same download, check and smoke-test steps. Running sessions keep their binary until restarted.</li>
 </ul>
@@ -157,7 +158,7 @@
 <tr><td>Claude Code</td><td><code>downloads.claude.ai</code></td><td>Checked daily on open; install or rollback via the setup script</td></tr>
 <tr><td>Git</td><td>Termux apt</td><td><code>apt</code> through the relocation hook</td></tr>
 <tr><td>Dockito</td><td>Homebrew tap formula</td><td>Setup script <code>--only dockito</code></td></tr>
-<tr><td>Flutter (default version)</td><td>Flutter's <code>releases_linux.json</code></td><td>Adds the newer stable as a version and makes it the default; pins untouched. Only while installed</td></tr>
+<tr><td>Flutter (default version)</td><td>Flutter's <code>releases_linux.json</code></td><td>Installs the newer stable, makes it the default and removes the old default; other versions and pins untouched (<code>fvm install</code> brings an old one back). Only while installed</td></tr>
 <tr><td>Rust</td><td>Termux apt</td><td>As Git, <code>--only rust-update</code>. Only while installed</td></tr>
 </table>
 <p class="note">All of them are on one Updates screen (decision 41). Nothing installs on its own.</p>

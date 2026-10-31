@@ -102,7 +102,7 @@ fun FlutterToolPage(onBack: () -> Unit) {
             ToolCard("HOW TO USE") {
                 ToolText(
                     "In a terminal or a Claude session, run flutter or dart in your project: the version in its .fvmrc is used, " +
-                        "else the default. fvm list and fvm use work too. Run cargo check or cargo clippy in a Rust crate. " +
+                        "else the default. fvm install, fvm use, fvm flutter and fvm dart work too. Run cargo check or cargo clippy in a Rust crate. " +
                         "New terminals and sessions already have them.",
                 )
             }

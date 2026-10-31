@@ -208,4 +208,54 @@ class FlutterToolTest {
             root.deleteRecursively()
         }
     }
+
+    @Test fun theLauncherPointsFlutterScriptsAndPutsThemBackForGit() {
+        if (!launcher.exists()) return
+        val dir = File.createTempFile("flutter", "").apply { delete(); mkdirs() }
+        try {
+            val prefix = File(dir, "usr").apply { File(this, "bin").mkdirs() }
+            File(prefix, "bin/bash").apply { writeText("#!/bin/sh\n"); setExecutable(true) }
+            val root = File(dir, "flutter")
+            fun git(vararg args: String) = ProcessBuilder(listOf("git", "-C", root.path, "-c", "user.name=t", "-c", "user.email=t@t") + args)
+                .redirectErrorStream(true).start().let { it.inputStream.bufferedReader().readText(); it.waitFor() }
+            File(root, "bin/internal").mkdirs()
+            File(root, "bin/flutter").writeText("#!/usr/bin/env bash\necho flutter\n")
+            File(root, "bin/internal/shared.sh").writeText("#!/usr/bin/env bash\necho one\n")
+            File(root, "bin/internal/engine.version").writeText("abc\n")
+            assertEquals(0, git("init", "-q"))
+            git("add", "."); git("commit", "-qm", "one"); git("tag", "one")
+            File(root, "bin/internal/shared.sh").writeText("#!/usr/bin/env bash\necho two\n")
+            git("commit", "-qam", "two"); git("tag", "two")
+            assertEquals(0, git("checkout", "-q", "one"))
+
+            fun launcher(code: String) = shell(launcher, "POCKETROCKET_FLUTTER_SOURCE_ONLY", "PREFIX=\"$2\"; $code", root.path, prefix.path)
+            fun status() = ProcessBuilder("git", "-C", root.path, "status", "--porcelain").start().inputStream.bufferedReader().readText()
+            val pointed = "#!${prefix.path}/bin/bash"
+            assertEquals(0, launcher("pr_fix_scripts \"$1\"").first)
+            assertEquals(pointed, File(root, "bin/flutter").readLines().first())
+            assertEquals(pointed, File(root, "bin/internal/shared.sh").readLines().first())
+            assertEquals("abc", File(root, "bin/internal/engine.version").readText().trim())
+            assertEquals("", status()) // git ignores the change
+            val once = File(root, "bin/internal/shared.sh").readText()
+            launcher("pr_fix_scripts \"$1\"")
+            assertEquals(once, File(root, "bin/internal/shared.sh").readText()) // again changes nothing
+            assertEquals(0, launcher("pr_scripts_ready \"$1\"").first) // ready
+
+            // Put back, git moves the checkout over a changed script, and the scripts are pointed again.
+            assertEquals(0, launcher("pr_restore_scripts \"$1\"").first)
+            assertEquals("#!/usr/bin/env bash", File(root, "bin/flutter").readLines().first())
+            assertEquals(0, git("reset", "-q", "--hard", "two"))
+            assertEquals("echo two", File(root, "bin/internal/shared.sh").readLines()[1])
+            assertEquals(1, launcher("pr_scripts_ready \"$1\"").first)
+            launcher("pr_fix_scripts \"$1\"")
+            assertEquals(pointed, File(root, "bin/internal/shared.sh").readLines().first())
+            assertEquals("", status())
+
+            fun moves(args: String) = launcher("pr_moves_checkout $args").first == 0
+            assertTrue(moves("upgrade")); assertTrue(moves("-v upgrade")); assertTrue(moves("downgrade")); assertTrue(moves("channel beta"))
+            assertFalse(moves("channel")); assertFalse(moves("analyze")); assertFalse(moves("--version")); assertFalse(moves("pub upgrade"))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
 }
