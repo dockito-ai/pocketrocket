@@ -30,6 +30,8 @@ object Routes {
     /** Settings › Backup, and its Restore page (decision 53). */
     const val BACKUP = "backup"
     const val RESTORE = "restore"
+    /** Settings › About: version, source and licences (decision 88). */
+    const val ABOUT = "about"
 
     /** Settings › Assistant: Rocket's switches (decision 52). */
     const val ASSISTANT = "assistant"

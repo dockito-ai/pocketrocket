@@ -35,6 +35,7 @@ import com.pocketrocket.ui.settings.AssistantProjectsScreen
 import com.pocketrocket.ui.settings.AssistantScreen
 import com.pocketrocket.ui.settings.SensitiveActionsScreen
 import com.pocketrocket.ui.settings.ClaudeCodeScreen
+import com.pocketrocket.ui.settings.AboutScreen
 import com.pocketrocket.ui.settings.HealthScreen
 import com.pocketrocket.ui.settings.LocalOpenHealth
 import com.pocketrocket.ui.settings.LocalOpenUsage
@@ -191,6 +192,7 @@ fun PocketRocketApp(startScreen: AppScreen, onOpenTerminal: () -> Unit, showSess
             r == Routes.ASSISTANT_PROJECTS -> AssistantProjectsScreen(onBack = ::pop)
             r == Routes.HEALTH -> HealthScreen(onBack = ::pop, navigate = ::push)
             r == Routes.USAGE -> UsageScreen(onBack = ::pop)
+            r == Routes.ABOUT -> AboutScreen(onBack = ::pop)
             parts[0] == "home" -> HomeScreen(
                 tab = tab,
                 onTab = { pickedTab = it },

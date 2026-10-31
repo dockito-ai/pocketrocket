@@ -1,18 +1,14 @@
 package com.pocketrocket.ui.settings
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import com.pocketrocket.auth.ClaudeStatuses
 import com.pocketrocket.auth.SignInStatus
 import com.pocketrocket.profiles.ClaudeAccounts
 import com.pocketrocket.profiles.GitHubAccounts
-import com.pocketrocket.ui.components.Caps
 import com.pocketrocket.ui.components.MockIcons
 
 /** Settings → ACCOUNTS (mockup Settings): a Claude card and a GitHub card (Dockito's logins are on its tool page, decision 64), each showing the default and opening its list. */
@@ -35,8 +31,7 @@ fun AccountsSetting(onClaude: () -> Unit, onGitHub: () -> Unit) {
     } ?: "Not set up"
     val githubLine = github.default?.let { "${it.login} · default" } ?: "Not connected"
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Caps("ACCOUNTS")
+    Section("ACCOUNTS") {
         SettingsCard(tile = { LetterTile("C") }, title = "Claude", line = claudeLine, trailing = countLabel(claude.accounts.size), onClick = onClaude)
         SettingsCard(tile = { IconTile(MockIcons.Branch) }, title = "GitHub", line = githubLine, trailing = countLabel(github.accounts.size), onClick = onGitHub)
     }

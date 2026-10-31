@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pocketrocket.ui.components.Caps
@@ -82,15 +83,17 @@ internal fun legible(brand: Color, text: Color, background: Color): Color {
 
 /** A tool's brand mark on a rounded tile, in the brand's colour (legible on either theme). */
 @Composable
-fun ToolIcon(icon: ToolGlyph, big: Boolean = false) {
+fun ToolIcon(icon: ToolGlyph, big: Boolean = false) =
+    if (big) ToolIcon(icon, tile = 48.dp, glyph = 24.dp, corner = 14.dp) else ToolIcon(icon, tile = 36.dp, glyph = 20.dp, corner = 10.dp)
+
+/** [ToolIcon] at any size (Settings' Tools card shows a strip of small ones). */
+@Composable
+fun ToolIcon(icon: ToolGlyph, tile: Dp, glyph: Dp, corner: Dp) {
     val c = PrTheme.colors
-    Box(
-        Modifier.size(if (big) 48.dp else 36.dp).clip(RoundedCornerShape(if (big) 14.dp else 10.dp)).background(c.iconTile),
-        contentAlignment = Alignment.Center,
-    ) {
+    Box(Modifier.size(tile).clip(RoundedCornerShape(corner)).background(c.iconTile), contentAlignment = Alignment.Center) {
         Icon(
             ImageVector.vectorResource(icon.res), contentDescription = null,
-            tint = legible(Color(icon.brand), c.text, c.iconTile), modifier = Modifier.size(if (big) 24.dp else 20.dp),
+            tint = legible(Color(icon.brand), c.text, c.iconTile), modifier = Modifier.size(glyph),
         )
     }
 }

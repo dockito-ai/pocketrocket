@@ -2,6 +2,14 @@ package com.pocketrocket.ui.settings
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import com.pocketrocket.ui.tools.ToolGlyph
+import com.pocketrocket.ui.tools.ToolIcon
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,10 +67,10 @@ import com.pocketrocket.usage.UsageText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.pocketrocket.ui.theme.PrTheme
-import com.pocketrocket.ui.theme.PrType
 
 /**
- * Settings (mockup Settings): ACCOUNTS cards, the Assistant row, the Health row, and the APP list (Tools, Theme, Updates). The Health row turns amber when a check needs attention (R15).
+ * Settings (decision 88): five sections, ACCOUNTS, DEVELOP, ROCKET, THIS PHONE and APP, every item one [SettingsCard].
+ * Health turns amber when a check needs attention (R15); Theme switches from the buttons on its card.
  */
 @Composable
 fun SettingsScreen(
@@ -72,6 +80,7 @@ fun SettingsScreen(
     onUpdates: () -> Unit = {},
     onBackup: () -> Unit = {},
     onAssistant: () -> Unit = {},
+    onAbout: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val c = mock
@@ -94,18 +103,44 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(22.dp),
         ) {
             AccountsSetting(onClaudeAccounts, onGitHubAccounts)
-            AssistantRow(onAssistant)
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                HealthRow()
-                UsageRow()
+            Section("DEVELOP") {
+                // "4 included · 2 add-ons" (decision 64), and the installed tools' marks (decision 87).
+                SettingsCard(
+                    tile = { IconTile(MockIcons.Wrench) },
+                    title = "Tools",
+                    line = ToolModel.summary(tools.map { (tool, state) -> tool.spec to state }),
+                    onClick = onTools,
+                    below = { ToolStrip(tools.filter { (_, state) -> state.installed }.map { (tool, _) -> tool.icon }) },
+                )
+                SettingsCard(
+                    tile = { IconTile(MockIcons.Download) },
+                    title = "Updates",
+                    line = UpdatesRow.value(updates).removeSuffix(" ›"),
+                    lineColor = UpdatesRow.color(updates),
+                    onClick = onUpdates,
+                )
             }
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Caps("APP", modifier = Modifier.padding(bottom = 6.dp))
-                // "2 built in · 3 installed" (decision 64).
-                AppRow("Tools", "${ToolModel.summary(tools.map { (tool, state) -> tool.spec to state })} ›", divider = true, onClick = onTools)
-                AppRow("Theme", "${mode.label} ›", divider = true) { pickingTheme = true }
-                AppRow("Updates", UpdatesRow.value(updates), divider = true, valueColor = UpdatesRow.color(updates), onClick = onUpdates)
-                AppRow("Backup", BackupRow.value(backupJob), divider = false, valueColor = BackupRow.color(backupJob), onClick = onBackup)
+            Section("ROCKET") { AssistantCard(onAssistant) }
+            Section("THIS PHONE") {
+                HealthCard()
+                UsageCard()
+            }
+            Section("APP") {
+                SettingsCard(
+                    tile = { IconTile(MockIcons.Auto) },
+                    title = "Theme",
+                    line = mode.label,
+                    onClick = { pickingTheme = true },
+                    end = { ThemeButtons(mode) { ThemePrefs.set(context, it) } },
+                )
+                SettingsCard(
+                    tile = { IconTile(MockIcons.Cloud) },
+                    title = "Backup",
+                    line = BackupRow.value(backupJob).removeSuffix(" ›"),
+                    lineColor = BackupRow.color(backupJob),
+                    onClick = onBackup,
+                )
+                SettingsCard(tile = { IconTile(MockIcons.Info) }, title = "About", line = "Version, source and licences", onClick = onAbout)
             }
         }
     }
@@ -136,6 +171,46 @@ fun SettingsScreen(
     }
 }
 
+/** A Caps header over its cards. */
+@Composable
+internal fun Section(title: String, content: @Composable () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Caps(title)
+        content()
+    }
+}
+
+/** Theme's quick buttons: System, Light, Dark, the current one in accent. */
+@Composable
+private fun ThemeButtons(mode: ThemeMode, onPick: (ThemeMode) -> Unit) {
+    val c = mock
+    Row(
+        Modifier.background(c.bg, RoundedCornerShape(10.dp)).border(1.dp, c.rowBorder, RoundedCornerShape(10.dp)).padding(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        listOf(ThemeMode.System to MockIcons.Auto, ThemeMode.Light to MockIcons.Sun, ThemeMode.Dark to MockIcons.Moon).forEach { (option, icon) ->
+            val on = option == mode
+            Box(
+                Modifier.size(34.dp).clip(RoundedCornerShape(8.dp)).background(if (on) c.accent.copy(alpha = 0.16f) else Color.Transparent)
+                    .semantics { contentDescription = option.label; selected = on }
+                    .clickable(role = Role.RadioButton) { onPick(option) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = if (on) c.accent else c.muted, modifier = Modifier.size(17.dp))
+            }
+        }
+    }
+}
+
+/** The installed tools' brand marks, small, in Tools' order. */
+@Composable
+private fun ToolStrip(icons: List<ToolGlyph>) {
+    if (icons.isEmpty()) return
+    Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        icons.forEach { ToolIcon(it, tile = 22.dp, glyph = 13.dp, corner = 6.dp) }
+    }
+}
+
 /** A row of the APP list: label left, muted value right, a hairline under all but the last. */
 @Composable
 internal fun AppRow(label: String, value: String, divider: Boolean, valueColor: Color = mock.muted, onClick: (() -> Unit)? = null) {
@@ -152,16 +227,22 @@ internal fun AppRow(label: String, value: String, divider: Boolean, valueColor: 
     }
 }
 
-/** The mockup's settings card: a 36 dp tile, a title and a line, and a trailing hint. */
+/**
+ * The card every Settings item uses (decision 88): a 36 dp tile, a title and a status line, and a trailing
+ * "›" or an [end] control. [below] adds a line under the status (Tools' icon strip).
+ */
 @Composable
 internal fun SettingsCard(
     tile: @Composable () -> Unit,
     title: String,
     line: String,
-    trailing: String,
+    trailing: String = "›",
     onClick: (() -> Unit)? = null,
+    lineColor: Color = mock.muted,
     background: Color = mock.field,
     border: BorderStroke = BorderStroke(1.dp, mock.rowBorder),
+    below: (@Composable () -> Unit)? = null,
+    end: (@Composable () -> Unit)? = null,
 ) {
     val c = mock
     MockBox(Modifier.fillMaxWidth(), radius = 14.dp, background = background, border = border, onClick = onClick) {
@@ -169,9 +250,10 @@ internal fun SettingsCard(
             tile()
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(title, style = mockText(14.sp, FontWeight.SemiBold, c.text))
-                Text(line, style = mockText(12.sp, color = c.muted), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(line, style = mockText(12.sp, color = lineColor), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                below?.invoke()
             }
-            Text(trailing, style = mockText(12.sp, color = c.muted))
+            if (end != null) end() else Text(trailing, style = mockText(12.sp, color = c.muted))
         }
     }
 }
@@ -185,70 +267,58 @@ internal fun LetterTile(letter: String) {
     }
 }
 
-/** A grey tile with a line icon (GitHub's branch, Health's pulse); orange when [accent]. */
+/** A grey tile with a line icon (GitHub's branch, Health's pulse); orange when [accent], or in [tone] (Health's amber). */
 @Composable
-internal fun IconTile(icon: ImageVector, accent: Boolean = false) {
+internal fun IconTile(icon: ImageVector, accent: Boolean = false, tone: Color? = null) {
     val c = mock
-    Box(Modifier.size(36.dp).background(if (accent) c.accent.copy(alpha = 0.14f) else c.rowBorder, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
-        Icon(icon, contentDescription = null, tint = if (accent) c.accent else c.text, modifier = Modifier.size(18.dp))
+    val ink = tone ?: if (accent) c.accent else null
+    Box(Modifier.size(36.dp).background(ink?.copy(alpha = if (tone != null) 0.16f else 0.14f) ?: c.rowBorder, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+        Icon(icon, contentDescription = null, tint = ink ?: c.text, modifier = Modifier.size(18.dp))
     }
 }
 
-/** The way into Settings › Assistant: a plain settings card, on or off. */
+/** The way into Settings › Assistant: on (with its login) or off. */
 @Composable
-private fun AssistantRow(onClick: () -> Unit) {
+private fun AssistantCard(onClick: () -> Unit) {
     val context = LocalContext.current
     val settings by remember { AssistantPrefs.settings(context) }.collectAsState()
     val accounts by ClaudeAccounts.state.collectAsState()
     val line = if (settings.enabled) listOfNotNull("On", settings.loginName(accounts)).joinToString(" · ") else "Off"
-    SettingsCard(tile = { IconTile(MockIcons.Mic) }, title = "Assistant", line = line, trailing = "›", onClick = onClick)
+    SettingsCard(tile = { IconTile(MockIcons.Mic) }, title = "Assistant", line = line, onClick = onClick)
 }
 
-/** The Usage row with one read of storage and memory each time Settings opens; only the Usage screen keeps refreshing. */
+/** Usage, with one read of storage and memory each time Settings opens; only the Usage screen keeps refreshing. */
 @Composable
-private fun UsageRow() {
+private fun UsageCard() {
     val context = LocalContext.current
     val line by produceState("Reading…", context) {
         value = withContext(Dispatchers.IO) { UsageText.summary(StorageUsage.totalBytes(context), RamUsage.read(context).totalKb) }
     }
-    SettingsCard(tile = { IconTile(MockIcons.Bars) }, title = "Usage", line = line, trailing = "›", onClick = LocalOpenUsage.current)
+    SettingsCard(tile = { IconTile(MockIcons.Bars) }, title = "Usage", line = line, onClick = LocalOpenUsage.current)
 }
 
 /**
- * The Health row: amber with "N things need attention" when a check needs it (mockup Settings), a plain
- * settings card otherwise. Opening Settings re-runs the checks when the last run is over five minutes old.
+ * Health: amber with "N things need attention" when a check needs it (mockup Settings), plain otherwise.
+ * Opening Settings re-runs the checks when the last run is over five minutes old.
  */
 @Composable
-private fun HealthRow() {
+private fun HealthCard() {
     val context = LocalContext.current
-    val open = LocalOpenHealth.current
     val report by Health.report.collectAsState()
     LaunchedEffect(Unit) { Health.check(context, ifOlderThanMs = 5 * 60_000L) }
     val attention = report?.attention ?: 0
-    if (attention == 0) {
-        SettingsCard(
-            tile = { IconTile(MockIcons.Pulse) },
-            title = "Health",
-            line = if (report == null) "Checking…" else "Everything checks out",
-            trailing = "›",
-            onClick = open,
-        )
-        return
-    }
-    val c = PrTheme.colors
-    MockBox(Modifier.fillMaxWidth(), radius = 14.dp, background = c.amberSurface, border = BorderStroke(1.5.dp, c.amber), onClick = open) {
-        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(Modifier.size(36.dp).background(c.amber.copy(alpha = 0.16f), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
-                Icon(MockIcons.Pulse, contentDescription = null, tint = c.amber, modifier = Modifier.size(18.dp))
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Health", style = PrType.body.copy(fontWeight = FontWeight.SemiBold, color = c.text, lineHeight = 18.sp))
-                Text(
-                    "$attention ${if (attention == 1) "thing needs" else "things need"} attention",
-                    style = PrType.caption.copy(color = c.amberText),
-                )
-            }
-            Text("›", style = PrType.body.copy(fontSize = 16.sp, color = c.textMuted))
-        }
-    }
+    val p = PrTheme.colors
+    SettingsCard(
+        tile = { IconTile(MockIcons.Pulse, tone = if (attention > 0) p.amber else null) },
+        title = "Health",
+        line = when {
+            attention > 0 -> "$attention ${if (attention == 1) "thing needs" else "things need"} attention"
+            report == null -> "Checking…"
+            else -> "Everything checks out"
+        },
+        lineColor = if (attention > 0) p.amberText else mock.muted,
+        background = if (attention > 0) p.amberSurface else mock.field,
+        border = if (attention > 0) BorderStroke(1.5.dp, p.amber) else BorderStroke(1.dp, mock.rowBorder),
+        onClick = LocalOpenHealth.current,
+    )
 }
