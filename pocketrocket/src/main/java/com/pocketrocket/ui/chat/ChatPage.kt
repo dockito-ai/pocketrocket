@@ -43,6 +43,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.rememberCoroutineScope
+import com.pocketrocket.claudeconfig.SessionMcpHost
+import com.pocketrocket.claudeconfig.SetupChoices
+import com.pocketrocket.claudeconfig.SetupPanel
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,6 +69,7 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
     val context = LocalContext.current
     val working = state.status == SessionStatus.Working || state.status == SessionStatus.Starting
     var controls by remember { mutableStateOf(false) }
+    var controlsAtModel by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf(false) }
     var setup by remember { mutableStateOf(false) }
     var background by remember { mutableStateOf(false) }
@@ -72,6 +77,15 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
     var openAgent by remember { mutableStateOf<String?>(null) }
     var picked by remember { mutableStateOf<Draft?>(null) }
     val rows = state.items.size + if (working) 1 else 0
+    val dictator = rememberDictator()
+    // Settings over the session's own process, for the effort on the model chip and in the controls.
+    val scope = rememberCoroutineScope()
+    val setupPanel = remember(session.id) { SetupPanel(SessionMcpHost(context.applicationContext, session), scope) }
+    val alive by session.alive.collectAsState()
+    val settings by setupPanel.state.collectAsState()
+    LaunchedEffect(alive, state.model, setup) {
+        if (alive && !state.demo && !setup) setupPanel.refreshSettings()
+    }
 
     // Follow the conversation as it grows: animate for new items, jump (no animation per token) while text streams.
     val last = state.items.lastOrNull()
@@ -88,7 +102,8 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
     }
 
     val c = PrTheme.colors
-    Column(modifier.fillMaxSize()) {
+    DictationOverlay(dictator, modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize()) {
         LazyColumn(
             state = list,
             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -157,23 +172,35 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
                 state.id, working = working, onStop = session::interrupt,
                 onSend = session::send,
                 commands = state.commands, draft = state.draft, insert = picked, active = active,
+                dictator = dictator,
+                chip = ComposerChip(
+                    modelChipText(
+                        state.modelName, settings.settings?.appliedEffort,
+                        SetupChoices.effortLevels(state.models, settings.settings?.appliedModel ?: state.model),
+                    ),
+                ) { controlsAtModel = true; controls = true },
             )
             StatusLine(
-                state, onOpenControls = { controls = true }, onShowBackground = { background = true },
+                state, onOpenControls = { controlsAtModel = false; controls = true }, onShowBackground = { background = true },
                 onOpenBranches = { GitHead.repoRoot(state.folder)?.let { GitScreens.openBranches(context, it.path) } },
                 onSwitchMode = { session.setMode(state.mode.tapNext) },
             )
         }
     }
+    }
+    // Leaving this chat (swiping to another session) keeps what was said, in this chat's box.
+    LaunchedEffect(active) { if (!active) dictator.keep() }
 
     if (controls) {
         ControlsSheet(
             session, state,
-            onDismiss = { controls = false },
+            onDismiss = { controls = false; controlsAtModel = false },
             onCommand = { name -> picked = Draft("/$name ", (picked?.key ?: 0) + 1) },
             onRewind = session::edit,
             onOpenStatus = { controls = false; status = true },
             onOpenSetup = { controls = false; setup = true },
+            setup = setupPanel,
+            modelFirst = controlsAtModel,
         )
     }
     if (background) {

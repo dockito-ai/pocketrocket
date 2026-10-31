@@ -1,7 +1,6 @@
 package com.pocketrocket.ui.chat
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -19,13 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import com.pocketrocket.ui.theme.PrTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,98 +27,39 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import com.pocketrocket.dictation.Dictation
 
 /**
- * The dictation mic inside the chat box (R13). Tap to listen, tap again (or stop talking) to finish. Words stream
- * into the box through [onTextChange], after whatever was already typed ([currentText] when listening started);
- * nothing is ever sent from here. Asks for the microphone on first use, with a plain reason first.
+ * The dictation mic in the chat box's row (decision 81): a plain mic that raises [dictator]'s listening panel. Always
+ * there, with text in the box and while Claude works. Asks for the microphone on first use, with a plain reason first.
  */
 @Composable
-fun MicButton(
-    currentText: () -> String,
-    onTextChange: (String) -> Unit,
-    onListeningChange: (Boolean) -> Unit,
-    onHint: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    /** Changing this cancels listening (the message was sent, so late words must not refill the box). */
-    cancelKey: Int = 0,
-) {
+fun MicButton(dictator: Dictator, onHint: (String) -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val mic = remember { MicState(context) }
-    mic.currentText = currentText
-    mic.onTextChange = onTextChange
-    mic.onListeningChange = onListeningChange
-    mic.onHint = onHint
-    DisposableEffect(Unit) { onDispose { mic.engine.release() } }
-    LaunchedEffect(cancelKey) { mic.cancel() }
-
+    val c = PrTheme.colors
     val askForMic = micPermissionAsker(
         rationaleTitle = "Dictate with the microphone",
         rationale = "PocketRocket listens only while the mic is on. Android's speech recognition turns what you say into " +
             "text in the chat box (on the phone where it can), and nothing is sent until you tap Send.",
         blocked = "To dictate, allow the microphone for PocketRocket in its app settings.",
-        onGranted = { mic.start() },
+        onGranted = { dictator.start() },
         onRefused = { if (it == MicRefusal.Denied) onHint("Dictation needs the microphone.") },
     )
 
     fun tap() {
         when {
-            mic.listening -> mic.engine.stop()
-            !mic.engine.isAvailable -> onHint("Speech recognition isn't available on this phone.")
-            context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED -> mic.start()
+            !dictator.available -> onHint("Speech recognition isn't available on this phone.")
+            !dictator.needsMic -> dictator.start()
+            context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED -> dictator.start()
             else -> askForMic()
         }
     }
 
-    MicVisual(mic.listening, mic.level, ::tap, modifier)
-}
-
-/** Listening state and the [Dictation] engine, kept across recompositions. Callbacks are refreshed each composition. */
-private class MicState(context: Context) : Dictation.Listener {
-    var listening by mutableStateOf(false)
-        private set
-    var level by mutableFloatStateOf(0f)
-        private set
-    var currentText: () -> String = { "" }
-    var onTextChange: (String) -> Unit = {}
-    var onListeningChange: (Boolean) -> Unit = {}
-    var onHint: (String) -> Unit = {}
-    val engine = Dictation(context, this)
-    private var base = ""
-
-    fun start() {
-        base = currentText()
-        markListening(true)
-        engine.start()
+    Box(
+        modifier.clip(CircleShape).clickable(role = Role.Button, onClickLabel = "Dictate", onClick = ::tap),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(ChatIcons.Mic, contentDescription = "Dictate", tint = c.textSoft, modifier = Modifier.size(20.dp))
     }
-
-    fun cancel() {
-        engine.release()
-        if (listening) markListening(false)
-    }
-
-    override fun onText(text: String, final: Boolean) = onTextChange(join(base, text))
-
-    override fun onLevel(level: Float) { this.level = level }
-
-    override fun onEnd(error: String?) {
-        markListening(false)
-        error?.let(onHint)
-    }
-
-    private fun markListening(on: Boolean) {
-        listening = on
-        if (!on) level = 0f
-        onListeningChange(on)
-    }
-}
-
-/** Dictated words go after typed ones, with one space between. */
-private fun join(base: String, spoken: String): String = when {
-    base.isBlank() -> spoken
-    base.endsWith(" ") || base.endsWith("\n") -> base + spoken
-    else -> "$base $spoken"
 }
 
 /**

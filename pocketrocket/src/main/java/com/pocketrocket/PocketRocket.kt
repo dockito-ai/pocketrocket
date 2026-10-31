@@ -42,6 +42,8 @@ object PocketRocket {
     @JvmStatic
     fun init(context: Context) {
         LastStop.onProcessStart(context)
+        // A dictation the process died in may have left the recognizer's sounds muted.
+        com.pocketrocket.dictation.RecognizerMute.restoreAfterCrash(context)
         com.pocketrocket.backup.BackupManager.recoverInterrupted()
         SessionManager.init(context)
         com.pocketrocket.notifications.CloneNotifier.init(context)
