@@ -26,10 +26,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +58,8 @@ import com.pocketrocket.workspaces.Workspace
 import com.pocketrocket.workspaces.RepoScan
 import com.pocketrocket.workspaces.Workspaces
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -100,6 +103,7 @@ private fun tree(workspaces: List<Workspace>): List<TreeNode> {
 }
 
 /** Workspaces tab (mockup Workspaces): the ~/projects tree with each workspace's repos and sessions. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkspacesScreen(navigate: (String) -> Unit) {
     val context = LocalContext.current
@@ -119,9 +123,17 @@ fun WorkspacesScreen(navigate: (String) -> Unit) {
         refresh++
         onPauseOrDispose {}
     }
-    LaunchedEffect(workspaces, refresh) { RepoStatus.refreshAll(context, workspaces) }
+    // Pulled down to refresh: the spinner stays until both reads below are done.
+    var pulling by remember { mutableStateOf(false) }
     // The walk for repos outside workspaces reads folders: off the main thread, keeping the last tree meanwhile.
-    val nodes by produceState<List<TreeNode>?>(null, workspaces, refresh) { value = withContext(Dispatchers.IO) { tree(workspaces) } }
+    var nodes by remember { mutableStateOf<List<TreeNode>?>(null) }
+    LaunchedEffect(workspaces, refresh) {
+        coroutineScope {
+            launch { RepoStatus.refreshAll(context, workspaces) }
+            nodes = withContext(Dispatchers.IO) { tree(workspaces) }
+        }
+        pulling = false
+    }
 
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -147,6 +159,8 @@ fun WorkspacesScreen(navigate: (String) -> Unit) {
             OutlineButton("New workspace", { navigate(Routes.NEW_WORKSPACE) }, Modifier.weight(1f))
             OutlineButton("Folder", { newFolder = true }, Modifier.weight(0.7f))
         }
+        // Pull down to read the folders and repos again (a repo cloned or a worktree removed from a terminal).
+        PullToRefreshBox(pulling, onRefresh = { pulling = true; refresh++ }, Modifier.fillMaxSize()) {
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
@@ -206,6 +220,7 @@ fun WorkspacesScreen(navigate: (String) -> Unit) {
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
                 )
             }
+        }
         }
     }
 
