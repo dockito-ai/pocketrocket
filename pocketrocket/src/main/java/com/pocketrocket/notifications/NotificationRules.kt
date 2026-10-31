@@ -11,8 +11,8 @@ enum class AllowTap { Answer, OpenSession, Stale }
 /** When a notification may approve anything. No Android, so it can be tested. */
 object NotificationRules {
     /**
-     * Allow only for what the notification really shows. Otherwise Deny and Review: a plan or a fingerprint request, or a command
-     * longer than what's displayed, whose summary stops at the first line.
+     * Whether Allow may answer from the notification: only what it really shows. Not a plan or a fingerprint request, or a
+     * command longer than what's displayed, whose summary stops at the first line; Allow on those opens the session instead.
      */
     fun offersAllow(asked: PendingPermission): Boolean = !asked.isPlan && SensitiveActions.protectionOf(asked) != Protection.Fingerprint && commandIsWhollyShown(asked)
 
