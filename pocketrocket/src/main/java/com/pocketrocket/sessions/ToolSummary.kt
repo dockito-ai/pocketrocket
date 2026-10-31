@@ -13,4 +13,7 @@ object ToolSummary {
         val short = if (key.endsWith("path")) value.substringAfterLast('/') else value
         return short.lineSequence().first().take(160)
     }
+
+    /** The input as a tool card shows it when opened: indented JSON, slashes unescaped. */
+    fun inputJson(input: JSONObject): String = input.toString(2).replace("\\/", "/")
 }

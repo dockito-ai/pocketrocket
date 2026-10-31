@@ -33,14 +33,14 @@ import com.pocketrocket.ui.theme.PrType
 /**
  * What runs beside the conversation (BackgroundTasks.html), from the counts on the status line: running agents and
  * background shells, each shell with Stop, then the shells that ended in this session, dimmed. A shell opens its
- * output ([onOpenShell]); an agent scrolls the chat to its card ([onShowAgent]).
+ * output ([onOpenShell]), an agent opens full screen ([onOpenAgent]); a running agent has Stop too.
  */
 @Composable
 fun BackgroundSheet(
     state: SessionState,
     onDismiss: () -> Unit,
     onOpenShell: (ChatItem.Tool) -> Unit,
-    onShowAgent: (ChatItem.Tool) -> Unit,
+    onOpenAgent: (ChatItem.Tool) -> Unit,
     onStop: (taskId: String) -> Unit,
 ) {
     val c = PrTheme.colors
@@ -54,12 +54,12 @@ fun BackgroundSheet(
         }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (running.isEmpty()) Text("Nothing running in the background.", style = PrType.body, color = c.textMuted)
-            running.forEach { tool -> TaskRow(tool, onOpenShell, onShowAgent, onStop) }
+            running.forEach { tool -> TaskRow(tool, onOpenShell, onOpenAgent, onStop) }
         }
         if (ended.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("FINISHED THIS SESSION", style = PrType.micro, fontWeight = FontWeight.SemiBold, color = c.textMuted)
-                ended.forEach { tool -> TaskRow(tool, onOpenShell, onShowAgent, onStop, modifier = Modifier.alpha(0.6f)) }
+                ended.forEach { tool -> TaskRow(tool, onOpenShell, onOpenAgent, onStop, modifier = Modifier.alpha(0.6f)) }
             }
         }
     }
@@ -69,7 +69,7 @@ fun BackgroundSheet(
 private fun TaskRow(
     tool: ChatItem.Tool,
     onOpenShell: (ChatItem.Tool) -> Unit,
-    onShowAgent: (ChatItem.Tool) -> Unit,
+    onOpenAgent: (ChatItem.Tool) -> Unit,
     onStop: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -79,7 +79,7 @@ private fun TaskRow(
     val tileShape = RoundedCornerShape(10.dp)
     Row(
         modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-            .clickable { if (shell != null) onOpenShell(tool) else onShowAgent(tool) }
+            .clickable { if (shell != null) onOpenShell(tool) else onOpenAgent(tool) }
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -103,6 +103,7 @@ private fun TaskRow(
             agent != null -> {
                 val now by tickingNow(true)
                 Text(agent.elapsedMs(true, now)?.let(::agentClock).orEmpty(), style = PrType.codeSmall, color = c.lilac)
+                agent.taskId?.let { task -> StopButton { onStop(task) } }
             }
         }
     }

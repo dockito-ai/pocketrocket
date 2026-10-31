@@ -240,7 +240,9 @@ class SessionReducerTest {
         var agent = (state.items.single() as ChatItem.Tool).agent!!
         assertEquals("Read a.txt and report", agent.description)
         assertEquals("Reading a.txt", agent.activity)
-        assertEquals(listOf(AgentStep("toolu_B", "Read", "a.txt")), agent.steps)
+        assertEquals(listOf("toolu_B" to "a.txt"), agent.steps.map { it.id to it.summary })
+        assertEquals("k", agent.taskId)
+        assertEquals("Read a.txt", agent.prompt)
         state = state.feed(
             """{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_B","type":"tool_result","content":"the secret is 42"}]},"parent_tool_use_id":"toolu_A"}""",
             """{"type":"system","subtype":"task_notification","tool_use_id":"toolu_A","status":"completed","summary":"a.txt says: the secret is 42"}""",
@@ -248,7 +250,7 @@ class SessionReducerTest {
         )
         val tool = state.items.single() as ChatItem.Tool
         agent = tool.agent!!
-        assertTrue(agent.steps.single().done)
+        assertEquals("the secret is 42", agent.steps.single().result)
         assertEquals("completed", agent.status)
         assertEquals("a.txt says: the secret is 42", agent.summary)
         assertEquals("report", tool.result)
