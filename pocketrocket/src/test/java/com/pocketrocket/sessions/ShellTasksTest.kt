@@ -1,6 +1,5 @@
 package com.pocketrocket.sessions
 
-import com.pocketrocket.keepalive.KeepAliveNotification
 import com.pocketrocket.sessions.protocol.StreamJsonParser
 import com.pocketrocket.ui.chat.backgroundCounts
 import com.pocketrocket.ui.chat.shellState
@@ -168,6 +167,6 @@ class ShellTasksTest {
         assertEquals("2 background commands and 1 agent", stillRunning(2, 1))
         assertEquals("1 background command", stillRunning(1, 0))
         assertNull(stillRunning(0, 0))
-        assertEquals("1 shell", KeepAliveNotification.shellCount(1))
+        assertEquals("1 agent · 2 shells", runningWork(1, 2))
     }
 }

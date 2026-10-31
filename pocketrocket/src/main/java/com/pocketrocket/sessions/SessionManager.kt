@@ -221,7 +221,7 @@ object SessionManager {
 
     private fun liveSnapshots(): Flow<List<SessionKeepAlive.Live>> = _sessions.flatMapLatest { list ->
         if (list.isEmpty()) flowOf(emptyList())
-        else combine(list.map { s -> combine(s.alive, s.state) { alive, state -> SessionKeepAlive.Live(state.id, state.conversationId, alive && !state.demo, state.status, state.title, state.demo, state.runningShells) } }) { it.toList() }
+        else combine(list.map { s -> combine(s.alive, s.state) { alive, state -> SessionKeepAlive.Live(state.id, state.conversationId, alive && !state.demo, state.status, state.title, state.demo, state.runningShells, state.runningAgents) } }) { it.toList() }
     }.distinctUntilChanged()
 
     private fun toSaved(session: Session, state: SessionState) = SavedSession(
