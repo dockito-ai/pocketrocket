@@ -10,7 +10,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Decision 78: back, the path bar, names, and which deletes and renames need care. */
+/** Decision 80: back, the path bar, names, and which deletes and renames need care. */
 class FileRulesTest {
     private val home = "/data/data/app.pocket/files/home"
     private val projects = "$home/projects"

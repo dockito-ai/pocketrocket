@@ -4,6 +4,7 @@ import com.pocketrocket.ui.theme.PrTheme
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -39,6 +41,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.pocketrocket.profiles.AccountPaths
 import com.pocketrocket.sessions.SessionManager
 import com.pocketrocket.sessions.SessionState
 import com.pocketrocket.sessions.SessionStatus
@@ -124,10 +127,20 @@ fun WorkspacesScreen(navigate: (String) -> Unit) {
         Row(
             Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("Workspaces", style = mockText(26.sp, FontWeight.Bold, c.text, letterSpacing = (-0.5).sp))
+            Text("Workspaces", style = mockText(26.sp, FontWeight.Bold, c.text, letterSpacing = (-0.5).sp), modifier = Modifier.weight(1f))
             Text("~/projects", style = mockText(12.sp, color = c.textMuted, mono = true))
+            // The file manager from home (decision 80): every file on the phone's side of the app, not just repos.
+            Row(
+                Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClickLabel = "Open the file manager") { navigate(Routes.files(AccountPaths.home.path)) }
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(MockIcons.Folder, contentDescription = null, tint = c.accent, modifier = Modifier.size(18.dp))
+                Text("Files", style = mockText(13.sp, FontWeight.SemiBold, c.accent))
+            }
         }
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AccentButton("Clone repo", { navigate(Routes.clone(Workspaces.projectsRoot.path)) }, Modifier.weight(1f), height = 44.dp, radius = 12.dp, fontSize = 14.sp)

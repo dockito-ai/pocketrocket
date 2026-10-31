@@ -9,7 +9,7 @@ import org.junit.Test
 import java.io.File
 import java.nio.file.Files
 
-/** Decision 78: text or binary, images by name, packages, image sampling, and reading text with the 1 MB limit. */
+/** Decision 80: text or binary, images by name, packages, image sampling, and reading text with the 1 MB limit. */
 class FileKindsTest {
     private val dir: File = Files.createTempDirectory("kinds").toFile()
 

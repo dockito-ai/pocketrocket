@@ -5,7 +5,7 @@ import org.junit.Test
 import java.util.Calendar
 import java.util.TimeZone
 
-/** Decision 78: how the file manager orders entries and writes sizes and times. */
+/** Decision 80: how the file manager orders entries and writes sizes and times. */
 class FileFormatTest {
     private fun entry(name: String, dir: Boolean = false) = FileEntry(name, "/h/$name", dir, false, 0, 0)
 

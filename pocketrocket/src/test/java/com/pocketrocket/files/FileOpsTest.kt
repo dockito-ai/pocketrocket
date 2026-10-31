@@ -10,7 +10,7 @@ import org.junit.Test
 import java.io.File
 import java.nio.file.Files
 
-/** Decision 78: new folder, rename and delete on a real temporary folder, with symlinks pointing out of it. */
+/** Decision 80: new folder, rename and delete on a real temporary folder, with symlinks pointing out of it. */
 class FileOpsTest {
     private val base: File = Files.createTempDirectory("files").toFile().canonicalFile
     private val home = File(base, "home").apply { mkdirs() }

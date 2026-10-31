@@ -3,7 +3,7 @@ package com.pocketrocket.files
 import java.io.File
 
 /**
- * One row of a folder in the file manager (decision 78). [size] is the file's length in bytes; for a folder,
+ * One row of a folder in the file manager (decision 80). [size] is the file's length in bytes; for a folder,
  * [items] is how many entries it holds (null when it can't be read). [modified] is in epoch milliseconds.
  * [isLink] marks a symlink, shown as one and never followed when deleting.
  */
