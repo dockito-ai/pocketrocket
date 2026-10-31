@@ -46,7 +46,7 @@ android {
         targetSdkVersion project.properties.targetSdkVersion.toInteger()
         // PocketRocket's own version (decision 26); scripts/release.sh sets it. versionCode is
         // 1000 + major*10000 + minor*100 + patch (minor and patch below 100), always above Termux's 118.
-        def pocketRocketVersion = "1.0.8"
+        def pocketRocketVersion = "1.0.9"
         versionName pocketRocketVersion
         versionCode pocketRocketVersion.tokenize(".").with { 1000 + it[0].toInteger() * 10000 + it[1].toInteger() * 100 + it[2].toInteger() }
 
