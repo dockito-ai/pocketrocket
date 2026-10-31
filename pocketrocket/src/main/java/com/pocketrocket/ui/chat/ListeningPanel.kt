@@ -5,7 +5,6 @@ import android.content.pm.ApplicationInfo
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -43,14 +42,19 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -76,8 +80,6 @@ import com.pocketrocket.ui.theme.Inter
 import com.pocketrocket.ui.theme.JetBrainsMono
 import com.pocketrocket.ui.theme.PrTheme
 import com.pocketrocket.ui.theme.PrType
-import kotlin.math.abs
-import kotlin.random.Random
 
 /**
  * One chat's dictation (decision 81, Dictation.html): what the listening panel shows, and where kept words go. The chat
@@ -283,20 +285,38 @@ private fun TranscriptText(settled: String, partial: String) {
 
 private const val BARS = 23
 
-/** Bars that move with the voice over a soft orange glow that swells with it. Tapping it is ✓, as in the mockup. */
+/**
+ * Bars that move with the voice over a soft orange glow that swells with it. Tapping it is ✓, as in the mockup. The
+ * motion is [VoiceBars], stepped every frame, so the bars flow between loudness readings instead of jumping on each.
+ */
 @Composable
 private fun Waveform(level: Float, onTap: () -> Unit) {
     val c = PrTheme.colors
-    val glow by animateFloatAsState(0.8f + level * 0.9f, tween(120), label = "glow")
-    // A fresh wobble for each loudness reading, so the bars flicker like a voice rather than move as one.
-    val wobble = remember(level) { FloatArray(BARS) { 0.6f + Random.nextFloat() * 0.4f } }
+    val bars = remember { VoiceBars(BARS) }
+    val latest by rememberUpdatedState(level)
+    // Read only while drawing, so each frame redraws the canvases without recomposing anything.
+    var frame by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(bars) {
+        var last = 0L
+        while (true) withFrameNanos { now ->
+            if (last != 0L) bars.step((now - last) / 1_000_000_000f, latest)
+            last = now
+            frame = now
+        }
+    }
     Box(
         Modifier.fillMaxWidth().height(90.dp).clickable(
             interactionSource = null, indication = null, role = Role.Button, onClickLabel = "Done", onClick = onTap,
         ),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(Modifier.size(120.dp).graphicsLayer { scaleX = glow; scaleY = glow }) {
+        Canvas(
+            Modifier.size(120.dp).graphicsLayer {
+                frame
+                val glow = 0.8f + bars.envelope * 0.9f
+                scaleX = glow; scaleY = glow
+            },
+        ) {
             drawCircle(
                 Brush.radialGradient(
                     0f to c.accent.copy(alpha = 0.45f), 0.7f to c.accent.copy(alpha = 0f),
@@ -304,16 +324,24 @@ private fun Waveform(level: Float, onTap: () -> Unit) {
                 ),
             )
         }
-        Row(Modifier.height(70.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Canvas(Modifier.width(BAR_WIDTH * BARS + BAR_GAP * (BARS - 1)).height(BAR_MAX)) {
+            frame
+            val w = BAR_WIDTH.toPx()
+            val step = w + BAR_GAP.toPx()
+            val min = BAR_MIN.toPx()
+            val radius = CornerRadius(w / 2, w / 2)
             for (i in 0 until BARS) {
-                val centre = 1f - abs(i - (BARS - 1) / 2f) / ((BARS - 1) / 2f)
-                val target = maxOf(6f, 66f * level * (0.35f + 0.65f * centre) * wobble[i])
-                val height by animateDpAsState(target.dp, tween(100), label = "bar")
-                Box(Modifier.width(5.dp).height(height).clip(RoundedCornerShape(3.dp)).background(c.accent))
+                val h = min + (size.height - min) * bars.heights[i]
+                drawRoundRect(c.accent, Offset(i * step, (size.height - h) / 2), Size(w, h), radius)
             }
         }
     }
 }
+
+private val BAR_WIDTH = 5.dp
+private val BAR_GAP = 4.dp
+private val BAR_MIN = 6.dp
+private val BAR_MAX = 66.dp
 
 @Composable
 private fun RoundAction(label: String, icon: ImageVector, filled: Boolean, onClick: () -> Unit) {
