@@ -42,3 +42,8 @@ runs:
       with:
         path: app/src/main/cpp/bootstrap-*.zip
         key: ${{ steps.boot.outputs.key }}
+
+    # The native build embeds the zips, and Gradle only hooks downloadBootstraps to Java compile, which can run after it.
+    - name: Download the bootstrap zips
+      shell: bash
+      run: ./gradlew --no-daemon downloadBootstraps
