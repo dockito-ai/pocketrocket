@@ -164,7 +164,7 @@ class ShellTasksTest {
 
     @Test fun countsAndWords() {
         assertEquals(listOf("1 agent" to false, "2 shells" to true), backgroundCounts(1, 2))
-        assertEquals(emptyList<Pair<String, Boolean>>(), backgroundCounts(0, 0))
+        assertEquals(listOf("0 agents" to false, "0 shells" to true), backgroundCounts(0, 0))
         assertEquals("2 background commands and 1 agent", stillRunning(2, 1))
         assertEquals("1 background command", stillRunning(1, 0))
         assertNull(stillRunning(0, 0))

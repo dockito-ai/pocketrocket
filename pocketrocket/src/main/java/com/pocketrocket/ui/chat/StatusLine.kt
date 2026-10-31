@@ -92,7 +92,7 @@ fun StatusLine(state: SessionState, onOpenControls: () -> Unit, onShowBackground
                     buildAnnotatedString {
                         counts.forEach { (text, shell) ->
                             withStyle(SpanStyle(color = bar)) { append(" │ ") }
-                            withStyle(SpanStyle(color = if (shell) c.teal else c.lilac)) { append(text) }
+                            withStyle(SpanStyle(color = if (text.startsWith("0 ")) dim else if (shell) c.teal else c.lilac)) { append(text) }
                         }
                     },
                     style = style,
@@ -105,10 +105,10 @@ fun StatusLine(state: SessionState, onOpenControls: () -> Unit, onShowBackground
     }
 }
 
-/** "1 agent", "2 shells": what runs beside the conversation, each paired with whether it is a shell. */
-internal fun backgroundCounts(agents: Int, shells: Int): List<Pair<String, Boolean>> = listOfNotNull(
-    agents.takeIf { it > 0 }?.let { (if (it == 1) "1 agent" else "$it agents") to false },
-    shells.takeIf { it > 0 }?.let { (if (it == 1) "1 shell" else "$it shells") to true },
+/** "0 agents", "2 shells": what runs beside the conversation, always shown, each paired with whether it is a shell. */
+internal fun backgroundCounts(agents: Int, shells: Int): List<Pair<String, Boolean>> = listOf(
+    (if (agents == 1) "1 agent" else "$agents agents") to false,
+    (if (shells == 1) "1 shell" else "$shells shells") to true,
 )
 
 /** How Claude Code shows each mode under its prompt, with ‖ and ▸▸ for its ⏸ and ⏵⏵. */
