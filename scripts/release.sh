@@ -9,7 +9,7 @@
 # Checks main is clean and pushed, sets the version in app/build.gradle, builds the arm64 release APK signed
 # with the release key (~/.pocketrocket-keys/pocketrocket-release.jks, password from the login Keychain, never
 # printed), checks the signer with apksigner, names it pocketrocket-vX.Y.Z-arm64.apk and computes its SHA-256.
-# Then commits the bump, tags the code repo vX.Y.Z, pushes both, and creates the prerelease in the public
+# Then commits the bump, tags the code repo vX.Y.Z, pushes both, and creates the release, marked Latest, in the public
 # dockito-ai/pocketrocket repo (where the app looks) with the SHA-256 line in its notes.
 # --dry-run does the checks and the signed build, prints what it would publish, and puts app/build.gradle
 # back; it never commits, tags, pushes or touches GitHub.
@@ -111,7 +111,7 @@ if [ "$DRY" = 1 ]; then
   echo "  git commit -m 'Release $TAG' app/build.gradle"
   echo "  git tag -a $TAG -m 'PocketRocket $VERSION'"
   echo "  git push origin main $TAG"
-  echo "  gh release create $TAG $APK --repo $CODE_REPO --verify-tag --prerelease --title 'PocketRocket $VERSION' --notes-file $NOTES"
+  echo "  gh release create $TAG $APK --repo $CODE_REPO --verify-tag --latest --title 'PocketRocket $VERSION' --notes-file $NOTES"
   echo "  notes:"; sed 's/^/    /' "$NOTES"
   exit 0
 fi
@@ -123,6 +123,6 @@ git commit -q -m "Release $TAG" app/build.gradle
 git tag -a "$TAG" -m "PocketRocket $VERSION"
 git push -q origin main "$TAG"
 
-say "Creating the GitHub prerelease"
-gh release create "$TAG" "$APK" --repo "$CODE_REPO" --verify-tag --prerelease --title "PocketRocket $VERSION" --notes-file "$NOTES"
+say "Creating the GitHub release, marked Latest"
+gh release create "$TAG" "$APK" --repo "$CODE_REPO" --verify-tag --latest --title "PocketRocket $VERSION" --notes-file "$NOTES"
 say "Done: https://github.com/$CODE_REPO/releases/tag/$TAG"
