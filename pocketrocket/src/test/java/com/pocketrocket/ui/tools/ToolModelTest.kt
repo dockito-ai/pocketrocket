@@ -84,11 +84,15 @@ class ToolModelTest {
         assertEquals(ToolJob.None, ToolModel.job(running = false, failed = false, removing = true))
     }
 
+    @Test fun addOnsTabComesFirst() {
+        assertEquals(listOf("Add-ons", "Included"), ToolKind.entries.map { it.tab })
+    }
+
     @Test fun summaryCountsIncludedAndInstalledAddOns() {
         val tools = listOf(node to installed, dockito to installed, chrome to installed, android to missing, wrangler to installed)
-        assertEquals("2 included · 2 add-ons", ToolModel.summary(tools))
-        assertEquals("2 included · 1 add-on", ToolModel.summary(listOf(node to installed, dockito to missing, chrome to installed)))
-        assertEquals("2 included · no add-ons", ToolModel.summary(listOf(node to installed, dockito to missing, chrome to missing)))
+        assertEquals("2 add-ons · 2 included", ToolModel.summary(tools))
+        assertEquals("1 add-on · 2 included", ToolModel.summary(listOf(node to installed, dockito to missing, chrome to installed)))
+        assertEquals("no add-ons · 2 included", ToolModel.summary(listOf(node to installed, dockito to missing, chrome to missing)))
     }
 
     @Test fun tabsSplitByKindAndSortByName() {

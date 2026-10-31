@@ -27,15 +27,16 @@ import com.pocketrocket.ui.components.mockText
 import com.pocketrocket.ui.theme.PrTheme
 
 /**
- * Settings → Tools (decisions 64 and 87): a search on top, then two tabs. Included holds what comes with PocketRocket
- * and stays (first-run setup installs it); Add-ons what is installed and removed from here. Each tab lists its tools
+ * Settings → Tools (decisions 64 and 87): a search on top, then two tabs, Add-ons first (opens on it): what is installed
+ * and removed from here, installed ones ticked; then Included, what comes with PocketRocket and stays (first-run setup
+ * installs it). Each tab lists its tools
  * whose name matches the search, A to Z; a tile opens the tool's page. Claude and GitHub logins stay in Accounts.
  */
 @Composable
 fun ToolsPage(onBack: () -> Unit, onOpen: (Tool) -> Unit) {
     val tools = rememberTools()
     var query by rememberSaveable { mutableStateOf("") }
-    var kind by rememberSaveable { mutableStateOf(ToolKind.BuiltIn) }
+    var kind by rememberSaveable { mutableStateOf(ToolKind.Optional) }
     val c = PrTheme.colors
     fun shown(k: ToolKind) = ToolModel.tab(tools, k, query) { it.first.spec }
     MockPage {
@@ -64,7 +65,7 @@ fun ToolsPage(onBack: () -> Unit, onOpen: (Tool) -> Unit) {
                 Text("No tool here matches \"${query.trim()}\".", style = mockText(13.sp), color = c.textMuted)
             }
             list.forEach { (tool, state) ->
-                ToolTile(tool.spec.name, tool.icon, ToolModel.status(tool.spec, state)) { onOpen(tool) }
+                ToolTile(tool.spec.name, tool.icon, ToolModel.status(tool.spec, state), installed = tool.spec.kind == ToolKind.Optional && state.installed) { onOpen(tool) }
             }
         }
     }
