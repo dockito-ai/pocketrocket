@@ -126,3 +126,17 @@ data class GraphCommit(
 
     fun toCommit() = Commit(sha, shortSha, author, time, subject)
 }
+
+/**
+ * One entry of `git worktree list`: its folder, the commit it is on and its [branch] (null when detached, as a PR
+ * review is). The first one is the [main] checkout. [locked] holds the lock's reason ("claude agent agent-a44…"),
+ * empty when locked without one; [prunable] says why git thinks its folder is gone.
+ */
+data class Worktree(
+    val path: String,
+    val head: String,
+    val branch: String?,
+    val main: Boolean = false,
+    val locked: String? = null,
+    val prunable: String? = null,
+)

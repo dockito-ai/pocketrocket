@@ -51,6 +51,7 @@ class GitActivity : ComponentActivity() {
                     is GitRoute.File -> FileScreen(model, route.path, onBack = back)
                     is GitRoute.Pr -> PrScreen(model, route.number, onBack = back, onOpen = push)
                     is GitRoute.PrDiff -> PrDiffScreen(model, route.number, route.path, onBack = back)
+                    GitRoute.Worktrees -> WorktreesScreen(model, onBack = back)
                 }
             }
         }

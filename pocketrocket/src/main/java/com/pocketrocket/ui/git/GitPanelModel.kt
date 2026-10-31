@@ -78,6 +78,9 @@ class GitPanelModel(application: Application) : AndroidViewModel(application) {
     /** Local branches already merged into [defaultBranch]. */
     var merged by mutableStateOf<Set<String>>(emptySet()); private set
 
+    /** Every worktree of the repo with its details (main checkout first); empty until loaded. */
+    var worktrees by mutableStateOf<List<WorktreeRow>>(emptyList()); private set
+
     /** The branch sheet is open. */
     var showBranches by mutableStateOf(false)
 
@@ -245,6 +248,7 @@ class GitPanelModel(application: Application) : AndroidViewModel(application) {
                 defaultBranch = base
                 merged = mergedSet
                 error = null
+                worktrees = runCatching { WorktreeRows.load(repo, mergedSet) }.getOrDefault(worktrees)
             } catch (e: Exception) {
                 error = e.message
             } finally {
@@ -377,6 +381,35 @@ class GitPanelModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Runs a write action, reports failures (and long-running successes), then refreshes. */
+    // Worktrees.
+
+    /** Removes [row]'s worktree, then its branch too when [deleteBranch] (only offered for a merged one). */
+    fun removeWorktree(row: WorktreeRow, deleteBranch: Boolean) = act("Removing ${row.name}…") { repo ->
+        val removed = repo.removeWorktree(row.tree.path, locked = row.tree.locked != null)
+        val branch = row.tree.branch
+        if (!removed.ok || !deleteBranch || branch == null) return@act if (removed.ok) GitOutcome(true, "Removed ${row.name}") else removed
+        val deleted = repo.deleteBranch(branch)
+        if (deleted.ok) GitOutcome(true, "Removed ${row.name} and $branch")
+        else GitOutcome(false, "Removed ${row.name}, but $branch stays:\n${deleted.message}")
+    }
+
+    /** Removes every tidy worktree ([WorktreeRow.tidy]) with its merged branch, then forgets ones whose folder is gone. */
+    fun cleanUpWorktrees() = act("Cleaning up…") { repo ->
+        val tidy = worktrees.filter { it.tidy }
+        val failed = mutableListOf<String>()
+        for (row in tidy) {
+            val removed = repo.removeWorktree(row.tree.path, locked = false)
+            if (removed.ok) row.tree.branch?.let { repo.deleteBranch(it) } else failed += row.name
+        }
+        repo.pruneWorktrees()
+        val done = tidy.size - failed.size
+        val words = "Removed $done worktree${if (done == 1) "" else "s"}"
+        if (failed.isEmpty()) GitOutcome(true, words) else GitOutcome(false, "$words; couldn't remove ${failed.joinToString()}")
+    }
+
+    /** Forgets worktrees whose folders were deleted by hand. */
+    fun pruneWorktrees() = act("Pruning…") { it.pruneWorktrees().let { r -> if (r.ok) GitOutcome(true, "Pruned missing worktrees") else r } }
+
     private fun act(label: String?, after: (() -> Unit)? = null, action: suspend (GitRepo) -> GitOutcome) {
         val repo = repo ?: return
         if (busy != null) return
