@@ -227,8 +227,9 @@ fun Composer(
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (attachable) PlusButton(onClick = { attaching = true }, size = 36.dp)
-                if (chip != null) ModelChip(chip, Modifier.weight(1f, fill = false))
-                Spacer(Modifier.weight(1f))
+                // One weighted slot: the chip takes the free width it needs and only ellipsizes when the row is
+                // really full. A second weighted spacer beside it would split the room in half and cut it short.
+                Box(Modifier.weight(1f)) { if (chip != null) ModelChip(chip) }
                 val round = Modifier.size(36.dp)
                 when {
                     voice != null -> voice.button(round)
