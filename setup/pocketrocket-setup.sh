@@ -932,7 +932,7 @@ ANDROID_BUILD_TOOLS_SHA1=b0b6376977657e8ad9b969bacf4093601da2c6fb
 ANDROID_REPO_URL=https://dl.google.com/android/repository
 ANDROID_PROFILE="${PREFIX:-}/etc/profile.d/pocketrocket-android-build.sh"
 ANDROID_ADDED_FILE="$PR_HOME/android-build.packages"   # what this tool installed, so uninstall removes only that
-ANDROID_BASELINE_FILE="$PR_HOME/android-build.baseline" # the packages before the first attempt, kept across retries
+ANDROID_BASELINE_FILE="$PR_HOME/android-build.baseline" # the packages before a run, until its apt step is recorded
 ANDROID_MARKER=.pocketrocket-installed                 # AndroidBuildTool.INSTALLED_MARKER: the app's "installed" test
 ANDROID_GRADLE_BEGIN="# >>> PocketRocket Android build (removed on uninstall)"
 ANDROID_GRADLE_END="# <<< PocketRocket Android build"
@@ -1008,14 +1008,12 @@ android_sdk_zip() {
 step_android_packages() {
   step "Installing Java, Gradle and build tools"
   apt_refresh
-  [ -f "$ANDROID_BASELINE_FILE" ] || android_installed_packages >"$ANDROID_BASELINE_FILE"
+  # The baseline goes once recorded, so a later run never counts what other tools (Flutter & Rust) added since.
+  packages_baseline "$ANDROID_BASELINE_FILE"
   # Java 17 goes first: gradle accepts any JDK, and on its own apt would pick 21.
   apt_install_progress openjdk-17
   apt_install_progress $ANDROID_BUILD_PACKAGES
-  local now="$TMPDIR/android-build.now"
-  android_installed_packages >"$now"
-  android_new_packages "$ANDROID_BASELINE_FILE" "$now" >"$ANDROID_ADDED_FILE"
-  rm -f "$now"
+  packages_record "$ANDROID_BASELINE_FILE" "$ANDROID_ADDED_FILE"
   [ -x "$ANDROID_JAVA_HOME/bin/java" ] || fail "Java 17 is missing after install"
   [ -x "$PREFIX/bin/gradle" ] || fail "gradle is missing after install"
   ok "packages installed"
@@ -1291,13 +1289,11 @@ step_android_ndk_packages() {
   step "Installing clang, CMake and Ninja"
   [ -f "$ANDROID_SDK_DIR/$ANDROID_MARKER" ] || fail "Install the Android tool first."
   apt_refresh
-  [ -f "$ANDROID_NDK_BASELINE_FILE" ] || android_installed_packages >"$ANDROID_NDK_BASELINE_FILE"
+  packages_baseline "$ANDROID_NDK_BASELINE_FILE"
   # shellcheck disable=SC2086
   apt_install_progress $ANDROID_NDK_PACKAGES
-  local now="$TMPDIR/android-ndk.now" b
-  android_installed_packages >"$now"
-  android_new_packages "$ANDROID_NDK_BASELINE_FILE" "$now" >"$ANDROID_NDK_ADDED_FILE"
-  rm -f "$now"
+  local b
+  packages_record "$ANDROID_NDK_BASELINE_FILE" "$ANDROID_NDK_ADDED_FILE"
   for b in bin/clang bin/cmake bin/ninja lib/crtbegin_so.o lib/libc++_shared.so; do
     [ -e "$PREFIX/$b" ] || fail "$b is missing after install"
   done
@@ -1317,12 +1313,10 @@ step_android_ndk_wire() {
 android_ndk_remove() {
   android_ndk_remove_folders
   rm -f "$ANDROID_NDK_INIT_SCRIPT"; rmdir "$(dirname "$ANDROID_NDK_INIT_SCRIPT")" 2>/dev/null || true
-  # An install that stopped inside apt left a baseline but no list yet.
+  # An install that stopped inside apt left a baseline but no list yet. (Only then: installs before the baseline was
+  # dropped after recording kept theirs, and it would now count what other tools added since.)
   if [ -f "$ANDROID_NDK_BASELINE_FILE" ] && [ ! -f "$ANDROID_NDK_ADDED_FILE" ]; then
-    local now="$TMPDIR/android-ndk.now"
-    android_installed_packages >"$now"
-    android_new_packages "$ANDROID_NDK_BASELINE_FILE" "$now" >"$ANDROID_NDK_ADDED_FILE"
-    rm -f "$now"
+    packages_record "$ANDROID_NDK_BASELINE_FILE" "$ANDROID_NDK_ADDED_FILE"
   fi
   android_purge_added "$ANDROID_NDK_ADDED_FILE"
   rm -f "$ANDROID_NDK_ADDED_FILE" "$ANDROID_NDK_BASELINE_FILE"
