@@ -17,6 +17,7 @@ PocketRocket is licensed under the GNU General Public License v3 (`LICENSE.md`).
 
 | Component | Licence | Notes |
 |---|---|---|
+| [workerd](https://github.com/cloudflare/workerd), Cloudflare's Workers runtime, for `wrangler dev` in the optional Wrangler tool | Apache 2.0, © Cloudflare, Inc. | Unmodified upstream built without tcmalloc by `ports/workerd`, released here as `workerd-v<version>` with upstream's LICENSE. Downloaded when Wrangler is installed and checked against a pinned SHA-256. |
 | sherpa-onnx native library and its English keyword model (for the opt-in "Hey Rocket" wake word) | Apache 2.0 | Pinned release from `github.com/k2-fsa/sherpa-onnx`, checked after download. |
 | Claude Code | Anthropic's terms, not GPL | Downloaded on the phone from `downloads.claude.ai` at first run and checked against Anthropic's manifest. Never bundled. |
 | Termux bootstrap packages, git, gh, node, npm and the other tools set up on first run | Their own licences | Installed on the phone by the package manager. |

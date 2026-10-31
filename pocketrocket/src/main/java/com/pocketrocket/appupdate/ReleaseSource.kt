@@ -34,7 +34,7 @@ object GitHubReleaseSource : ReleaseSource {
     override val label = "github.com/${ReleaseSource.REPO}"
 
     override fun releasesJson(): String =
-        get("https://api.github.com/repos/${ReleaseSource.REPO}/releases?per_page=30", json = true) { it.bufferedReader().readText() }
+        get("https://api.github.com/repos/${ReleaseSource.REPO}/releases?per_page=100", json = true) { it.bufferedReader().readText() }
 
     override fun download(asset: ApkAsset, dest: File, onBytes: (Long) -> Unit) {
         dest.delete()

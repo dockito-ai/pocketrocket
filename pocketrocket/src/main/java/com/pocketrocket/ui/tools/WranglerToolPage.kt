@@ -18,9 +18,7 @@ import com.pocketrocket.wrangler.Wrangler
 import com.pocketrocket.wrangler.WranglerState
 import com.pocketrocket.wrangler.WranglerTool
 
-private const val NO_LOCAL_DEV = "Local Workers. wrangler dev needs workerd, Cloudflare's local runtime, which has no Android build, so it does not run here. Deploy to Cloudflare to try a change."
-
-/** Settings → Tools → Wrangler (decision 49): what it does and leaves out, its version, the Cloudflare sign-in, sizes, and Install, Uninstall or Retry. */
+/** Settings → Tools → Wrangler (decisions 49 and 82): what it does, its version, the Cloudflare sign-in, sizes, and Install, Uninstall or Retry. */
 @Composable
 fun WranglerToolPage(onBack: () -> Unit) {
     val context = LocalContext.current
@@ -48,20 +46,20 @@ fun WranglerToolPage(onBack: () -> Unit) {
     ) {
         if (s.installed) {
             ToolCard("HOW TO USE") {
-                ToolText("In a terminal or a Claude session, run wrangler deploy in your project. wrangler deploy --dry-run checks a Worker without an account. New terminals and sessions already have it.")
+                ToolText("In a terminal or a Claude session, run wrangler dev in your project to try a Worker on the phone at localhost:8787, and wrangler deploy to put it on Cloudflare. New terminals and sessions already have it.")
             }
         } else {
             ToolCard("WHAT IT DOES") {
                 ToolBullets(
                     listOf(
                         "Cloudflare's command line tool.",
+                        "Runs Workers on the phone with wrangler dev, KV, D1 and the rest kept locally.",
                         "Deploys and manages Workers on your Cloudflare account.",
                         "Works in terminals and Claude sessions.",
                     ),
                 )
             }
         }
-        ToolCard("NOT INCLUDED") { ToolText(NO_LOCAL_DEV) }
     }
 }
 

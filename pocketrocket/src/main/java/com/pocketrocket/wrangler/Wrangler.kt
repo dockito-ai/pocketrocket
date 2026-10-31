@@ -30,6 +30,7 @@ object Wrangler {
     private val prefix = TermuxConstants.TERMUX_PREFIX_DIR_PATH
     private val home = File(TermuxConstants.TERMUX_HOME_DIR_PATH)
     private val marker = File("$prefix/${WranglerTool.PACKAGE_RELATIVE}", WranglerTool.INSTALLED_MARKER)
+    private val workerd = File("$prefix/${WranglerTool.PACKAGE_RELATIVE}", WranglerTool.WORKERD_RELATIVE)
     private val config = File(home, WranglerTool.CONFIG_RELATIVE)
     private val debugLogs = File(TermuxConstants.TERMUX_TMP_PREFIX_DIR_PATH, "pocketrocket-wrangler")
 
@@ -38,7 +39,8 @@ object Wrangler {
 
     @Volatile private var loginProcess: Process? = null
 
-    fun installed(): Boolean = marker.isFile
+    /** An install from before local dev (decision 82) has no workerd, so it reads as not installed and Install brings it up to date. */
+    fun installed(): Boolean = marker.isFile && workerd.isFile
 
     private fun signedIn(): Boolean = WranglerTool.hasLogin(runCatching { config.readText() }.getOrNull())
 

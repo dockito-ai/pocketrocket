@@ -99,7 +99,14 @@ fun ShellOutputScreen(tool: ChatItem.Tool, onStop: (taskId: String) -> Unit, onD
             }
             Box(Modifier.weight(1f).fillMaxWidth().background(c.codeBackground)) {
                 LazyColumn(state = list, contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp), modifier = Modifier.fillMaxSize()) {
-                    if (lines == null) item { Text("Waiting for output…", style = PrType.codeSmall, color = c.textMuted) }
+                    // An empty file says so: many commands (a quiet wait loop, a build) print only when they finish.
+                    val note = when {
+                        lines == null -> "Waiting for output…"
+                        shown.isNotEmpty() -> null
+                        running -> "Nothing to show yet. This command hasn't printed anything."
+                        else -> "Nothing to show. This command printed nothing."
+                    }
+                    if (note != null) item { Text(note, style = PrType.codeSmall, color = c.textMuted) }
                     itemsIndexed(shown) { _, line -> Text(line.ifEmpty { " " }, style = PrType.codeSmall, color = lineColor(line)) }
                 }
                 if (!atEnd && shown.isNotEmpty()) {
