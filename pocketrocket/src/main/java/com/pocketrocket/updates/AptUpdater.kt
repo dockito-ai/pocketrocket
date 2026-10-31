@@ -1,6 +1,7 @@
 package com.pocketrocket.updates
 
 import android.content.Context
+import com.pocketrocket.fluttertool.FlutterRust
 import com.pocketrocket.setup.SetupLine
 import com.pocketrocket.setup.SetupPhase
 import com.pocketrocket.setup.SetupScript
@@ -54,14 +55,14 @@ data class AptUpdateState(
 val GitUpdater = AptUpdater("git", "Git")
 
 /** Rust on the Updates screen, once the Flutter & Rust tool has it (decision 75). */
-val RustUpdater = AptUpdater("rust", "Rust")
+val RustUpdater = AptUpdater("rust", "Rust") { FlutterRust.rustInstalled() }
 
 /**
  * One Termux package on the Updates screen: versions from apt, the update through the setup script's
  * `--only <package>-update`, which upgrades it alone with the apt progress phases. Loading reads the package
  * index already on the phone; a check refreshes it first (`--only <package>-check`). Nothing runs on its own.
  */
-class AptUpdater(private val pkg: String, private val name: String) {
+class AptUpdater(private val pkg: String, private val name: String, private val isInstalled: () -> Boolean = { true }) {
     /** The steps `--only <package>-update` prints. */
     val steps = listOf("Checking the device", "Updating $name")
 
@@ -74,6 +75,7 @@ class AptUpdater(private val pkg: String, private val name: String) {
     fun load(context: Context) {
         val app = context.applicationContext
         scope.launch {
+            if (!isInstalled()) return@launch forget()
             val policy = policy(app) ?: return@launch
             _state.update { if (it.checking || it.running) it else it.copy(policy = policy) }
         }
@@ -82,6 +84,8 @@ class AptUpdater(private val pkg: String, private val name: String) {
     /** Refreshes apt's index, then reads the policy again. Blocking; call from a background thread. */
     fun checkBlocking(context: Context) {
         if (_state.value.checking || _state.value.running) return
+        // Not installed (Rust removed, or never added): no row, and no apt-get update for nothing.
+        if (!isInstalled()) return forget()
         val app = context.applicationContext
         _state.update { it.copy(checking = true) }
         val lines = mutableListOf<String>()
@@ -131,6 +135,9 @@ class AptUpdater(private val pkg: String, private val name: String) {
             }
         }
     }
+
+    /** Drops what was read while the package was installed, so its row goes. */
+    private fun forget() = _state.update { if (it.running) it else it.copy(policy = null, checkFailed = false, outcome = null) }
 
     private fun policy(context: Context): AptPolicy? = runCatching {
         if (!aptCache.exists()) return null

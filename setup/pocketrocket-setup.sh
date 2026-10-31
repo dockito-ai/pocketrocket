@@ -1113,6 +1113,8 @@ android_purge_added() {
 
 step_android_remove_packages() {
   step "Removing Java, Gradle and build tools"
+  # shellcheck disable=SC2086
+  if flutter_present; then packages_hand_over "$ANDROID_ADDED_FILE" "$FLUTTER_ADDED_FILE" $FLUTTER_PACKAGES; fi
   android_purge_added "$ANDROID_ADDED_FILE"
   rm -f "$ANDROID_ADDED_FILE" "$ANDROID_BASELINE_FILE"
   ok "packages removed"
@@ -1330,12 +1332,25 @@ android_ndk_remove() {
 # apt-cache policy prints "Installed: X" and "Candidate: Y".
 apt_policy_field() { apt-cache policy "$1" 2>/dev/null | awk -v k="$2:" '$1 == k { print $2; exit }'; }
 
-# apt_check <package>: refreshes the index and prints the package's policy. Its own log; no lock, no steps.
+# apt_check <package>: refreshes the index and prints the package's policy. Its own log (<package>-check.log, so a
+# check never wipes the install or update log); no lock, no steps.
 apt_check() {
-  PR_LOG="$PR_HOME/$1.log"; mkdir -p "$PR_HOME"; : >"$PR_LOG"
+  PR_LOG="$PR_HOME/$1-check.log"; mkdir -p "$PR_HOME"; : >"$PR_LOG"
   export DEBIAN_FRONTEND=noninteractive
   apt_refresh
   apt-cache policy "$1" 2>/dev/null
+}
+
+# main_apt_update <name> <version command> <package> [packages that move with it]: --only <package>-update, with the
+# device check, the package's own log and its version at the end.
+main_apt_update() {
+  local name="$1" check="$2"; shift 2
+  TOTAL_STEPS=2; PR_LOG="$PR_HOME/$1.log"
+  step "Checking the device"; preflight_checks; ok "Termux on aarch64"
+  step_apt_update "$name" "$@"
+  # shellcheck disable=SC2086
+  ok "$($check 2>&1)"
+  printf '[done]\n'
 }
 
 # step_apt_update <name> <package> [packages that move with it]: upgrades them alone, plus only what the new
@@ -1516,22 +1531,47 @@ watch_file() {
 }
 
 # packages_baseline <file> / packages_record <baseline> <added>: what an install brings in, so its uninstall removes
-# only that. Same helpers as the Android tools.
+# only that. The baseline lives only from a run's apt step to its record (a Retry after apt stopped reuses it). The
+# record adds what this run brought to the list, never drops what an earlier run added, and deletes the baseline, so
+# a later run never counts what other tools installed in between. Same helpers as the Android tools.
 packages_baseline() { [ -f "$1" ] || android_installed_packages >"$1"; }
 packages_record() {
-  local now="$TMPDIR/pocketrocket-packages.now"
+  local now="$TMPDIR/pocketrocket-packages.now" list="$TMPDIR/pocketrocket-packages.list"
   android_installed_packages >"$now"
-  android_new_packages "$1" "$now" >"$2"
-  rm -f "$now"
+  { if [ -f "$2" ]; then cat "$2"; fi; android_new_packages "$1" "$now"; } | sed '/^$/d' | sort -u >"$list"
+  mv -f "$list" "$2"
+  rm -f "$now" "$1"
 }
 
-# The launchers: flutter (and dart, a link to it) from setup/flutter, and fvm, whose Dart is prepared like Flutter's.
+# packages_hand_over <from list> <to list> <packages…>: another installed tool needs some of the same packages (unzip
+# is in both the Flutter and the Android tool). Those move from this tool's list to the other's, so removing this tool
+# leaves them and removing the other later takes them.
+packages_hand_over() {
+  local from="$1" to="$2" p moved=""; shift 2
+  [ -f "$from" ] || return 0
+  for p in "$@"; do grep -qxF "$p" "$from" && moved="$moved $p"; done
+  [ -n "$moved" ] || return 0
+  # shellcheck disable=SC2086
+  grep -vxF -f <(printf '%s\n' $moved) "$from" >"$from.tmp" || true
+  mv -f "$from.tmp" "$from"
+  # shellcheck disable=SC2086
+  { if [ -f "$to" ]; then cat "$to"; fi; printf '%s\n' $moved; } | sort -u >"$to.tmp"
+  mv -f "$to.tmp" "$to"
+  info "kept for the other tool that uses them:$moved"
+}
+
+# Whether each tool is on the phone, finished or not, for packages_hand_over.
+android_build_present() { [ -d "$ANDROID_SDK_DIR" ] || [ -f "$ANDROID_ADDED_FILE" ]; }
+# FlutterRust.flutterInstalled: the marker, or what a failed install left (FVM, or the package list).
+flutter_present() { [ -f "$FLUTTER_MARKER" ] || [ -d "$FVM_DIR" ] || [ -f "$FLUTTER_ADDED_FILE" ] || [ -f "$FLUTTER_BASELINE_FILE" ]; }
+
+# The launchers: flutter from setup/flutter, with dart and fvm links to it. As fvm it runs FVM's own Dart (prepared
+# like Flutter's) and makes ready the versions FVM installs or runs.
 flutter_launchers() {
   install_launcher flutter
   ln -sf flutter "$PREFIX/bin/dart"
-  printf '#!%s\n# PocketRocket launcher for FVM %s (decision 75).\nexec %s %s "$@"\n' \
-    "$PREFIX/bin/bash" "$FVM_VERSION" "$FVM_DIR/src/dart" "$FVM_DIR/src/fvm.snapshot" >"$PREFIX/bin/fvm"
-  chmod 755 "$PREFIX/bin/fvm"
+  rm -f "$PREFIX/bin/fvm"
+  ln -s flutter "$PREFIX/bin/fvm"
 }
 
 step_flutter_helpers() {
@@ -1620,11 +1660,32 @@ step_flutter_setup() {
   (cd "$HOME" && POCKETROCKET_FLUTTER_ROOT="$FLUTTER_ROOT" "$PREFIX/bin/flutter" precache --universal) >>"$PR_LOG" 2>&1 \
     || warn "flutter precache failed; Flutter downloads what it needs on first use"
   POCKETROCKET_FLUTTER_PREPARE="$FLUTTER_ROOT" "$PREFIX/bin/flutter" >>"$PR_LOG" 2>&1 || fail "could not prepare Flutter's engine tools for this phone"
+  local old replace="${POCKETROCKET_FLUTTER_REPLACE:-}"
+  old="$(flutter_default_name)"
   if [ ! -e "$FLUTTER_DEFAULT/bin/flutter" ] || [ "${POCKETROCKET_FLUTTER_DEFAULT:-0}" = 1 ]; then
     flutter_set_default "$FLUTTER_VERSION"
   fi
   : >"$FLUTTER_MARKER"
+  # An update from Settings › Updates replaces the default: the old one goes once the new one works, only if it was
+  # the default, and other versions stay. A project that pins it gets it back with `fvm install <version>`.
+  if [ -n "$replace" ] && [ "$replace" = "$old" ] && [ "$replace" != "$FLUTTER_VERSION" ] && flutter_version_name_ok "$replace" \
+    && [ "$(flutter_default_name)" = "$FLUTTER_VERSION" ]; then
+    flutter_delete_version "$replace"
+    info "Flutter $replace removed; \`fvm install $replace\` brings it back"
+  fi
   ok "$(printf '%s\n' "$out" | grep -m 1 '^Flutter ')"
+}
+
+# flutter_default_name: the default version's folder name, or nothing.
+flutter_default_name() {
+  [ -e "$FLUTTER_DEFAULT/bin/flutter" ] || return 0
+  basename "$(cd -P "$FLUTTER_DEFAULT" && pwd)"
+}
+
+# flutter_delete_version <version>: its folder and any unfinished clone of it, after stopping what runs from it.
+flutter_delete_version() {
+  pkill -f "$FLUTTER_VERSIONS/$1/" 2>/dev/null || true
+  rm -rf "${FLUTTER_VERSIONS:?}/$1" "$FLUTTER_VERSIONS/.staging-$1"
 }
 
 # flutter_set_default <version>: FVM's global version, which the launcher uses outside pinned projects.
@@ -1641,7 +1702,18 @@ flutter_newest_installed() {
   for d in "$FLUTTER_VERSIONS"/*/; do
     d="${d%/}"; d="${d##*/}"
     if [ "$d" != "${1:-}" ] && [ -f "$FLUTTER_VERSIONS/$d/bin/flutter" ]; then printf '%s\n' "$d"; fi
-  done | sort -V | tail -n 1
+  done | flutter_version_order | head -n 1
+}
+
+# flutter_version_order: names on stdin, newest first, in FlutterTool.installedVersions' order: numbers part by part,
+# a pre-release ("3.50.0-0.3.pre") before its release, and names that aren't versions last, by name.
+flutter_version_order() {
+  awk '{
+    if (match($0, /^[0-9]+\.[0-9]+\.[0-9]+(-.+)?$/)) {
+      split($0, v, "-"); split(v[1], n, "."); pre = substr($0, length(v[1]) + 2)
+      printf "0 %d %d %d %d %s %s\n", n[1], n[2], n[3], (pre == "" ? 1 : 0), (pre == "" ? "-" : pre), $0
+    } else if ($0 != "" && substr($0, 1, 1) != ".") printf "1 0 0 0 0 - %s\n", $0
+  }' | LC_ALL=C sort -k1,1n -k2,2nr -k3,3nr -k4,4nr -k5,5nr -k6,6r -k7,7 | cut -d' ' -f7-
 }
 
 # flutter_version_name_ok <version>: a folder name under versions/, never a path.
@@ -1651,7 +1723,7 @@ step_flutter_remove_version() {
   local v="$1" next
   flutter_version_name_ok "$v" || fail "no such Flutter version: $v"
   step "Removing Flutter $v"
-  rm -rf "${FLUTTER_VERSIONS:?}/$v" "$FLUTTER_VERSIONS/.staging-$v"
+  flutter_delete_version "$v"
   if [ ! -e "$FLUTTER_DEFAULT/bin/flutter" ]; then
     rm -f "$FLUTTER_DEFAULT"
     next="$(flutter_newest_installed)"
@@ -1673,8 +1745,10 @@ step_flutter_remove() {
   pkill -f "$FLUTTER_VERSIONS/" 2>/dev/null || true   # an analysis server left running would keep writing
   while IFS= read -r p; do rm -rf "${p:?}"; done < <(flutter_remove_paths)
   rmdir "$PREFIX/opt" "$HOME/.config" 2>/dev/null || true
-  # An install that stopped inside apt left a baseline but no list yet.
-  if [ ! -f "$FLUTTER_ADDED_FILE" ] && [ -f "$FLUTTER_BASELINE_FILE" ]; then packages_record "$FLUTTER_BASELINE_FILE" "$FLUTTER_ADDED_FILE"; fi
+  # A run that stopped inside apt left a baseline it didn't record yet.
+  if [ -f "$FLUTTER_BASELINE_FILE" ]; then packages_record "$FLUTTER_BASELINE_FILE" "$FLUTTER_ADDED_FILE"; fi
+  # shellcheck disable=SC2086
+  if android_build_present; then packages_hand_over "$FLUTTER_ADDED_FILE" "$ANDROID_ADDED_FILE" $ANDROID_BUILD_PACKAGES; fi
   android_purge_added "$FLUTTER_ADDED_FILE"
   rm -f "$FLUTTER_ADDED_FILE" "$FLUTTER_BASELINE_FILE"
   ok "Flutter removed"
@@ -1692,13 +1766,12 @@ step_rust_install() {
   out="$(rustc --version 2>&1)" || fail "rustc --version failed: $out"
   # Written last: the app reads this file as "installed".
   packages_record "$RUST_BASELINE_FILE" "$RUST_ADDED_FILE"
-  rm -f "$RUST_BASELINE_FILE"
   ok "$out"
 }
 
 step_rust_remove() {
   step "Removing Rust"
-  if [ ! -f "$RUST_ADDED_FILE" ] && [ -f "$RUST_BASELINE_FILE" ]; then packages_record "$RUST_BASELINE_FILE" "$RUST_ADDED_FILE"; fi
+  if [ -f "$RUST_BASELINE_FILE" ]; then packages_record "$RUST_BASELINE_FILE" "$RUST_ADDED_FILE"; fi
   [ -s "$RUST_ADDED_FILE" ] || info "Rust was on the phone before this tool, so it stays"
   android_purge_added "$RUST_ADDED_FILE"
   rm -f "$RUST_ADDED_FILE" "$RUST_BASELINE_FILE"
@@ -1749,25 +1822,12 @@ main() {
         flutter|flutter-default|flutter-remove-version|flutter-remove|rust|rust-remove|flutter-rust|flutter-rust-remove|rust-check|rust-update) ;;
         *) fail "--only takes: claude, dockito, chromium, chromium-remove, android-build, android-build-remove, android-ndk, android-ndk-remove, wrangler, wrangler-remove, flutter [version], flutter-default <version>, flutter-remove-version <version>, flutter-remove, rust, rust-remove, flutter-rust, flutter-rust-remove, git-check, git-update, rust-check or rust-update" ;;
       esac
-      if [ "$2" = git-check ]; then apt_check git; return 0; fi
-      if [ "$2" = rust-check ]; then apt_check rust; return 0; fi
-      if [ "$2" = git-update ]; then
-        TOTAL_STEPS=2; PR_LOG="$PR_HOME/git.log"
-        step "Checking the device"; preflight_checks; ok "Termux on aarch64"
-        step_apt_update Git git
-        ok "$(git --version 2>&1)"
-        printf '[done]\n'
-        return 0
-      fi
-      if [ "$2" = rust-update ]; then
-        TOTAL_STEPS=2; PR_LOG="$PR_HOME/rust.log"
-        step "Checking the device"; preflight_checks; ok "Termux on aarch64"
+      case "$2" in
+        git-check|rust-check) apt_check "${2%-check}"; return 0 ;;
+        git-update) main_apt_update Git "git --version" git; return 0 ;;
         # The standard library has to stay at the compiler's version.
-        step_apt_update Rust rust rust rust-std-aarch64-linux-android
-        ok "$(rustc --version 2>&1)"
-        printf '[done]\n'
-        return 0
-      fi
+        rust-update) main_apt_update Rust "rustc --version" rust rust-std-aarch64-linux-android; return 0 ;;
+      esac
       case "$2" in
         flutter*|rust*)
           main_flutter_rust "$2" "${3:-}"

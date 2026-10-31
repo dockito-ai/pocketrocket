@@ -109,7 +109,11 @@ if [ "${1:-}" = --only ]; then
     fi
     step 5 "Setting up Flutter $fv"; sleep "$pace"
     mkdir -p "$fvm_home/versions/$fv/bin"; printf '#!/bin/sh\n' > "$fvm_home/versions/$fv/bin/flutter"
+    old="$(basename "$(readlink "$fvm_home/default" 2>/dev/null)")"
     if [ ! -e "$fvm_home/default/bin/flutter" ] || [ "${POCKETROCKET_FLUTTER_DEFAULT:-0}" = 1 ]; then rm -f "$fvm_home/default"; ln -s "versions/$fv" "$fvm_home/default"; fi
+    # Updates replaces the old default.
+    r="${POCKETROCKET_FLUTTER_REPLACE:-}"
+    if [ -n "$r" ] && [ "$r" = "$old" ] && [ "$r" != "$fv" ]; then rm -rf "${fvm_home:?}/versions/$r"; echo "[info] Flutter $r removed"; fi
     : > "$fvm_home/.pocketrocket-installed"; echo "[ok] Flutter $fv"
   }
   stub_rust() { printf '[progress 30] Downloading rust · 40 of 128 MB\n'; sleep "$pace"; mkdir -p "$HOME/.pocketrocket"; printf 'rust\n' > "$rust_marker"; echo "[ok] rustc 1.99.1"; }

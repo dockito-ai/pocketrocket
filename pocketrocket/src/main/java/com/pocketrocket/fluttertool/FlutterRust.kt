@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -71,11 +72,20 @@ object FlutterRust {
     private val defaultLink = File(fvm, "default")
     private val flutterMarker = File(fvm, FlutterTool.INSTALLED_MARKER)
     private val rustMarker = File(home, FlutterTool.RUST_MARKER_RELATIVE)
+    /** What an install leaves before its marker: FVM (step 2 on), or the package list (step 1). */
+    private val leftovers = listOf(
+        File(TermuxConstants.TERMUX_PREFIX_DIR_PATH, FlutterTool.FVM_DIR_RELATIVE),
+        File(home, FlutterTool.PACKAGES_RELATIVE),
+        File(home, FlutterTool.BASELINE_RELATIVE),
+    )
+    private val measuring = AtomicBoolean(false)
+    private val measureAgain = AtomicBoolean(false)
 
     private val _state = MutableStateFlow(FlutterRustState())
     val state: StateFlow<FlutterRustState> = _state.asStateFlow()
 
-    fun flutterInstalled(): Boolean = flutterMarker.isFile
+    /** Set up, or a failed install's leftovers (the setup script's flutter_present): either way Uninstall is offered. */
+    fun flutterInstalled(): Boolean = flutterMarker.isFile || leftovers.any { it.exists() }
     fun rustInstalled(): Boolean = rustMarker.isFile
 
     /** The default version's folder name, from FVM's link, or null. */
@@ -100,8 +110,22 @@ object FlutterRust {
         }
     }
 
-    /** Measures each version's folder. Blocking; a large version takes a few seconds. */
+    /**
+     * Measures each version's folder. Blocking; a large version takes a few seconds. One walk at a time: a call while
+     * one runs (the page opening as a job ends) leaves it to that walk, which then goes round once more.
+     */
     fun measure() {
+        measureAgain.set(true)
+        while (measureAgain.get() && measuring.compareAndSet(false, true)) {
+            try {
+                while (measureAgain.getAndSet(false)) measureVersions()
+            } finally {
+                measuring.set(false)
+            }
+        }
+    }
+
+    private fun measureVersions() {
         refresh()
         _state.value.versions.filter { it.bytes == null }.forEach { v ->
             val bytes = runCatching { walkDisk(AndroidWalkFs, File(versionsDir, v.version).path, Unit, emptyMap()).bytes[Unit] ?: 0L }.getOrNull()
@@ -127,11 +151,18 @@ object FlutterRust {
     fun installAll(context: Context) =
         run(context, "flutter-rust", FlutterAction.InstallAll, null, FlutterTool.installAllSteps(_state.value.latestStable))
 
-    /** Adds a Flutter version; [makeDefault] also makes it the default (Updates does). */
-    fun addVersion(context: Context, version: String, makeDefault: Boolean = false) =
+    /** Adds a Flutter version. */
+    fun addVersion(context: Context, version: String) =
+        run(context, "flutter", FlutterAction.AddVersion, version, FlutterTool.flutterSteps(version), mapOf(FlutterTool.VERSION_ENV to version))
+
+    /**
+     * Updates' way: adds [version], makes it the default and removes the old default [replaces] once the new one works.
+     * Other versions stay; an older one comes back with `fvm install <version>`.
+     */
+    fun updateDefault(context: Context, version: String, replaces: String) =
         run(
             context, "flutter", FlutterAction.AddVersion, version, FlutterTool.flutterSteps(version),
-            mapOf(FlutterTool.VERSION_ENV to version) + (if (makeDefault) mapOf(FlutterTool.DEFAULT_ENV to "1") else emptyMap()),
+            mapOf(FlutterTool.VERSION_ENV to version, FlutterTool.DEFAULT_ENV to "1", FlutterTool.REPLACE_ENV to replaces),
         )
 
     fun setDefault(context: Context, version: String) =

@@ -135,8 +135,7 @@ object ToolStates {
      */
     fun flutter(s: FlutterRustState): ToolState {
         val whole = s.action == FlutterAction.InstallAll || s.action == FlutterAction.UninstallAll
-        val flutterMb = s.flutterBytes?.let { (it / 1_000_000).toInt() }
-            ?: if (s.flutterInstalled) FlutterTool.FLUTTER_INSTALLED_MB else 0
+        val flutterMb = FlutterTool.flutterSizeMb(s.flutterInstalled, s.versions.size, s.flutterBytes)
         return ToolState(
             installed = s.installed,
             checked = s.checked,

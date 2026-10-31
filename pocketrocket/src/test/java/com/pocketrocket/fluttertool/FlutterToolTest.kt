@@ -117,6 +117,57 @@ class FlutterToolTest {
         }
     }
 
+    @Test fun theScriptOrdersVersionsAsTheApp() {
+        if (!script.exists()) return
+        val names = listOf("3.44.1", "stable", "3.50.0", "3.47.10", "3.50.0-0.3.pre", "3.47.9")
+        val out = shell(script, "POCKETROCKET_SETUP_SOURCE_ONLY", "printf '%s\\n' \"$@\" | flutter_version_order", *names.toTypedArray())
+        assertEquals(FlutterTool.installedVersions(names), out.second.lines().filter { it.isNotBlank() })
+        assertEquals(listOf("3.50.0", "3.50.0-0.3.pre", "3.47.10", "3.47.9", "3.44.1", "stable"), FlutterTool.installedVersions(names))
+        val dir = File.createTempFile("fvm", "").apply { delete(); mkdirs() }
+        try {
+            names.forEach { File(dir, "versions/$it/bin").mkdirs(); File(dir, "versions/$it/bin/flutter").writeText("") }
+            val newest = "FLUTTER_VERSIONS=\"$1/versions\"; flutter_newest_installed \"$2\""
+            assertEquals("3.50.0\n", shell(script, "POCKETROCKET_SETUP_SOURCE_ONLY", newest, dir.path, "").second)
+            assertEquals("3.50.0-0.3.pre\n", shell(script, "POCKETROCKET_SETUP_SOURCE_ONLY", newest, dir.path, "3.50.0").second)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test fun theTileShowsNoFlutterSizeWithoutVersions() {
+        assertEquals(0, FlutterTool.flutterSizeMb(installed = true, versions = 0, measuredBytes = null))
+        assertEquals(0, FlutterTool.flutterSizeMb(installed = false, versions = 0, measuredBytes = null))
+        assertEquals(FlutterTool.FLUTTER_INSTALLED_MB * 2, FlutterTool.flutterSizeMb(installed = true, versions = 2, measuredBytes = null))
+        assertEquals(1234, FlutterTool.flutterSizeMb(installed = true, versions = 1, measuredBytes = 1_234_500_000))
+    }
+
+    @Test fun aLaterRunRecordsOnlyWhatItAddedAndSharedPackagesChangeHands() {
+        if (!script.exists()) return
+        val dir = File.createTempFile("pkgs", "").apply { delete(); mkdirs() }
+        try {
+            fun run(code: String) = shell(script, "POCKETROCKET_SETUP_SOURCE_ONLY", "D=\"$1\"; TMPDIR=\"$1\"; info() { :; }; android_installed_packages() { cat \"\$D/now\"; }; $code", dir.path)
+            fun lines(name: String) = File(dir, name).takeIf { it.exists() }?.readLines()?.filter { it.isNotBlank() }
+            // The install: which was added.
+            File(dir, "now").writeText("bash\nunzip\n")
+            run("packages_baseline \"$1/base\"")
+            File(dir, "now").writeText("bash\nunzip\nwhich\n")
+            run("packages_record \"$1/base\" \"$1/flutter\"")
+            assertEquals(listOf("which"), lines("flutter"))
+            assertFalse(File(dir, "base").exists())
+            // The Android tool comes next, then Add version: nothing new, and Android's packages are not counted.
+            File(dir, "now").writeText("bash\nunzip\nwhich\nopenjdk-17\ngradle\n")
+            run("packages_baseline \"$1/base\"; packages_record \"$1/base\" \"$1/flutter\"")
+            assertEquals(listOf("which"), lines("flutter"))
+            // Removing the Android tool while Flutter is there hands unzip over.
+            File(dir, "android").writeText("openjdk-17\ngradle\nunzip\n")
+            run("packages_hand_over \"$1/android\" \"$1/flutter\" which unzip")
+            assertEquals(listOf("openjdk-17", "gradle"), lines("android"))
+            assertEquals(listOf("unzip", "which"), lines("flutter"))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
     @Test fun theLauncherFindsTheNearestPin() {
         if (!launcher.exists()) return
         val root = File.createTempFile("pin", "").apply { delete(); mkdirs() }

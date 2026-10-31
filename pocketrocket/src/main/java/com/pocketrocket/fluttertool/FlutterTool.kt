@@ -17,6 +17,13 @@ object FlutterTool {
     /** In FVM's folder; the setup script writes it once a Flutter version is set up. Means "Flutter installed". */
     const val INSTALLED_MARKER = ".pocketrocket-installed"
 
+    /** FVM itself, under $PREFIX: there from an install's second step. */
+    const val FVM_DIR_RELATIVE = "opt/fvm"
+
+    /** The packages the Flutter part added, and the list taken before its apt step. Under home. */
+    const val PACKAGES_RELATIVE = ".pocketrocket/flutter.packages"
+    const val BASELINE_RELATIVE = ".pocketrocket/flutter.baseline"
+
     /** What the Rust install added, written last; means "Rust installed". Under home. */
     const val RUST_MARKER_RELATIVE = ".pocketrocket/rust.packages"
 
@@ -28,6 +35,9 @@ object FlutterTool {
 
     /** Set to 1 to make the version being added the default. */
     const val DEFAULT_ENV = "POCKETROCKET_FLUTTER_DEFAULT"
+
+    /** A version to remove once the one being added is the default, if it was the default (Updates). */
+    const val REPLACE_ENV = "POCKETROCKET_FLUTTER_REPLACE"
 
     /** The FVM release the setup script pins and checks. */
     const val FVM_VERSION = "4.3.2"
@@ -133,6 +143,16 @@ object FlutterTool {
     fun installedVersions(folders: List<String>): List<String> {
         val (versions, others) = folders.filter { it.isNotEmpty() && !it.startsWith(".") }.partition { parse(it) != null }
         return versions.sortedWith { a, b -> compareVersions(b, a) } + others.sorted()
+    }
+
+    /**
+     * Flutter's part of the tile's size in MB: nothing when no version is there (a failed install's leftovers count as
+     * installed), the measured total, else the estimate per version.
+     */
+    fun flutterSizeMb(installed: Boolean, versions: Int, measuredBytes: Long?): Int = when {
+        !installed || versions == 0 -> 0
+        measuredBytes != null -> (measuredBytes / 1_000_000).toInt()
+        else -> FLUTTER_INSTALLED_MB * versions
     }
 
     /** A size as the page shows it: "1.1 GB", "590 MB", "Under 1 MB". Decimal units, as Android's storage screens. */

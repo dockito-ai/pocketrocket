@@ -105,12 +105,13 @@ class AptSource(override val component: UpdateComponent, private val updater: Ap
 
 val GitSource = AptSource(UpdateComponent.Git, GitUpdater)
 
-/** Rust shows only once it's installed (the row has no installed version until then). */
+/** Rust shows only while the tool has it: no installed version otherwise, and Check now skips its apt-get update. */
 val RustSource = AptSource(UpdateComponent.Rust, RustUpdater)
 
 /**
- * Flutter (decision 75): a newer stable for the default version only. Updating adds it as a new version and makes it
- * the default; the old one stays for projects that pin it, and a project's pin is never changed.
+ * Flutter (decision 75): a newer stable for the default version only. Updating adds it as a new version, makes it the
+ * default and removes the old default; other versions stay, and a project's pin is never changed (a project pinning
+ * the old one gets it back with `fvm install <version>`).
  */
 object FlutterSource : UpdateSource {
     override val component = UpdateComponent.Flutter
@@ -121,7 +122,7 @@ object FlutterSource : UpdateSource {
         UpdateRow(
             component, installed = default?.takeIf { s.flutterInstalled }, latest = s.latestStable,
             available = s.flutterInstalled && FlutterTool.newerStable(default, s.latestStable), checking = busy,
-            job = if (adding) s.job else null, jobTitle = s.latestStable?.let { "Adding Flutter $it" },
+            job = if (adding) s.job else null, jobTitle = s.latestStable?.let { "Updating to $it" },
             outcome = if (adding && s.failed) Outcome(s.outcome ?: "Stopped.", failed = true) else null,
             steps = FlutterTool.flutterSteps(s.latestStable),
         )
@@ -147,8 +148,9 @@ object FlutterSource : UpdateSource {
     override suspend fun update(context: Context) {
         val s = FlutterRust.state.value
         val latest = s.latestStable ?: return
-        if (!FlutterTool.newerStable(s.defaultVersion, latest) || s.running) return
-        FlutterRust.addVersion(context, latest, makeDefault = true)
+        val old = s.defaultVersion ?: return
+        if (!FlutterTool.newerStable(old, latest) || s.running) return
+        FlutterRust.updateDefault(context, latest, replaces = old)
         FlutterRust.awaitJob()
     }
 }
