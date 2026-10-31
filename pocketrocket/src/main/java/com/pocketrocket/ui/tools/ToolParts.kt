@@ -100,16 +100,16 @@ fun ToolIcon(icon: ToolGlyph, tile: Dp, glyph: Dp, corner: Dp) {
 }
 
 /**
- * One tile on the Tools list: icon, name, status line, chevron. An [installed] add-on gets a green tick just left of
- * the chevron, a green status line and a slightly stronger card, so it stands apart from the muted ones that aren't installed.
+ * One tile on the Tools list: icon, name, status line, chevron. An [installed] add-on looks the same as one that isn't,
+ * apart from a plain green tick just left of the chevron.
  */
 @Composable
 fun ToolTile(name: String, icon: ToolGlyph, status: ToolStatus, installed: Boolean = false, onClick: () -> Unit) {
     val c = PrTheme.colors
     val shape = RoundedCornerShape(14.dp)
     Row(
-        Modifier.fillMaxWidth().clip(shape).background(if (installed) lerp(c.surface, c.green, 0.06f) else c.surface)
-            .border(1.dp, if (installed) c.green.copy(alpha = 0.45f) else c.iconTile, shape).clickable(onClick = onClick).padding(14.dp),
+        Modifier.fillMaxWidth().clip(shape).background(c.surface)
+            .border(1.dp, c.iconTile, shape).clickable(onClick = onClick).padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -117,16 +117,13 @@ fun ToolTile(name: String, icon: ToolGlyph, status: ToolStatus, installed: Boole
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(name, style = mockText(14.sp, FontWeight.SemiBold), color = c.text)
             val tone = when {
-                installed && status.tone == ToolTone.Installed -> c.green
                 status.tone == ToolTone.Idle || status.tone == ToolTone.Installed -> c.textMuted
                 else -> c.tone(status.tone)
             }
             Text(status.line, style = mockText(12.sp), color = tone)
         }
         if (installed) {
-            Box(Modifier.size(18.dp).clip(CircleShape).background(c.green), contentAlignment = Alignment.Center) {
-                Icon(MockIcons.Check, contentDescription = "Installed", tint = Color.White, modifier = Modifier.size(12.dp))
-            }
+            Icon(MockIcons.Check, contentDescription = "Installed", tint = c.green, modifier = Modifier.size(16.dp))
         }
         Text("›", style = mockText(14.sp), color = c.textMuted)
     }
