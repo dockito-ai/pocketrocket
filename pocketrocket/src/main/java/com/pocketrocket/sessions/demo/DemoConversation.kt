@@ -71,15 +71,26 @@ enum class DemoConversation(val folder: String, val prompt: String?, val profile
         }
     },
 
-    /** A short question with an answer. */
+    /**
+     * A short question with an answer. A background subagent it started goes on for a while after the turn ends, so
+     * the card reads "1 agent running" until it finishes and only then Done (decision 79).
+     */
     Done("~/notes", "What's the difference between git rebase and merge? Short.") {
-        override fun turns(lines: FakeLines): List<List<FakeStep>> = listOf(
-            listOf(
-                Emit(300, lines.init()),
-                Emit(900, lines.text("**Merge** joins two branches with a new merge commit. History stays exactly as it happened.\n\n**Rebase** replays your commits on top of the other branch, so history is a straight line, but the commits get new ids.\n\n- Shared branch: merge\n- Your own branch before a PR: rebase")),
-                Emit(200, lines.result("done")),
-            ),
-        )
+        override fun turns(lines: FakeLines): List<List<FakeStep>> {
+            val task = "Find rebase and merge examples in my notes"
+            val (agentId, agent) = lines.toolUse("Agent", JSONObject().put("description", task).put("subagent_type", "Explore").put("prompt", "Look through ~/notes for examples of rebase and merge.").put("run_in_background", true))
+            return listOf(
+                listOf(
+                    Emit(300, lines.init()),
+                    Emit(600, agent),
+                    Emit(400, lines.taskStarted("demo-agent-1", agentId, task)),
+                    Emit(300, lines.toolResult(agentId, "Async agent launched successfully.\nagentId: demo-agent-1")),
+                    Emit(900, lines.text("**Merge** joins two branches with a new merge commit. History stays exactly as it happened.\n\n**Rebase** replays your commits on top of the other branch, so history is a straight line, but the commits get new ids.\n\n- Shared branch: merge\n- Your own branch before a PR: rebase\n\nAn agent is still looking for examples in your notes.")),
+                    Emit(200, lines.result("done")),
+                    Emit(45_000, lines.taskNotification("demo-agent-1", agentId, "completed", "Found 3 notes with rebase and merge examples.")),
+                ),
+            )
+        }
     },
 
     /** A turn that fails. */

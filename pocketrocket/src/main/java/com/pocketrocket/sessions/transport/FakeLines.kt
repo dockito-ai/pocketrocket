@@ -56,6 +56,16 @@ class FakeLines(private val sessionId: String, private val cwd: String) {
                 ))
             }).toString()
 
+    /** A subagent or shell task starting, as the CLI reports it for the tool call [toolUseId]. */
+    fun taskStarted(taskId: String, toolUseId: String, description: String) = JSONObject()
+        .put("type", "system").put("subtype", "task_started").put("session_id", sessionId)
+        .put("task_id", taskId).put("tool_use_id", toolUseId).put("description", description).put("task_type", "local_agent").toString()
+
+    /** A task ending ([status] `completed`, `failed`, `stopped`), possibly long after the turn that started it. */
+    fun taskNotification(taskId: String, toolUseId: String, status: String, summary: String) = JSONObject()
+        .put("type", "system").put("subtype", "task_notification").put("session_id", sessionId)
+        .put("task_id", taskId).put("tool_use_id", toolUseId).put("status", status).put("summary", summary).toString()
+
     fun result(text: String, isError: Boolean = false) = JSONObject()
         .put("type", "result").put("subtype", if (isError) "error_during_execution" else "success")
         .put("is_error", isError).put("result", text).put("session_id", sessionId).toString()
