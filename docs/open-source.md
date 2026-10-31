@@ -90,7 +90,7 @@ git log --all -p | grep -ci 'k[e]us'            # 0 (the brackets keep this line
 
 ## Publish steps (only after the scan is clean and Shankar says go)
 
-Decisions 65 and 66 set the order. Since the updater (`ReleaseSource`) already reads `ShankarKakumani/pocketrocket` first and falls back to `pocketrocket-releases` while that repo is private or has no release, nothing in the app, README or Settings needs to change for the new repo. The private repo currently owns the name, so it has to go first.
+*Done: the steps below are historical. The fallback to `pocketrocket-releases` has been removed (decision 83).* Decisions 65 and 66 set the order. Since the updater (`ReleaseSource`) already reads `ShankarKakumani/pocketrocket` first and falls back to `pocketrocket-releases` while that repo is private or has no release, nothing in the app, README or Settings needs to change for the new repo. The private repo currently owns the name, so it has to go first.
 
 1. Ship the next release (1.0.5) as before, to `pocketrocket-releases`, with the release skill. This is the release that has the new updater logic.
 2. Free the name `ShankarKakumani/pocketrocket`. Decision 66 says the private repo can be deleted; renaming it instead keeps an archive, and is safer if anything is unsure: `GH_TOKEN=$(gh auth token -u ShankarKakumani) gh repo rename pocketrocket-private --repo ShankarKakumani/pocketrocket --yes`. Update this Mac's clone to match: `git remote set-url origin git@github.com:ShankarKakumani/pocketrocket-private.git`. Deleting is permanent and Shankar's call.

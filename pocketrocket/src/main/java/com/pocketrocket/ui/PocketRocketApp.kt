@@ -23,6 +23,8 @@ import com.pocketrocket.ui.accounts.ClaudeAccountsScreen
 import com.pocketrocket.ui.accounts.GitHubAccountsScreen
 import com.pocketrocket.ui.accounts.GitHubConnectScreen
 import com.pocketrocket.ui.auth.SignInScreen
+import com.pocketrocket.ui.files.FileViewerScreen
+import com.pocketrocket.ui.files.FilesScreen
 import com.pocketrocket.ui.home.HomeScreen
 import com.pocketrocket.ui.home.HomeTab
 import com.pocketrocket.ui.sessions.NewSessionScreen
@@ -132,6 +134,21 @@ fun PocketRocketApp(startScreen: AppScreen, onOpenTerminal: () -> Unit, showSess
             r == "setup" -> SetupScreen(onFinished = { replace("signin") })
             r == "signin" -> SignInScreen(onDone = { replace("home") }, onDismiss = { replace("home") }, dismissLabel = "Not now")
             args[0] == "ws" -> WorkspaceScreen(args[1], onBack = ::pop, navigate = ::push)
+            // The rest of the route is the path, whatever it holds.
+            args[0] == "files" -> FilesScreen(
+                r.substringAfter('|'),
+                onBack = ::pop,
+                navigate = ::push,
+                // Screens below follow a folder renamed or deleted here; this one keeps its place.
+                onMoved = { from, to -> current().let { now -> setStack(now.dropLast(1).map { Routes.moved(it, from, to) } + now.last()) } },
+                onDeleted = { gone, here ->
+                    val below = current().dropLast(1)
+                    val kept = below.filterNot { Routes.inside(it, gone) }
+                    // Dropping a screen below re-keys this one, so it reopens where it was.
+                    if (kept.size != below.size) setStack(kept + Routes.files(here))
+                },
+            )
+            args[0] == "file" -> FileViewerScreen(r.substringAfter('|'), onBack = ::pop)
             args[0] == "memory-account" -> AccountMemoryScreen(args[1], onBack = ::pop)
             args[0] == "memory-folder" -> FolderMemoryScreen(args[1], onBack = ::pop)
             args[0] == "ws-settings" -> WorkspaceSettingsScreen(

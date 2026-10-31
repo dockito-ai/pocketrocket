@@ -45,7 +45,7 @@ data class AppUpdateState(
 }
 
 /**
- * Updates PocketRocket itself from a button (decisions 26 and 30), from the public releases repo with no
+ * Updates PocketRocket itself from a button (decisions 26 and 83), from the code repo's public releases with no
  * login. Checks GitHub only when the screen opens or Check
  * again is tapped; downloads, verifies and installs only when Update is tapped. Nothing runs on its own.
  */

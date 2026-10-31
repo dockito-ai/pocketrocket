@@ -7,11 +7,9 @@
 #   pocketrocket-vX.Y.Z-arm64.apk, computes its SHA-256 and writes the notes with the SHA-256 line the updater reads.
 #   A dry run signs with the real key when the secrets exist, else with a throwaway key made in the job (then the
 #   signer is checked against that key instead of the pin), prints what would be published and stops.
-# publish (real runs from main only): commits the bump, tags vX.Y.Z, pushes both, creates the prerelease in this
-#   repo, and in ShankarKakumani/pocketrocket-releases too when the RELEASES_REPO_TOKEN secret is set (decision 66).
+# publish (real runs from main only): commits the bump, tags vX.Y.Z, pushes both, creates the prerelease in this repo.
 #
-# Secrets: RELEASE_KEYSTORE_BASE64 (the PKCS12 keystore, base64), RELEASE_KEYSTORE_PASSWORD (store and key share it),
-# RELEASES_REPO_TOKEN (optional; fine-grained token with Contents read/write on pocketrocket-releases).
+# Secrets: RELEASE_KEYSTORE_BASE64 (the PKCS12 keystore, base64), RELEASE_KEYSTORE_PASSWORD (store and key share it).
 name: Release
 
 on:
@@ -39,7 +37,6 @@ concurrency:
 
 env:
   KEY_ALIAS: pocketrocket
-  RELEASES_REPO: ShankarKakumani/pocketrocket-releases
 
 jobs:
   build:
@@ -180,7 +177,6 @@ jobs:
           KIND: ${{ steps.key.outputs.kind }}
           APK: ${{ steps.apk.outputs.apk }}
           OUT: ${{ steps.apk.outputs.dir }}
-          HAS_RELEASES_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN != '' }}
         run: |
           {
             if [ "$DRY_RUN" = true ]; then echo "## Dry run: $TAG, nothing published"; else echo "## Release $TAG"; fi
@@ -193,11 +189,6 @@ jobs:
             echo "git tag -a $TAG -m 'PocketRocket $VERSION'"
             echo "git push --atomic origin HEAD:main $TAG"
             echo "gh release create $TAG $(basename "$APK") --repo $GITHUB_REPOSITORY --verify-tag --prerelease --title 'PocketRocket $VERSION' --notes-file notes-$TAG.md"
-            if [ "$HAS_RELEASES_TOKEN" = true ]; then
-              echo "gh release create $TAG $(basename "$APK") --repo $RELEASES_REPO --prerelease --title 'PocketRocket $VERSION' --notes-file notes-$TAG.md"
-            else
-              echo "# RELEASES_REPO_TOKEN not set: $RELEASES_REPO is skipped"
-            fi
             echo '```'
             echo
             echo "Notes:"
@@ -274,12 +265,3 @@ jobs:
           DIGEST="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[0].digest // ""')"
           [ -z "$DIGEST" ] || [ "$DIGEST" = "sha256:$SHA" ] || { echo "::error::GitHub's digest $DIGEST isn't sha256:$SHA"; exit 1; }
           echo "Published https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" | tee -a "$GITHUB_STEP_SUMMARY"
-
-      - name: Create the prerelease in the old releases repo (updater fallback, decision 66)
-        env:
-          GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
-        run: |
-          if [ -z "$GH_TOKEN" ]; then echo "RELEASES_REPO_TOKEN not set; skipping $RELEASES_REPO"; exit 0; fi
-          gh release create "$TAG" "$RUNNER_TEMP/release/pocketrocket-$TAG-arm64.apk" --repo "$RELEASES_REPO" \
-            --prerelease --title "PocketRocket $VERSION" --notes-file "$RUNNER_TEMP/release/notes-$TAG.md"
-          echo "Published https://github.com/$RELEASES_REPO/releases/tag/$TAG" | tee -a "$GITHUB_STEP_SUMMARY"

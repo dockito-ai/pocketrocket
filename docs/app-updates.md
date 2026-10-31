@@ -14,7 +14,7 @@ Minor and patch stay below 100. Every code is above Termux's 118 and grows with 
 
 ## Where releases come from
 
-The updater reads **`dockito-ai/pocketrocket`** (`ReleaseSource.REPO`) first and falls back to the old public **`ShankarKakumani/pocketrocket-releases`** (`OLD_REPO`) while the code repo is private or has no release (decision 66). The app reads `https://api.github.com/repos/<repo>/releases` over plain HTTPS, with no login and no gh. It picks the highest `vX.Y.Z` tag by semver, prereleases included and drafts skipped, and downloads the arm64 asset's `browser_download_url`. Each release is tagged `vX.Y.Z` in the code repo, so a release maps to a commit. The Release workflow publishes every release to the code repo, and to `pocketrocket-releases` as well while the `RELEASES_REPO_TOKEN` secret is set (decision 67).
+The updater reads **`dockito-ai/pocketrocket`** (`ReleaseSource.REPO`) only (decisions 68 and 83). The app reads `https://api.github.com/repos/<repo>/releases` over plain HTTPS, with no login and no gh. It picks the highest `vX.Y.Z` tag by semver, prereleases included and drafts skipped, and downloads the arm64 asset's `browser_download_url`. Each release is tagged `vX.Y.Z` in the code repo, so a release maps to a commit. The Release workflow publishes every release to the code repo (decision 67).
 
 ## The screen
 
@@ -41,7 +41,7 @@ Releases are signed with PocketRocket's own release key, not the debug key:
 - **Certificate:** its SHA-256 is pinned in `scripts/release-cert.sha256` (`44b223b1bfa74b64481318e5b828ac212d5cd7b08f836f3387befd3c1d731048`). The workflow and `release.sh` refuse a keystore whose certificate isn't the pin, and an APK with any other signer (`scripts/check-release-apk.sh`).
 - **On GitHub:** the same keystore and password in the repo's Actions secrets (below), added by Shankar only.
 
-`app/build.gradle` has a `release` signingConfig that exists only when `POCKETROCKET_KEYSTORE` and `POCKETROCKET_KEY_PASSWORD` (and optionally `POCKETROCKET_KEY_ALIAS`) are set. Nothing secret is in the repo. Debug builds are unchanged and keep Termux's `testkey_untrusted.jks`. Release builds keep Termux's `minifyEnabled true`. The minified, release-signed build was checked on the emulator: setup, Settings, and the update screen against the real releases repo.
+`app/build.gradle` has a `release` signingConfig that exists only when `POCKETROCKET_KEYSTORE` and `POCKETROCKET_KEY_PASSWORD` (and optionally `POCKETROCKET_KEY_ALIAS`) are set. Nothing secret is in the repo. Debug builds are unchanged and keep Termux's `testkey_untrusted.jks`. Release builds keep Termux's `minifyEnabled true`. The minified, release-signed build was checked on the emulator: setup, Settings, and the update screen against the then-current public releases repo (since replaced by `dockito-ai/pocketrocket`).
 
 **Switching keys once.** The first release-key build can't install over an app signed with the old debug key, because Android refuses an update from a different signer. That takes one uninstall, which wipes the app's data, and then a fresh setup and sign-in. Every update after that installs in place and keeps data.
 
@@ -72,7 +72,7 @@ Inputs: `version` (X.Y.Z, newer than `app/build.gradle`), `notes` (Markdown; the
 6. Names it `pocketrocket-vX.Y.Z-arm64.apk`, computes its SHA-256 and writes the notes ending in ``SHA-256: `<hex>` ``, the line the updater reads.
 7. Prints the plan and the notes in the run summary, keeps APK and notes as the run's `release` artifact, and deletes the keystore.
 
-The **publish** job (the only one with `contents: write`, real runs from main only) checks main hasn't moved since the build and the APK's hash is unchanged, commits "Release vX.Y.Z" as `Shankar Kakumani <ShankarKakumani@users.noreply.github.com>`, tags `vX.Y.Z`, pushes main and the tag together, and creates the prerelease "PocketRocket X.Y.Z" in this repo with the APK and notes, checking GitHub's asset digest against the hash. With `RELEASES_REPO_TOKEN` set it creates the same prerelease in `pocketrocket-releases` (the updater's fallback, decision 66); without it that step is skipped.
+The **publish** job (the only one with `contents: write`, real runs from main only) checks main hasn't moved since the build and the APK's hash is unchanged, commits "Release vX.Y.Z" as `Shankar Kakumani <ShankarKakumani@users.noreply.github.com>`, tags `vX.Y.Z`, pushes main and the tag together, and creates the prerelease "PocketRocket X.Y.Z" in this repo with the APK and notes, checking GitHub's asset digest against the hash.
 
 **Dry run** (`dry_run=true`, any branch): the build job only. It signs with the real key when the secrets are there, else with a throwaway key made in the job (the signer is then checked against that key), runs every check and prints what would be published. It never commits, tags, pushes or releases.
 
@@ -86,13 +86,12 @@ Settings › Secrets and variables › Actions on `dockito-ai/pocketrocket`, or 
 
 - `RELEASE_KEYSTORE_BASE64`: the PKCS12 keystore, base64. Alias `pocketrocket`.
 - `RELEASE_KEYSTORE_PASSWORD`: its one password (store and key).
-- `RELEASES_REPO_TOKEN` (optional, only while the code repo is private): a fine-grained token limited to `ShankarKakumani/pocketrocket-releases` with Contents read and write, made at github.com › Settings › Developer settings › Fine-grained tokens. `gh secret set RELEASES_REPO_TOKEN -R dockito-ai/pocketrocket` asks for it without echoing. Delete the secret and the token once the public repo is up.
 
 Actions must be enabled on the repo (Settings › Actions › General › Allow all actions). Secrets don't move with the code: when the public repo replaces the private one (decisions 63 and 66), enable Actions there and run the first two commands again against it.
 
 ### Local fallback
 
-`scripts/release.sh X.Y.Z [--notes FILE] [--dry-run]` (or `scripts/ship.sh --local`) does the same on the Mac when Actions can't run: it checks main is clean and equal to origin/main and git's email is the noreply one, reads the keystore and the Keychain password (never printed), checks the key against the pin, and runs the same `set-version.sh` and `check-release-apk.sh`. It publishes to `pocketrocket-releases` and then the code repo (`--verify-tag`) with `GH_TOKEN=$(gh auth token -u ShankarKakumani)`. Its dry run puts `app/build.gradle` back and never commits, pushes or calls GitHub.
+`scripts/release.sh X.Y.Z [--notes FILE] [--dry-run]` (or `scripts/ship.sh --local`) does the same on the Mac when Actions can't run: it checks main is clean and equal to origin/main and git's email is the noreply one, reads the keystore and the Keychain password (never printed), checks the key against the pin, and runs the same `set-version.sh` and `check-release-apk.sh`. It publishes to the code repo (`--verify-tag`) with `GH_TOKEN=$(gh auth token -u ShankarKakumani)`. Its dry run puts `app/build.gradle` back and never commits, pushes or calls GitHub.
 
 ## Testing without GitHub (debug builds only)
 
