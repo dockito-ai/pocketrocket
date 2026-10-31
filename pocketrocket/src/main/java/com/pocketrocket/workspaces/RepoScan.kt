@@ -10,6 +10,17 @@ object RepoScan {
 
     fun isRepo(dir: File) = File(dir, ".git").exists()
 
+    /**
+     * A linked worktree: an extra checkout of another repo, whose `.git` is a file pointing into that repo's
+     * `.git/worktrees/`. It belongs to its repo's workspace (shown in the Git screen's Worktrees), not on its own.
+     */
+    fun isLinkedWorktree(dir: File): Boolean {
+        val git = File(dir, ".git")
+        if (!git.isFile) return false
+        val target = runCatching { git.readText() }.getOrNull()?.trim()?.removePrefix("gitdir:")?.trim() ?: return false
+        return target.trimEnd('/').substringBeforeLast('/').endsWith("/.git/worktrees")
+    }
+
     /** Subfolders worth walking into: not hidden, not in [skip]. */
     internal fun children(dir: File): List<File> =
         dir.listFiles()?.filter { it.isDirectory && !it.name.startsWith(".") && it.name !in skip }?.sortedBy { it.name.lowercase() }.orEmpty()
@@ -19,7 +30,7 @@ object RepoScan {
      * Claude, so the Workspaces list can offer to make them workspaces. [workspaces] are their paths. Walks
      * folders at any depth up to [maxDepth], skipping hidden ones, [skip] and symlinks, and never descends
      * into a workspace or a repo (a repo with workspaces inside it is walked through instead, so workspaces
-     * are never nested).
+     * are never nested). Linked worktrees are left out: they belong to the repo they were made from.
      */
     fun notWorkspaces(root: File, workspaces: List<String>, maxDepth: Int = 6): List<File> {
         val found = mutableListOf<File>()
@@ -28,6 +39,7 @@ object RepoScan {
             children(dir).filterNot(FileOps::isSymlink).forEach { child ->
                 when {
                     child.path in workspaces -> Unit
+                    isLinkedWorktree(child) -> Unit
                     isRepo(child) && !holdsWorkspace(child) -> found += child
                     depth < maxDepth -> walk(child, depth + 1)
                 }
