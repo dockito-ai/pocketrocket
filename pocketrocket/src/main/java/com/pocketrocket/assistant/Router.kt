@@ -183,7 +183,7 @@ object Router {
         else -> Reply(line(s) + ".")
     }
 
-    private fun line(s: SessionState): String = s.permission?.let { Briefing.request(s.title, it) } ?: "${s.title} ${Briefing.doing(s.status)}"
+    private fun line(s: SessionState): String = s.permission?.let { Briefing.request(s.title, it) } ?: "${s.title} ${Briefing.doing(s.shownStatus)}"
 
     private fun wants(name: String, sessions: List<SessionState>, book: MemoryBook): Reply {
         if (name in PRONOUNS) {
@@ -199,7 +199,7 @@ object Router {
 
     /** The real request goes in a card; aloud it's the short version. */
     internal fun request(s: SessionState): Reply {
-        val asked = s.permission ?: return Reply("${s.title} isn't waiting on you. It ${Briefing.doing(s.status)}.")
+        val asked = s.permission ?: return Reply("${s.title} isn't waiting on you. It ${Briefing.doing(s.shownStatus)}.")
         val text = Briefing.request(s.title, asked) + "."
         val reason = asked.reason?.takeIf { it.isNotBlank() }?.let { "Reason: ${brief(it)}" }
         // A reason can quote anything, so with no command to show it gets the card and stays out of the sentence.

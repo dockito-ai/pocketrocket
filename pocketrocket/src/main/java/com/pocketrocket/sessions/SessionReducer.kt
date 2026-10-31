@@ -17,6 +17,8 @@ object SessionReducer {
     const val MODE_ID = "pr-mode-"
     const val CONTEXT_ID = "pr-context-"
     const val REWIND_ID = "pr-rewind-"
+    /** Stop or move a shell task ([ShellTasks]). */
+    const val TASK_ID = "pr-task-"
     /** Configuration requests (`claudeconfig/`): their replies go to whoever asked and never reach the state. */
     const val CONFIG_ID = "pr-config-"
 
@@ -41,7 +43,7 @@ object SessionReducer {
         is StreamEvent.UserEcho -> onUserEcho(state, event.uuid)
         is StreamEvent.ToolResult -> state.copy(
             items = state.items.map {
-                if (it is ChatItem.Tool && it.id == event.toolUseId) it.copy(result = event.content, isError = event.isError, agent = it.agent?.launched(event.content)) else it
+                if (it is ChatItem.Tool && it.id == event.toolUseId) ShellTasks.onResult(it, event.content).copy(result = event.content, isError = event.isError, agent = it.agent?.launched(event.content)) else it
             },
         )
         is StreamEvent.ApiError -> state.append(ChatItem.Error(state.nextId(), event.text.ifBlank { event.code }))
@@ -76,6 +78,7 @@ object SessionReducer {
                 tokens = event.tokens ?: it.tokens, toolUses = event.toolUses ?: it.toolUses, durationMs = event.durationMs ?: it.durationMs,
             )
         }
+        is StreamEvent.ShellStarted, is StreamEvent.TaskBackgrounded, is StreamEvent.ShellEnded -> ShellTasks.onEvent(state, event)
         is StreamEvent.ControlResponse -> onControlResponse(state, event)
     }
 
@@ -166,6 +169,7 @@ object SessionReducer {
                 }
             }
             id.startsWith(REWIND_ID) -> onRewound(state, reply, event.error)
+            id.startsWith(TASK_ID) && reply == null -> state.append(ChatItem.Notice(state.nextId(), "Couldn't change the background task: ${event.error}"))
             else -> state
         }
     }

@@ -94,6 +94,7 @@ One agent per task, in order, visible result after each. Opus builds, Sonnet for
 | T13 | Claude Code configuration (S5), in the order in `docs/claude-config.md` |
 | T14 | Voice assistant (S6), in the order in `docs/assistant.md` |
 | T15 | Backup and restore (S7), in the order in `docs/backup-restore.md` |
+| T16 | Background shells in the chat: live Bash cards, Background sheet, output screen, Stop and Move to background (decision 68) |
 
 ## 9. Sizes
 

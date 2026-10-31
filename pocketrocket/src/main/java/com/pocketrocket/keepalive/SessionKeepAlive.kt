@@ -32,6 +32,8 @@ object SessionKeepAlive {
         val status: SessionStatus,
         val title: String = "",
         val demo: Boolean = false,
+        /** Shells running in the background: they keep the service on after the turn ends. */
+        val shells: Int = 0,
     )
 
     /** TermuxService, while it runs. */
@@ -54,14 +56,14 @@ object SessionKeepAlive {
     /** [isActive], to watch: the wake word listens while a session runs (decision 54). */
     val busyNow: StateFlow<Boolean> = _busyNow
 
-    private fun busy(): List<Live> = live.filter { it.alive && it.status in BUSY }
+    private fun busy(): List<Live> = live.filter { it.alive && (it.status in BUSY || it.shells > 0) }
 
     @JvmStatic
     fun setHost(service: Host?) {
         host = service
     }
 
-    /** True while any session is working or waiting for an answer; the service must not stop then. */
+    /** True while any session is working, waiting for an answer or running a background shell; the service must not stop then. */
     @JvmStatic
     fun isActive(): Boolean = busy().isNotEmpty()
 

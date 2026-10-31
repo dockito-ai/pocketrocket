@@ -80,6 +80,17 @@ data class SessionState(
     val runningAgents: Int
         get() = items.count { it is ChatItem.Tool && it.agentRunning }
 
+    /** Shells running in the background; the status line shows how many while any run. */
+    val runningShells: Int
+        get() = items.count { it is ChatItem.Tool && it.backgroundShell && it.shellRunning }
+
+    /**
+     * The status cards and tab dots show: a session whose turn ended while shells still run in the background is
+     * still working, so it does not read Done while a build goes on.
+     */
+    val shownStatus: SessionStatus
+        get() = if (runningShells > 0 && (status == SessionStatus.Done || status == SessionStatus.WaitingForInput)) SessionStatus.Working else status
+
     /** The line a session card shows: the latest thing said or done. */
     val lastLine: String
         get() = permission?.let { "Allow ${it.toolName}?  ${it.summary}" }

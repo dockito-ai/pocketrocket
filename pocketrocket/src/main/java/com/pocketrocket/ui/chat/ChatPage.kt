@@ -54,7 +54,6 @@ import com.pocketrocket.ui.git.GitScreens
 import androidx.compose.ui.platform.LocalContext
 import com.pocketrocket.sessions.Session
 import com.pocketrocket.sessions.SessionStatus
-import com.pocketrocket.sessions.agentRunning
 import com.pocketrocket.ui.claudeconfig.SessionSetupSheet
 import com.pocketrocket.ui.claudeconfig.SessionStatusSheet
 
@@ -69,6 +68,8 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
     var controls by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf(false) }
     var setup by remember { mutableStateOf(false) }
+    var background by remember { mutableStateOf(false) }
+    var openShell by remember { mutableStateOf<String?>(null) }
     var picked by remember { mutableStateOf<Draft?>(null) }
     val rows = state.items.size + if (working) 1 else 0
 
@@ -108,7 +109,9 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
                         UserBubble(item.text, item.attachments, menu = menu)
                     }
                     is ChatItem.Assistant -> AssistantMessage(item.text)
-                    is ChatItem.Tool -> if (item.agent != null) AgentCard(item, item.agent) else ToolCallCard(item)
+                    is ChatItem.Tool -> if (item.agent != null) AgentCard(item, item.agent) else ToolCallCard(
+                        item, onOpenOutput = { openShell = item.id }, onMoveToBackground = { session.moveToBackground(item.id) },
+                    )
                     is ChatItem.Error -> ErrorRow(item.text)
                     is ChatItem.Notice -> NoticeRow(item.text, item.byRocket)
                 }
@@ -147,12 +150,7 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
                 commands = state.commands, draft = state.draft, insert = picked, active = active,
             )
             StatusLine(
-                state, onOpenControls = { controls = true }, onCycleMode = session::cycleMode,
-                // Items are the list's first rows while any exist, so an item's index is its row.
-                onShowAgents = {
-                    val first = state.items.indexOfFirst { it is ChatItem.Tool && it.agentRunning }
-                    if (first >= 0) scope.launch { list.animateScrollToItem(first) }
-                },
+                state, onOpenControls = { controls = true }, onShowBackground = { background = true },
                 onOpenBranches = { GitHead.repoRoot(state.folder)?.let { GitScreens.openBranches(context, it.path) } },
             )
         }
@@ -167,6 +165,23 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
             onOpenStatus = { controls = false; status = true },
             onOpenSetup = { controls = false; setup = true },
         )
+    }
+    if (background) {
+        BackgroundSheet(
+            state, onDismiss = { background = false },
+            onOpenShell = { openShell = it.id },
+            // Items are the list's first rows while any exist, so an item's index is its row.
+            onShowAgent = { agent ->
+                background = false
+                val at = state.items.indexOfFirst { it.id == agent.id }
+                if (at >= 0) scope.launch { list.animateScrollToItem(at) }
+            },
+            onStop = session::stopTask,
+        )
+    }
+    // Looked up on each change, so the screen follows the shell to its end.
+    (state.items.firstOrNull { it.id == openShell } as? ChatItem.Tool)?.let { tool ->
+        ShellOutputScreen(tool, onStop = session::stopTask, onDismiss = { openShell = null })
     }
     if (status) SessionStatusSheet(session, state, onDismiss = { status = false })
     if (setup) SessionSetupSheet(session, state, onDismiss = { setup = false })

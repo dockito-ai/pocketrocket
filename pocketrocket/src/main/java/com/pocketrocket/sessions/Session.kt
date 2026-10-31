@@ -88,7 +88,7 @@ class Session(
                 lastActiveAt = now
                 events.forEach { event -> _state.update { SessionReducer.onEvent(it, event) } }
                 // The reducer is pure; subagents get their clock times here.
-                _state.update { SessionReducer.timeAgents(it, now) }
+                _state.update { ShellTasks.time(SessionReducer.timeAgents(it, now), now) }
                 events.forEach { (it as? StreamEvent.ControlResponse)?.let { reply -> awaiting.remove(reply.requestId)?.countDown() } }
                 if (events.any(::changesContext)) refreshContext()
                 runAfterTurn()
@@ -100,7 +100,7 @@ class Session(
                     transport = null
                     _alive.value = false
                 }
-                _state.update { SessionReducer.onExit(SessionReducer.stopAgents(it, System.currentTimeMillis()), code, message) }
+                _state.update { SessionReducer.onExit(stopRuns(it), code, message) }
                 releaseAwaiting()
                 runAfterTurn()
             }
@@ -156,8 +156,6 @@ class Session(
     /** Changes the permission mode at once, mid-turn too; the CLI confirms and the status line follows. */
     fun setMode(mode: PermissionMode) = control { StreamJsonWriter.setPermissionMode(SessionReducer.MODE_ID + it, mode.cli) }
 
-    /** shift+tab: Manual, Accept edits, Plan, Auto. */
-    fun cycleMode() = setMode(_state.value.mode.next)
 
     /** Summarises the conversation so far to free context (/compact). */
     fun compact() = send("/compact")
@@ -302,6 +300,22 @@ class Session(
         return true
     }
 
+    /** Subagents and shells end with the process. */
+    private fun stopRuns(state: SessionState): SessionState {
+        val now = System.currentTimeMillis()
+        return ShellTasks.stopAll(SessionReducer.stopAgents(state, now), now)
+    }
+
+    /** Stops shell task [taskId] (the Background sheet's Stop). Nothing to do when no process runs: its tasks went with it. */
+    fun stopTask(taskId: String) {
+        transport?.send(StreamJsonWriter.controlRequest(SessionReducer.TASK_ID + controlIds.incrementAndGet(), "stop_task", mapOf("task_id" to taskId)))
+    }
+
+    /** Moves the foreground Bash call [toolUseId] to the background (ctrl+b in the terminal); the turn goes on without waiting. */
+    fun moveToBackground(toolUseId: String) {
+        transport?.send(StreamJsonWriter.controlRequest(SessionReducer.TASK_ID + controlIds.incrementAndGet(), "background_tasks", mapOf("tool_use_id" to toolUseId)))
+    }
+
     fun interrupt() {
         transport?.send(StreamJsonWriter.interrupt("pr-interrupt-${controlIds.incrementAndGet()}"))
     }
@@ -317,7 +331,7 @@ class Session(
     /** Ends the process but keeps the session, ready to resume. */
     fun pause() {
         stopProcess()
-        _state.update { SessionReducer.onQueueLost(SessionReducer.stopAgents(it, System.currentTimeMillis())).copy(status = SessionStatus.Paused, permission = null) }
+        _state.update { SessionReducer.onQueueLost(stopRuns(it)).copy(status = SessionStatus.Paused, permission = null) }
     }
 
     /** Ends the process for good. */

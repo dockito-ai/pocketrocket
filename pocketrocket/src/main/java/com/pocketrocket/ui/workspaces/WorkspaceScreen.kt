@@ -118,7 +118,7 @@ fun WorkspaceScreen(path: String, onBack: () -> Unit, navigate: (String) -> Unit
                 SectionHead("SESSIONS", "+ New") { navigate(Routes.newSession(ws.path)) }
                 if (mine.isEmpty()) Text("No sessions here yet.", style = mockText(13.sp, color = c.textMuted), modifier = Modifier.padding(vertical = 4.dp, horizontal = 2.dp))
                 mine.forEach { (session, state) ->
-                    val dot = c.status(state.status)
+                    val dot = c.status(state.shownStatus)
                     val needsYou = state.status == SessionStatus.WaitingForPermission
                     MockBox(
                         Modifier.fillMaxWidth(),
