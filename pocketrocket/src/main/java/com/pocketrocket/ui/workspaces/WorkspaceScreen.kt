@@ -154,9 +154,15 @@ fun WorkspaceScreen(path: String, onBack: () -> Unit, navigate: (String) -> Unit
                 }
             }
 
-            // Files: the folder as it is on the phone, everything in it (decision 80). Browse files: the first repo at HEAD.
-            LinkRow("Files", "all of ${ws.dir.name}/") { navigate(Routes.files(ws.path)) }
-            LinkRow("Browse files", "at HEAD") { repos?.firstOrNull()?.let { GitScreens.browse(context, it.dir.path) } }
+            MockBox(
+                Modifier.fillMaxWidth(), radius = 14.dp, background = c.background,
+                onClick = { repos?.firstOrNull()?.let { GitScreens.browse(context, it.dir.path) } },
+            ) {
+                Row(Modifier.fillMaxWidth().padding(14.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Browse files", style = mockText(14.sp, color = c.text))
+                    Text("›", style = mockText(14.sp, color = c.textMuted))
+                }
+            }
             OutlineButton("Open a terminal here", { Termux.openTerminalIn(context, ws.dir, ws.name) }, Modifier.fillMaxWidth(), color = c.textSoft)
         }
     }
@@ -174,19 +180,6 @@ private fun AccountPill(label: String, name: String) {
         maxLines = 1,
         modifier = Modifier.background(c.card, RoundedCornerShape(999.dp)).border(1.dp, c.border, RoundedCornerShape(999.dp)).padding(horizontal = 10.dp, vertical = 6.dp),
     )
-}
-
-/** A quiet card that opens a screen: "Browse files ›", with a muted [note] before the chevron. */
-@Composable
-private fun LinkRow(label: String, note: String, onClick: () -> Unit) {
-    val c = PrTheme.colors
-    MockBox(Modifier.fillMaxWidth(), radius = 14.dp, background = c.background, onClick = onClick) {
-        Row(Modifier.fillMaxWidth().padding(14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(label, style = mockText(14.sp, color = c.text), modifier = Modifier.weight(1f))
-            Text(note, style = mockText(12.sp, color = c.textMuted, mono = true), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("›", style = mockText(14.sp, color = c.textMuted))
-        }
-    }
 }
 
 @Composable
