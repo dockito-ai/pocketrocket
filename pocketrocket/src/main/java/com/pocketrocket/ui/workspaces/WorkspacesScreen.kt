@@ -305,7 +305,7 @@ private fun NotWorkspaceRow(name: String, modifier: Modifier, onClick: () -> Uni
 /** What a workspace's sessions add up to: the status line on its card. */
 internal fun sessionsLine(states: List<SessionState>): Pair<String, SessionStatus?> {
     val waiting = states.count { it.status == SessionStatus.WaitingForPermission }
-    val working = states.count { it.status == SessionStatus.Working || it.status == SessionStatus.Starting }
+    val working = states.count { it.shownStatus == SessionStatus.Working || it.shownStatus == SessionStatus.Starting }
     return when {
         waiting > 0 -> "$waiting needs you" to SessionStatus.WaitingForPermission
         working > 0 -> "$working working" to SessionStatus.Working

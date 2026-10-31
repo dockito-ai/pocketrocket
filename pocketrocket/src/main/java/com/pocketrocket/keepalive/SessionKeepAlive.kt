@@ -8,6 +8,7 @@ import com.pocketrocket.MainActivity
 import com.pocketrocket.health.LastStop
 import com.pocketrocket.sessions.SessionManager
 import com.pocketrocket.sessions.SessionStatus
+import com.pocketrocket.sessions.shownWith
 import com.pocketrocket.termux.Termux
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,8 +19,9 @@ import kotlinx.coroutines.flow.StateFlow
  * sessions need it ([isActive]), what its notification should say ([describe]) and whether to hold its
  * CPU wake lock ([wantsWakeLock]); this object tells it when any of that changes ([Host]).
  *
- * Both are held only while some session is working (Starting, Working) or waiting for an answer
- * (WaitingForPermission), and let go once every session is idle (ready, Done, Error, Paused). Nothing
+ * Both are held only while some session is working (Starting, Working, or a finished turn with subagents or
+ * background shells still running) or waiting for an answer (WaitingForPermission), and let go once every
+ * session is idle (ready, Done, Error, Paused). Nothing
  * starts on boot (decision 8).
  */
 object SessionKeepAlive {
@@ -34,7 +36,12 @@ object SessionKeepAlive {
         val demo: Boolean = false,
         /** Shells running in the background: they keep the service on after the turn ends. */
         val shells: Int = 0,
-    )
+        /** Subagents still at work: like shells, they keep the service on after the turn ends (decision 79). */
+        val agents: Int = 0,
+    ) {
+        /** [status] as shown: a finished turn with agents or shells still running counts as working. */
+        val shown: SessionStatus get() = status.shownWith(agents + shells)
+    }
 
     /** TermuxService, while it runs. */
     fun interface Host {
@@ -56,14 +63,14 @@ object SessionKeepAlive {
     /** [isActive], to watch: the wake word listens while a session runs (decision 54). */
     val busyNow: StateFlow<Boolean> = _busyNow
 
-    private fun busy(): List<Live> = live.filter { it.alive && (it.status in BUSY || it.shells > 0) }
+    private fun busy(): List<Live> = live.filter { it.alive && (it.shown in BUSY || it.agents + it.shells > 0) }
 
     @JvmStatic
     fun setHost(service: Host?) {
         host = service
     }
 
-    /** True while any session is working, waiting for an answer or running a background shell; the service must not stop then. */
+    /** True while any session is working, waiting for an answer or running a subagent or background shell; the service must not stop then. */
     @JvmStatic
     fun isActive(): Boolean = busy().isNotEmpty()
 

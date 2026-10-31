@@ -4,19 +4,25 @@ import android.content.Context
 import com.pocketrocket.appupdate.AppUpdateState
 import com.pocketrocket.appupdate.AppUpdater
 import com.pocketrocket.dockito.Dockito
+import com.pocketrocket.fluttertool.FlutterAction
+import com.pocketrocket.fluttertool.FlutterRust
+import com.pocketrocket.fluttertool.FlutterTool
 import com.pocketrocket.setup.SetupPhase
 import com.pocketrocket.setup.SetupState
 import com.pocketrocket.setup.SetupStep
 import com.pocketrocket.setup.StepStatus
 import com.pocketrocket.updater.ClaudeUpdater
+import com.pocketrocket.updater.Outcome
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /*
- * The four Updates rows, each a thin adapter over the module that already does the work. No logic of
+ * The Updates rows, each a thin adapter over the module that already does the work. No logic of
  * its own beyond mapping that module's state to an UpdateRow.
  */
 
@@ -75,26 +81,77 @@ object ClaudeSource : UpdateSource {
     }
 }
 
-/** Git: apt, through `--only git-update`. */
-object GitSource : UpdateSource {
-    override val component = UpdateComponent.Git
-    override val row = GitUpdater.state.map { s ->
+/** A Termux package through apt, `--only <package>-update`: Git, and Rust from the Flutter & Rust tool. */
+class AptSource(override val component: UpdateComponent, private val updater: AptUpdater) : UpdateSource {
+    override val row = updater.state.map { s ->
         val latest = AptPolicy.display(s.policy?.candidate)
         UpdateRow(
             component, installed = AptPolicy.display(s.policy?.installed), latest = latest,
             available = s.policy?.updateAvailable == true, checking = s.checking,
-            job = s.job, jobTitle = latest?.let { "Updating to $it" }, outcome = s.outcome, steps = GitUpdater.STEPS,
+            job = s.job, jobTitle = latest?.let { "Updating to $it" }, outcome = s.outcome, steps = updater.steps,
         )
     }
 
-    override fun load(context: Context) = GitUpdater.load(context)
+    override fun load(context: Context) = updater.load(context)
 
-    override suspend fun check(context: Context) = withContext(Dispatchers.IO) { GitUpdater.checkBlocking(context) }
+    override suspend fun check(context: Context) = withContext(Dispatchers.IO) { updater.checkBlocking(context) }
 
     override suspend fun update(context: Context) {
-        if (GitUpdater.state.value.policy?.updateAvailable != true) return
-        GitUpdater.update(context)
-        GitUpdater.state.first { !it.running }
+        if (updater.state.value.policy?.updateAvailable != true) return
+        updater.update(context)
+        updater.state.first { !it.running }
+    }
+}
+
+val GitSource = AptSource(UpdateComponent.Git, GitUpdater)
+
+/** Rust shows only while the tool has it: no installed version otherwise, and Check now skips its apt-get update. */
+val RustSource = AptSource(UpdateComponent.Rust, RustUpdater)
+
+/**
+ * Flutter (decision 75): a newer stable for the default version only. Updating adds it as a new version, makes it the
+ * default and removes the old default; other versions stay, and a project's pin is never changed (a project pinning
+ * the old one gets it back with `fvm install <version>`).
+ */
+object FlutterSource : UpdateSource {
+    override val component = UpdateComponent.Flutter
+    private val checking = MutableStateFlow(false)
+    override val row = combine(FlutterRust.state, checking) { s, busy ->
+        val default = s.defaultVersion
+        val adding = s.action == FlutterAction.AddVersion && s.target == s.latestStable
+        UpdateRow(
+            component, installed = default?.takeIf { s.flutterInstalled }, latest = s.latestStable,
+            available = s.flutterInstalled && FlutterTool.newerStable(default, s.latestStable), checking = busy,
+            job = if (adding) s.job else null, jobTitle = s.latestStable?.let { "Updating to $it" },
+            outcome = if (adding && s.failed) Outcome(s.outcome ?: "Stopped.", failed = true) else null,
+            steps = FlutterTool.flutterSteps(s.latestStable),
+        )
+    }
+
+    /** Flutter's answer is not kept across restarts, so read it once per run, as for Dockito. */
+    override fun load(context: Context) {
+        FlutterRust.refresh()
+        if (FlutterRust.flutterInstalled() && FlutterRust.state.value.latestStable == null) FlutterRust.loadReleasesLater()
+    }
+
+    override suspend fun check(context: Context) {
+        if (!FlutterRust.flutterInstalled()) return
+        checking.value = true
+        try {
+            withContext(Dispatchers.IO) { FlutterRust.loadReleases() }
+        } finally {
+            checking.value = false
+        }
+        FlutterRust.refresh()
+    }
+
+    override suspend fun update(context: Context) {
+        val s = FlutterRust.state.value
+        val latest = s.latestStable ?: return
+        val old = s.defaultVersion ?: return
+        if (!FlutterTool.newerStable(old, latest) || s.running) return
+        FlutterRust.updateDefault(context, latest, replaces = old)
+        FlutterRust.awaitJob()
     }
 }
 

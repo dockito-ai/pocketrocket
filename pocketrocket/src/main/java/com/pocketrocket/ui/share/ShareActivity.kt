@@ -46,7 +46,7 @@ import com.pocketrocket.sessions.attachments.PendingAttachments
 import com.pocketrocket.ui.chat.ChatSheet
 import com.pocketrocket.ui.chat.SessionActivity
 import com.pocketrocket.ui.sessions.displayPath
-import com.pocketrocket.ui.sessions.label
+import com.pocketrocket.ui.sessions.statusLabel
 import com.pocketrocket.ui.theme.PocketRocketTheme
 import com.pocketrocket.ui.theme.PrTheme
 import com.pocketrocket.ui.theme.PrType
@@ -159,10 +159,10 @@ private fun ShareSheet(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Box(Modifier.size(10.dp).clip(CircleShape).background(c.status(state.status)))
+                    Box(Modifier.size(10.dp).clip(CircleShape).background(c.status(state.shownStatus)))
                     Column(Modifier.weight(1f)) {
                         Text(state.title, style = PrType.body.copy(fontWeight = FontWeight.SemiBold), color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("${state.status.label} · ${displayPath(state.folder)}", style = PrType.caption, color = c.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("${state.statusLabel} · ${displayPath(state.folder)}", style = PrType.caption, color = c.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Box(
                         Modifier.size(18.dp).clip(CircleShape).border(2.dp, if (on) c.accent else c.borderStrong, CircleShape),

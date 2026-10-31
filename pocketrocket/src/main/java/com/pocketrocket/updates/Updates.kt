@@ -18,7 +18,7 @@ import kotlinx.coroutines.awaitAll
 /** What the Updates screen and its Settings row show. */
 data class UpdatesState(
     val rows: List<UpdateRow> = emptyList(),
-    /** When the last Check now (all four) ended, epoch millis; 0 never. */
+    /** When the last Check now (every row) ended, epoch millis; 0 never. */
     val checkedAt: Long = 0,
     val checking: Boolean = false,
     /** The update running now, and the ones waiting after it, in order. */
@@ -35,20 +35,20 @@ data class UpdatesState(
 }
 
 /**
- * The Updates screen's model (decision 41): the four [UpdateSource]s behind one state. Check now asks all
- * four at once; updates run one at a time from a queue, PocketRocket always last because installing it
+ * The Updates screen's model (decision 41): the [UpdateSource]s behind one state. Check now asks them
+ * all at once; updates run one at a time from a queue, PocketRocket always last because installing it
  * restarts the app. Nothing checks or installs on its own except [onAppOpen]'s check when the last is old.
  */
 object Updates {
     private const val PREFS = "pocketrocket"
     private const val KEY_CHECKED_AT = "updates_checked_at"
 
-    val sources: List<UpdateSource> = listOf(AppSource, ClaudeSource, GitSource, DockitoSource)
+    val sources: List<UpdateSource> = listOf(AppSource, ClaudeSource, GitSource, DockitoSource, FlutterSource, RustSource)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val control = MutableStateFlow(UpdatesState())
 
-    private val rows = combine(sources.map { it.row }) { rows -> rows.toList() }
+    private val rows = combine(sources.map { it.row }) { rows -> rows.filter { it.shown } }
 
     val state: StateFlow<UpdatesState> = rows
         .combine(control) { rows, c -> c.copy(rows = rows) }
@@ -57,7 +57,7 @@ object Updates {
     @Volatile private var loaded = false
     private var runner: kotlinx.coroutines.Job? = null
 
-    /** Installed versions and cached checks, no network; then a check of all four when the last is older than [checkAfterMs]. */
+    /** Installed versions and cached checks, no network; then a check of all when the last is older than [checkAfterMs]. */
     fun onAppOpen(context: Context, checkAfterMs: Long = 6 * 60 * 60 * 1000L) {
         val app = context.applicationContext
         if (!loaded) {
@@ -69,7 +69,7 @@ object Updates {
         if (System.currentTimeMillis() - control.value.checkedAt >= checkAfterMs) checkAll(app)
     }
 
-    /** Check now: asks all four in parallel. Not while updating. */
+    /** Check now: asks every source in parallel. Not while updating. */
     fun checkAll(context: Context) {
         val app = context.applicationContext
         synchronized(this) {

@@ -37,6 +37,9 @@ class FakeClaudeTransport(private val script: FakeScript) : ClaudeTransport {
     private var currentTurn: Job? = null
     private var turnIndex = 0
     private var listener: ClaudeTransport.Listener? = null
+    /** Subagent task ids to their Agent call ids, from the lines played; and the calls whose agent was stopped. */
+    private val agentTasks = mutableMapOf<String, String>()
+    private val stoppedAgents = mutableSetOf<String>()
 
     override fun start(listener: ClaudeTransport.Listener) {
         this.listener = listener
@@ -54,7 +57,7 @@ class FakeClaudeTransport(private val script: FakeScript) : ClaudeTransport {
             when (step) {
                 is FakeStep.Emit -> {
                     delay(step.delayMs)
-                    listener.onLine(step.line)
+                    if (played(step.line)) listener.onLine(step.line)
                 }
                 is FakeStep.AskPermission -> {
                     delay(step.delayMs)
@@ -84,6 +87,7 @@ class FakeClaudeTransport(private val script: FakeScript) : ClaudeTransport {
     private fun controlRequest(id: String, request: JSONObject) {
         val reply = when (request.optString("subtype")) {
             "interrupt" -> return interrupt()
+            "stop_task" -> return stopTask(id, request.optString("task_id"))
             "set_permission_mode" -> JSONObject().put("mode", request.optString("mode"))
             "set_model" -> JSONObject().put("model", request.optString("model"))
             "mcp_status" -> FakeLines.mcpStatus()
@@ -97,6 +101,31 @@ class FakeClaudeTransport(private val script: FakeScript) : ClaudeTransport {
 
     private fun refuse(id: String, error: String) {
         val response = JSONObject().put("subtype", "error").put("request_id", id).put("error", error)
+        listener?.onLine(JSONObject().put("type", "control_response").put("response", response).toString())
+    }
+
+    /**
+     * Whether [line] goes out: a stopped agent's own lines don't. Notes each subagent's task id on the way, so
+     * `stop_task` can find it.
+     */
+    private fun played(line: String): Boolean {
+        val json = runCatching { JSONObject(line) }.getOrNull() ?: return true
+        val system = json.optString("type") == "system"
+        val toolUseId = json.optString("tool_use_id")
+        synchronized(agentTasks) {
+            if (system && json.optString("task_type") == "local_agent") agentTasks[json.optString("task_id")] = toolUseId
+            return json.optString("parent_tool_use_id") !in stoppedAgents && !(system && toolUseId in stoppedAgents)
+        }
+    }
+
+    /** Like the CLI (checked on 2.1.309): the agent ends as stopped and the turn goes on without it. */
+    private fun stopTask(id: String, taskId: String) {
+        val toolUseId = synchronized(agentTasks) { agentTasks[taskId]?.also { stoppedAgents += it } } ?: return refuse(id, "No task $taskId")
+        listener?.onLine(
+            JSONObject().put("type", "system").put("subtype", "task_notification").put("task_id", taskId).put("tool_use_id", toolUseId)
+                .put("status", "stopped").toString(),
+        )
+        val response = JSONObject().put("subtype", "success").put("request_id", id).put("response", JSONObject())
         listener?.onLine(JSONObject().put("type", "control_response").put("response", response).toString())
     }
 

@@ -87,11 +87,12 @@ data class SessionState(
         get() = items.count { it is ChatItem.Tool && it.backgroundShell && it.shellRunning }
 
     /**
-     * The status cards and tab dots show: a session whose turn ended while shells still run in the background is
-     * still working, so it does not read Done while a build goes on.
+     * The status shown everywhere outside the chat (cards, dots, the service notification, Rocket): a session whose
+     * turn ended while subagents or background shells still run is still working, so it does not read Done while
+     * work goes on (decisions 69 and 79).
      */
     val shownStatus: SessionStatus
-        get() = if (runningShells > 0 && (status == SessionStatus.Done || status == SessionStatus.WaitingForInput)) SessionStatus.Working else status
+        get() = status.shownWith(runningAgents + runningShells)
 
     /** The line a session card shows: the latest thing said or done. */
     val lastLine: String
@@ -108,6 +109,16 @@ data class SessionState(
             ?: preview
             ?: "Say what to work on"
 }
+
+/** This status with [running] subagents and background shells still at work: a finished turn reads Working until they end. */
+fun SessionStatus.shownWith(running: Int): SessionStatus =
+    if (running > 0 && (this == SessionStatus.Done || this == SessionStatus.WaitingForInput)) SessionStatus.Working else this
+
+/** "1 agent", "2 shells", "1 agent · 2 shells": what still runs in the background; empty when nothing does. */
+fun runningWork(agents: Int, shells: Int): String = listOfNotNull(
+    agents.takeIf { it > 0 }?.let { if (it == 1) "1 agent" else "$it agents" },
+    shells.takeIf { it > 0 }?.let { if (it == 1) "1 shell" else "$it shells" },
+).joinToString(" · ")
 
 /** claude-haiku-4-5-20251001 -> Haiku 4.5; anything else is returned as is. */
 internal fun prettyModel(id: String): String {
