@@ -63,21 +63,6 @@ Using the results, each tool becomes one of:
 
 Each choice is Shankar's call and goes into `decisions.md`.
 
-## Phase 3: Environments (later)
+## Idea for later: bundles
 
-A section in Tools for bundles of tools that go together, so setting up a kind of project is one tap. An environment is only a list of existing tools and options: installing it installs whichever aren't there yet; removing a tool still happens on its own page. First candidates, to be fixed by the sweep results:
-
-| Environment | Tools |
-|---|---|
-| Android | Android, Android NDK, Device testing when built |
-| Flutter | Flutter & Dart, Rust (for `flutter_rust_bridge`), Android |
-| MERN | Node (included), MongoDB or a stand-in if the server has no Android build, Headless Chrome for testing |
-| Cloudflare / Workers | Wrangler, Rust with the wasm target |
-| Python / data | Python, uv, sqlite3, PostgreSQL |
-
-Design (where it sits in Tools, a third tab or a section at the top of Add-ons) comes after the sweep, with a mockup, as for the Tools tabs.
-
-## Open questions
-
-- MERN: if MongoDB has no Android build, is a stand-in acceptable (FerretDB over PostgreSQL), or does the environment drop it?
-- "Merge stack": which stack is meant? MEAN (Angular) or something else?
+Not planned. Shankar floated it on 31 Oct 2026: bundles of tools that go together (mobile, Flutter, a web stack) installed with one tap, each just a list of existing tools. Revisit once the sweep shows what works.
