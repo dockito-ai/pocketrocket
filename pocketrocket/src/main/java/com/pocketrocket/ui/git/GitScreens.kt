@@ -53,4 +53,5 @@ sealed interface GitRoute {
     data class File(val path: String) : GitRoute
     data class Pr(val number: Int) : GitRoute
     data class PrDiff(val number: Int, val path: String) : GitRoute
+    data object Worktrees : GitRoute
 }

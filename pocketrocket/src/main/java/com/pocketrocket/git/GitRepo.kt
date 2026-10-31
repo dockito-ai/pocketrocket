@@ -156,6 +156,25 @@ class GitRepo(context: Context, val root: File) {
 
     suspend fun removeWorktree(dir: File) = write("worktree", "remove", "--force", dir.path)
 
+    /** Every worktree of this repo, the main checkout first. */
+    suspend fun worktrees(): List<Worktree> = io { GitParsers.worktrees(read("worktree", "list", "--porcelain", "-z")) }
+
+    /** Uncommitted files in the worktree at [path] (untracked too); null when git can't read it. */
+    suspend fun changesIn(path: String): Int? = io {
+        val r = git.run("-C", path, "status", "--porcelain", "-z")
+        if (r.ok) GitParsers.changeCount(r.out) else null
+    }
+
+    /** When the worktree at [path] last got a commit (unix seconds); null when unknown. */
+    suspend fun lastCommitIn(path: String): Long? = io { git.run("-C", path, "log", "-1", "--format=%ct").out.trim().toLongOrNull() }
+
+    /** Removes a worktree whatever it holds; a locked one (a Claude agent's) needs force twice. */
+    suspend fun removeWorktree(path: String, locked: Boolean): GitOutcome =
+        if (locked) write("worktree", "remove", "--force", "--force", path) else write("worktree", "remove", "--force", path)
+
+    /** Forgets worktrees whose folders are gone. */
+    suspend fun pruneWorktrees() = write("worktree", "prune")
+
     /** A worktree folder inside this repo (a workspace that is itself the repo) goes in .git/info/exclude, so it never shows as untracked. */
     private suspend fun ignoreIfInside(dir: File) = io {
         val relative = dir.path.removePrefix(root.path + "/").takeIf { it != dir.path } ?: return@io

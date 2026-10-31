@@ -99,6 +99,19 @@ GitScreens.startSession(context, folder, title, prompt)   // a Claude session in
   (dot folder). When the workspace is the repo itself, `/.worktrees/` goes into `.git/info/exclude`. The session is
   `SessionManager.startClaude` in that folder, renamed to the branch.
 
+### Worktrees (decision 71)
+
+- `git worktree list --porcelain -z` (`GitParsers.worktrees`): path, HEAD, branch (none when detached), `locked [reason]`
+  (Claude Code's agents lock theirs: `claude agent agent-…`), `prunable [reason]`. The first entry is the main checkout.
+- Per worktree (`WorktreeRows.load`, in parallel, on each panel refresh): `git -C <path> status --porcelain -z`
+  (renames counted once), `git -C <path> log -1 --format=%ct`, merged into the default branch (the panel's
+  `mergedInto` set), and sessions whose folder is in it (`SessionManager.sessions`; working or waiting counts as working).
+- "Worktrees · N" card under the branch card when there is any besides the main checkout; `GitRoute.Worktrees` opens
+  `WorktreesScreen`. Remove: `git worktree remove --force <path>` (`--force --force` when locked), then `git branch -d`
+  when asked and merged. Clean up: every `tidy` row (merged, clean, no session, not locked, on a branch), then
+  `git worktree prune`. Prune missing: `git worktree prune`. The main checkout and the folder the panel is open on
+  can't be removed.
+
 ### Graph
 
 - The Commits tab is now **Graph**, with This branch / All branches (default All, as in the mockup). Data:
