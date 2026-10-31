@@ -37,7 +37,7 @@ class ClaudeLauncherTest {
 
     private fun run(file: File, env: Map<String, String>, vararg args: String): String {
         // stdout only: a desktop loader may warn about the empty helper on stderr.
-        val pb = ProcessBuilder(listOf("bash", file.path) + args).redirectError(ProcessBuilder.Redirect.DISCARD)
+        val pb = ProcessBuilder(listOf("bash", file.path) + args).redirectError(File("/dev/null"))
         pb.environment().apply { remove("CLAUDE_CODE_SHELL"); remove("LD_PRELOAD"); putAll(env) }
         val p = pb.start()
         val out = p.inputStream.bufferedReader().readText().trim()
