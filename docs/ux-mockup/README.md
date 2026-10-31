@@ -9,3 +9,5 @@ Screens: Main (Home: sessions with project tabs), Session, Controls, NewSession,
 `Attachments.html` (29 Oct 2026, plain HTML drawn in this style, not from Claude Design): the composer "+" sheet, attachment tray, sent message and Share to PocketRocket. Option A is the approved one (decision 24).
 
 `Backup.dc.html` (31 Oct 2026, plain HTML in this style): Settings › Backup, back up and restore in every state (decision 53).
+
+`BackgroundTasks.html` (31 Oct 2026, plain HTML in this style, with buttons that stand in for Claude Code's events): background Bash cards, the counts beside the mode, the Background sheet, a shell's output screen, Move to background, the End session warning and the service notification (decision 69).

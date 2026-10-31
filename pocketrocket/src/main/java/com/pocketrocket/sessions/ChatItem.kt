@@ -28,7 +28,7 @@ sealed interface ChatItem {
 
     /**
      * A tool call and, once it arrives, its result. [result] is null while the tool runs. A Task/Agent call carries
-     * its subagent's progress in [agent].
+     * its subagent's progress in [agent]; a Bash call Claude Code runs as a task carries its [shell].
      */
     data class Tool(
         override val id: String,
@@ -38,6 +38,7 @@ sealed interface ChatItem {
         val result: String? = null,
         val isError: Boolean = false,
         val agent: AgentRun? = null,
+        val shell: ShellRun? = null,
     ) : ChatItem
 
     /** Something went wrong: an API error, a failed turn or the process exiting. */
