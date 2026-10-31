@@ -12,18 +12,18 @@ import com.pocketrocket.sessions.SessionStatus
 
 /**
  * What Termux's service notification shows while chat sessions are open: a headline for the most urgent
- * session ("pocketrocket needs you"), a coloured, lettered count per state ("1W  1E  2IP  1D", in urgency order and tab-dot colours),
+ * session ("pocketrocket needs you"), a coloured symbol and count per state ("✋ 1  ⚠ 1  ⧗ 2  ✓ 1", in urgency order and tab-dot colours),
  * one line per session when expanded, a clock since sessions started working, and an Open button for the
  * session that needs a look. Colours are the app's status colours (ui/theme/StatusColors).
  */
 internal object KeepAliveNotification {
 
-    /** How a session is counted here, most urgent first; [letter] tags its count: W waiting on you, E error, IP in progress, D done. */
-    enum class Group(private val one: String, private val many: String, val letter: String, val color: Int) {
-        NeedsYou("needs you", "need you", "W", 0xFFF5B83D.toInt()),
-        Error("error", "errors", "E", 0xFFFF6B6B.toInt()),
-        Working("working", "working", "IP", 0xFF7AB4FF.toInt()),
-        Done("done", "done", "D", 0xFF5BD69A.toInt());
+    /** How a session is counted here, most urgent first; [symbol] tags its count: ✋ needs you, ⚠ error, ⧗ in progress, ✓ done. Text-style symbols, so they take the state colour. */
+    enum class Group(private val one: String, private val many: String, val symbol: String, val color: Int) {
+        NeedsYou("needs you", "need you", "\u270B\uFE0E", 0xFFF5B83D.toInt()),
+        Error("error", "errors", "\u26A0\uFE0E", 0xFFFF6B6B.toInt()),
+        Working("working", "working", "\u29D7", 0xFF7AB4FF.toInt()),
+        Done("done", "done", "\u2713", 0xFF5BD69A.toInt());
 
         fun words(count: Int) = if (count == 1) one else many
     }
@@ -80,8 +80,8 @@ internal object KeepAliveNotification {
 
         val strip = SpannableStringBuilder()
         counts(shown).forEach { (group, count) ->
-            if (strip.isNotEmpty()) strip.append("  ")
-            coloured(strip, group, "$count${group.letter}")
+            if (strip.isNotEmpty()) strip.append("   ")
+            coloured(strip, group, "${group.symbol} $count")
         }
         val shells = shown.sumOf { it.shells }
         if (shells > 0) strip.append("   ·  ").append(shellCount(shells)).append(" running")
