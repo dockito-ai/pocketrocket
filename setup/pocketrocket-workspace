@@ -1,5 +1,5 @@
 #!/data/data/app.pocket/files/usr/bin/bash
-# pocketrocket-workspace: add or clone PocketRocket workspaces from a shell (decision 72).
+# pocketrocket-workspace: add or clone PocketRocket workspaces from a shell (decision 73).
 # Installed as $PREFIX/bin/pocketrocket-workspace by the app at every start.
 #
 #   pocketrocket-workspace add <path> [--name N] [--github ID] [--claude ID] [--dockito ID]

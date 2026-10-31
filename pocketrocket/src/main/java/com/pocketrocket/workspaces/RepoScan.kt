@@ -14,7 +14,7 @@ object RepoScan {
         dir.listFiles()?.filter { it.isDirectory && !it.name.startsWith(".") && it.name !in skip }?.sortedBy { it.name.lowercase() }.orEmpty()
 
     /**
-     * Repos under [root] that aren't workspaces and aren't in one (decision 71): cloned from a terminal or by
+     * Repos under [root] that aren't workspaces and aren't in one (decision 72): cloned from a terminal or by
      * Claude, so the Workspaces list can offer to make them workspaces. [workspaces] are their paths. Walks
      * folders at any depth up to [maxDepth], skipping hidden ones, [skip] and symlinks, and never descends
      * into a workspace or a repo (a repo with workspaces inside it is walked through instead, so workspaces

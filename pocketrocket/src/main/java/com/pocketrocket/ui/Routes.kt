@@ -39,7 +39,7 @@ object Routes {
     /** Settings › Assistant › Projects: a switch per project. */
     const val ASSISTANT_PROJECTS = "assistant-projects"
 
-    /** New workspace on an existing folder (a repo that isn't a workspace yet, decision 71): name and folder filled in. */
+    /** New workspace on an existing folder (a repo that isn't a workspace yet, decision 72): name and folder filled in. */
     fun newWorkspace(folder: String) = "$NEW_WORKSPACE|$folder"
 
     fun workspace(path: String) = "ws|$path"

@@ -6,7 +6,7 @@ import org.junit.Test
 import java.io.File
 import java.nio.file.Files
 
-/** Decision 71: repos under ~/projects that aren't workspaces, found by [RepoScan.notWorkspaces]. */
+/** Decision 72: repos under ~/projects that aren't workspaces, found by [RepoScan.notWorkspaces]. */
 class RepoScanTest {
     private val root: File = Files.createTempDirectory("projects").toFile()
 

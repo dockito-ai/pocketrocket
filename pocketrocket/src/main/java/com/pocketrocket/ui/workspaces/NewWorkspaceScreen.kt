@@ -55,7 +55,7 @@ private enum class StartWith { Clone, Init, Folder }
  * New workspace (mockup NewWorkspace): a name, a folder under ~/projects that Shankar picks, the Claude
  * and GitHub accounts (defaults preselected) and how to start. Creating it binds the folder to the
  * accounts (AccountWiring.bind). [onCreated] gets the folder and whether to go on to Clone.
- * With [initialFolder] (a repo the Workspaces list found outside any workspace, decision 71) it makes that
+ * With [initialFolder] (a repo the Workspaces list found outside any workspace, decision 72) it makes that
  * folder a workspace: name and location are filled in and there is nothing to start with.
  */
 @Composable

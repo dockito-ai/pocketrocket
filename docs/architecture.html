@@ -114,7 +114,7 @@
 
 <h3>Workspaces from a shell</h3>
 <div class="flow"><span><code>pocketrocket-workspace</code></span><i>→ <code>&lt;id&gt;.req</code> →</i><span>WorkspaceRequests (FileObserver)</span><i>→</i><span>WorkspaceCliRunner</span><i>→</i><span>Workspaces.add, CloneManager</span><i>→ <code>&lt;id&gt;.out</code>, <code>&lt;id&gt;.exit</code> →</i><span>the script prints and exits</span></div>
-<p>Requests go through <code>~/.pocketrocket/requests/</code>, which only the app's uid can read. The app does the work with the same code as its screens, so the Workspaces list updates at once. Add, clone and list only (decision 72).</p>
+<p>Requests go through <code>~/.pocketrocket/requests/</code>, which only the app's uid can read. The app does the work with the same code as its screens, so the Workspaces list updates at once. Add, clone and list only (decision 73).</p>
 
 <h2>5. Staying alive and telling you</h2>
 <div class="flow"><span>SessionManager</span><i>status change →</i><span>SessionKeepAlive</span><i>→</i><span>TermuxService + wake lock</span></div>

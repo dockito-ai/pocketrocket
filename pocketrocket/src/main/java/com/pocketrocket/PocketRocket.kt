@@ -47,7 +47,7 @@ object PocketRocket {
         com.pocketrocket.notifications.CloneNotifier.init(context)
         com.pocketrocket.assistant.WakeWord.init(context)
         com.pocketrocket.notifications.WorkspaceNotifier.init(context)
-        // pocketrocket-workspace in a shell: install the script and answer its requests (decision 72).
+        // pocketrocket-workspace in a shell: install the script and answer its requests (decision 73).
         thread(name = "pocketrocket-workspace-cli", isDaemon = true) { com.pocketrocket.workspaces.WorkspaceRequests.start(context) }
         thread(name = "pocketrocket-accounts", isDaemon = true) { AccountWiring.refresh() }
         thread(name = "pocketrocket-storage", isDaemon = true) { SharedStorage.linkIfNeeded(context) }

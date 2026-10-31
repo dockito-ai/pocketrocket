@@ -13,7 +13,7 @@ import com.pocketrocket.workspaces.Workspace
 import com.pocketrocket.workspaces.Workspaces
 
 /**
- * "Claude added <name> as a workspace" (decision 72): posted when `pocketrocket-workspace` makes a new
+ * "Claude added <name> as a workspace" (decision 73): posted when `pocketrocket-workspace` makes a new
  * workspace, so a workspace that appears from a session never goes unnoticed. Tapping opens the app.
  */
 object WorkspaceNotifier {

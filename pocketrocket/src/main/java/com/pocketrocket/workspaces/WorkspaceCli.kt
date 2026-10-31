@@ -5,7 +5,7 @@ import com.pocketrocket.profiles.FolderBinding
 import java.io.File
 
 /**
- * The pure half of `pocketrocket-workspace` (decision 72): what a request file says, what its arguments
+ * The pure half of `pocketrocket-workspace` (decision 73): what a request file says, what its arguments
  * mean, which paths are allowed and which accounts a new workspace gets. No Android and no app state here;
  * [WorkspaceCliRunner] does the work and [WorkspaceRequests] carries requests and answers.
  */

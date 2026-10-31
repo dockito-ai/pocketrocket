@@ -14,7 +14,7 @@ import java.io.File
 import java.io.FileOutputStream
 
 /**
- * How `pocketrocket-workspace` (setup/pocketrocket-workspace, decision 72) reaches the app: files in
+ * How `pocketrocket-workspace` (setup/pocketrocket-workspace, decision 73) reaches the app: files in
  * ~/.pocketrocket/requests/, which only the app's own uid can read or write, the same way Claude's
  * sign-in hands its URL back through a file (auth/ClaudeLogin). The script writes `<id>.req` (by rename,
  * so it is never read half-written); the app, watching the folder, takes it (renames it to `.taken`),

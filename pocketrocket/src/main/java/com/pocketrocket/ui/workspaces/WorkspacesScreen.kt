@@ -62,14 +62,14 @@ private sealed interface TreeNode {
     val key: String
     /**
      * A folder with workspaces in it ("work/"); [label] is empty for ~/projects itself. [repos] are repos in it
-     * that aren't workspaces (decision 71), offered as "Make workspace".
+     * that aren't workspaces (decision 72), offered as "Make workspace".
      */
     data class Group(override val key: String, val label: String, val folder: String, val workspaces: List<Workspace>, val repos: List<File>) : TreeNode
     /** A folder under ~/projects without workspaces, collapsed with its subfolder count. */
     data class Folder(override val key: String, val label: String, val folder: File, val children: List<File>) : TreeNode
 }
 
-/** Reads folders (repos at any depth, decision 71): call it off the main thread. */
+/** Reads folders (repos at any depth, decision 72): call it off the main thread. */
 private fun tree(workspaces: List<Workspace>): List<TreeNode> {
     val root = Workspaces.projectsRoot
     val repos = RepoScan.notWorkspaces(root, workspaces.map { it.path })
@@ -271,7 +271,7 @@ private fun SubfolderRow(label: String, onClick: () -> Unit) {
     }
 }
 
-/** A repo that isn't a workspace (decision 71): "Not a workspace · Make workspace" opens New workspace on it. */
+/** A repo that isn't a workspace (decision 72): "Not a workspace · Make workspace" opens New workspace on it. */
 @Composable
 private fun NotWorkspaceRow(name: String, modifier: Modifier, onClick: () -> Unit) {
     val c = PrTheme.colors

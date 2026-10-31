@@ -18,7 +18,7 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * Runs one `pocketrocket-workspace` request inside the app (decision 72), through the same code as the
+ * Runs one `pocketrocket-workspace` request inside the app (decision 73), through the same code as the
  * screens: [Workspaces.add] (which binds the accounts, so ~/.gitconfig's includeIf and env.sh follow) and
  * [CloneManager] for clones. Add and clone only: nothing is removed, renamed or moved from a shell.
  * [out] gets the lines the script prints; the result is its exit code.
@@ -131,7 +131,7 @@ object WorkspaceCliRunner {
         return path
     }
 
-    /** Flags first, then the target's or the caller's workspace (decision 72); each id is checked to exist. */
+    /** Flags first, then the target's or the caller's workspace (decision 73); each id is checked to exist. */
     private fun accountsFor(target: String, request: WorkspaceCli.Request, given: AccountPicks): AccountPicks {
         val explicit = AccountPicks(
             claude = given.claude?.let { WorkspaceCli.match("Claude", it, ClaudeAccounts.current.accounts).id },

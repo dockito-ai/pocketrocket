@@ -27,10 +27,10 @@ ticked and its name typed.
     `includeIf gitdir:` only applies once the repo exists. The clone screen can switch to another GitHub
     account in its top bar; that clone then uses its key and gh login, and the new repo is bound to it.
   - `RepoScan`: repo folders found by walking the disk. `notWorkspaces` lists repos under `~/projects`
-    that aren't workspaces or in one (decision 71), for the Workspaces list's "Not a workspace · Make
+    that aren't workspaces or in one (decision 72), for the Workspaces list's "Not a workspace · Make
     workspace" rows; it skips hidden folders, dependencies, build output and symlinks, never goes into a
     repo or a workspace, and stops six levels down.
-  - `WorkspaceCli`, `WorkspaceCliRunner`, `WorkspaceRequests`: `pocketrocket-workspace` (decision 72), see
+  - `WorkspaceCli`, `WorkspaceCliRunner`, `WorkspaceRequests`: `pocketrocket-workspace` (decision 73), see
     below.
   - `GhRepos`: every repo an account can reach (`/user/repos`: own, collaborator, organization) with that
     account's own `GH_CONFIG_DIR`.
@@ -48,7 +48,7 @@ ticked and its name typed.
   Accent and the rest, hex for hex), text sizes, building blocks and line icons. TODO: point them at the
   shared `ui/theme` tokens once those merge.
 
-## `pocketrocket-workspace` (decision 72)
+## `pocketrocket-workspace` (decision 73)
 
 ```
 pocketrocket-workspace add <path> [--name N] [--github ID] [--claude ID] [--dockito ID]
