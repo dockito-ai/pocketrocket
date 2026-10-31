@@ -111,13 +111,13 @@ internal fun backgroundCounts(agents: Int, shells: Int): List<Pair<String, Boole
     shells.takeIf { it > 0 }?.let { (if (it == 1) "1 shell" else "$it shells") to true },
 )
 
-/** How the terminal shows each mode under its prompt. */
+/** How Claude Code shows each mode under its prompt, with ‖ and ▸▸ for its ⏸ and ⏵⏵. */
 fun modeLine(mode: PermissionMode): String = when (mode) {
-    PermissionMode.Manual -> "▸ manual"
-    PermissionMode.AcceptEdits -> "▸▸ accept edits"
+    PermissionMode.Manual -> "‖ manual mode on"
+    PermissionMode.AcceptEdits -> "▸▸ accept edits on"
     // Not ⏸: Android draws it as an emoji.
-    PermissionMode.Plan -> "‖ plan mode"
-    PermissionMode.Auto -> "▸▸ auto mode"
+    PermissionMode.Plan -> "‖ plan mode on"
+    PermissionMode.Auto -> "▸▸ auto mode on"
 }
 
 /** Claude Code's own colours for each mode (its `inactive`, `autoAccept`, `planMode` and `warning`), dark and light. */
