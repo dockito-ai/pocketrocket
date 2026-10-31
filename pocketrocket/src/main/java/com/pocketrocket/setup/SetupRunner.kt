@@ -75,6 +75,8 @@ object SetupRunner {
         if (exitCode == 0 && sawDone) {
             SetupPrefs.markDone(context)
             Dockito.load()
+            // At app start home didn't exist yet: install pocketrocket-workspace and listen now.
+            com.pocketrocket.workspaces.WorkspaceRequests.start(context)
             _state.update { it.finish(StepStatus.Done).copy(phase = SetupPhase.Done, progress = null, detail = null) }
         } else {
             _state.update {

@@ -35,17 +35,26 @@ object CloneManager {
     /** Starts [request] when a slot is free; the service and its notification start with it. */
     fun start(context: Context, request: CloneRequest): CloneJob? {
         app = context.applicationContext
-        return queue.start(request)?.also { CloneService.start(app) }
+        return queue.start(request)?.also { startService() }
     }
 
     fun cancel(id: Int) = queue.cancel(id)
 
     fun retry(context: Context, id: Int): CloneJob? {
         app = context.applicationContext
-        return queue.retry(id)?.also { CloneService.start(app) }
+        return queue.retry(id)?.also { startService() }
     }
 
     fun dismiss(id: Int) = queue.dismiss(id)
+
+    /**
+     * The clone already runs; the service only keeps it alive. Android 12+ may refuse a foreground service
+     * started from the background (a clone asked for by `pocketrocket-workspace` while the app isn't on
+     * screen); the clone then goes on in the process sessions keep alive, without its own notification.
+     */
+    private fun startService() {
+        runCatching { CloneService.start(app) }.onFailure { android.util.Log.w("PocketRocketClone", "clone service not started", it) }
+    }
 
     private fun run(request: CloneRequest): Flow<CloneProgress> {
         val parent = File(request.parent)
@@ -66,7 +75,10 @@ object CloneManager {
         val other = cloneAs != null && cloneAs.id != folderAccount?.id
         val ws = Workspaces.containing(dir.path)
             ?.also { if (other) AccountWiring.bind(dir.path, parent?.claude, cloneAs!!.id, parent?.dockito) }
-            ?: Workspaces.add(dir.path, dir.name, claude = null, github = if (other) cloneAs!!.id else parent?.github)
+            ?: Workspaces.add(
+                dir.path, request.workspaceName ?: dir.name,
+                claude = request.claude, github = if (other) cloneAs!!.id else parent?.github, dockito = request.dockito,
+            )
         runCatching { RepoStatus.refresh(app, ws) }
         return ws.path
     }
