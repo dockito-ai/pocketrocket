@@ -13,7 +13,7 @@ PocketRocket is a native Android app wrapped around Anthropic's own Claude Code 
 
 PocketRocket is a fork of [Termux](https://github.com/termux/termux-app), licensed under the GNU GPL v3 (see `LICENSE.md`). It is not affiliated with Anthropic or the Termux project.
 
-> **A personal tool, still under active development.** I built PocketRocket for my own phone and my own way of working, and I use it every day. It is not a product: there is no support, and things change or break without notice. You're welcome to try it, but expect rough edges.
+> **Early and experimental.** PocketRocket is a [Dockito Labs](https://dockito.ai) project, under active development, and we use it every day. Things move fast and can break between releases, so expect rough edges.
 
 ## Screenshots
 
@@ -30,13 +30,13 @@ PocketRocket is a fork of [Termux](https://github.com/termux/termux-app), licens
   </tr>
 </table>
 
-## Why I made it
+## Why we made it
 
-I wanted a workstation in my pocket. A laptop is great at a desk, but I'm not always at one, and I didn't want my work to wait until I was. With PocketRocket the phone is enough. I can start a task, let Claude work on it, check in, answer a question, look over the diff and push, whether I'm on the sofa, travelling or out somewhere.
+We wanted a workstation in our pocket. A laptop is great at a desk, but we're not always at one, and work shouldn't have to wait until we are. With PocketRocket the phone is enough. You can start a task, let Claude work on it, check in, answer a question, look over the diff and push, whether you're on the sofa, travelling or out somewhere.
 
-It's about comfort and convenience. It isn't meant to replace the laptop; I just don't want to depend on it for everything.
+It's about comfort and convenience. It isn't meant to replace the laptop; it just means you don't have to depend on it for everything.
 
-Phones are powerful enough now: mine has 24 GB of RAM and 512 GB of storage. What was missing was a comfortable way to work on one. The Claude app runs Claude Code in Anthropic's cloud, not on my own folders and accounts. A raw Termux terminal is painful on a phone screen. So PocketRocket brings the parts I rely on at the laptop (several sessions, workspaces with repos, git, multiple accounts) onto the phone, made for the screen in your hand.
+Phones are powerful enough now: the one we build on has 24 GB of RAM and 512 GB of storage. What was missing was a comfortable way to work on one. The Claude app runs Claude Code in Anthropic's cloud, not on your own folders and accounts. A raw Termux terminal is painful on a phone screen. So PocketRocket brings the parts we rely on at the laptop (several sessions, workspaces with repos, git, multiple accounts) onto the phone, made for the screen in your hand.
 
 ## What it does
 
@@ -73,7 +73,7 @@ Phones are powerful enough now: mine has 24 GB of RAM and 512 GB of storage. Wha
 
 ## Requirements
 
-- An **arm64 Android phone**. I build and test on Android 16 (Poco F7); older versions may work but aren't tested.
+- An **arm64 Android phone**. We build and test on Android 16 (Poco F7); older versions may work but aren't tested.
 - A **Claude account** with Claude Code access, such as a Pro or Max plan.
 - A few GB of free space, plus more for any add-on tools.
 - Android only: iOS doesn't let an app run programs like this.
@@ -103,7 +103,7 @@ You need the Android SDK with NDK, and JDK 17 or newer.
 
 ## Feedback
 
-Bug reports and ideas are welcome in [Issues](../../issues). Since this is a personal tool, I can't promise a fix or a reply. For security problems, see `SECURITY.md`.
+Bug reports and ideas are welcome in [Issues](../../issues). It's an experimental Labs project, so we can't promise a fix or a reply to everything. For security problems, see `SECURITY.md`.
 
 ## Credits and licence
 
@@ -111,4 +111,4 @@ Bug reports and ideas are welcome in [Issues](../../issues). Since this is a per
 - **The glibc launcher.** The way Claude Code's glibc binary runs on Termux comes from [claude-code-android](https://github.com/ferrumclaudepilgrim/claude-code-android) (MIT); see `setup/NOTICE`.
 - **Claude Code** is Anthropic's software, downloaded from Anthropic at first run under their terms.
 
-PocketRocket is not affiliated with Anthropic, Google, Cloudflare or the Termux project.
+PocketRocket is made by [Dockito Labs](https://dockito.ai). It is not affiliated with Anthropic, Google, Cloudflare or the Termux project.
