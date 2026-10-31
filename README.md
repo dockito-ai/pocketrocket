@@ -1,10 +1,32 @@
 # PocketRocket
 
+[![Latest release](https://img.shields.io/github/v/release/ShankarKakumani/pocketrocket?include_prereleases)](../../releases)
+[![Downloads](https://img.shields.io/github/downloads/ShankarKakumani/pocketrocket/total)](../../releases)
+[![Stars](https://img.shields.io/github/stars/ShankarKakumani/pocketrocket?style=flat)](../../stargazers)
+[![Licence: GPL-3.0](https://img.shields.io/badge/licence-GPL--3.0-blue)](LICENSE.md)
+![Views](https://komarev.com/ghpvc/?username=ShankarKakumani-pocketrocket&label=Views&color=0e75b6&style=flat)
+<!-- The Views badge counts README loads, not unique visitors. -->
+
 Claude Code on an Android phone, in one app. The phone is the machine: repos, sessions and tools all live on it, and Claude runs there, not in the cloud.
 
 PocketRocket is a fork of [Termux](https://github.com/termux/termux-app) and is licensed under the GNU General Public License v3 (see `LICENSE.md`). It is not affiliated with the Termux project; Termux's original README is kept at `docs/upstream-termux-README.md`, and bundled third-party software is listed in `THIRD_PARTY.md`.
 
 > **A personal tool, still under development.** I built PocketRocket for myself, for my own phone and my own way of working. It is not a product, there is no support, and things change or break without notice. You're welcome to look around and try it, but expect rough edges.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/1-sessions.png" width="220" alt="Sessions list"><br><sub>Every session's state at a glance</sub></td>
+    <td align="center"><img src="docs/screenshots/2-chat.png" width="220" alt="Session chat"><br><sub>Chat with tool calls and permission cards</sub></td>
+    <td align="center"><img src="docs/screenshots/3-new-session.png" width="220" alt="New session"><br><sub>Start a session: folder, account, model, mode</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/4-settings.png" width="220" alt="Settings"><br><sub>Settings: accounts, health, tools, updates</sub></td>
+    <td align="center"><img src="docs/screenshots/5-tools.png" width="220" alt="Tools"><br><sub>Tools: built in and optional</sub></td>
+    <td align="center"><img src="docs/screenshots/6-tool-page.png" width="220" alt="Tool page"><br><sub>A tool page: what it does, size, install</sub></td>
+  </tr>
+</table>
 
 ## Why I made it
 
