@@ -53,8 +53,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import com.pocketrocket.sessions.ChatItem
-import com.pocketrocket.workspaces.GitHead
-import com.pocketrocket.ui.git.GitScreens
 import androidx.compose.ui.platform.LocalContext
 import com.pocketrocket.sessions.Session
 import com.pocketrocket.sessions.SessionStatus
@@ -182,7 +180,6 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
                 ),
                 onOpenModel = { controlsAtModel = true; controls = true },
                 onOpenControls = { controlsAtModel = false; controls = true }, onShowBackground = { background = true },
-                onOpenBranches = { GitHead.repoRoot(state.folder)?.let { GitScreens.openBranches(context, it.path) } },
                 onSwitchMode = { session.setMode(state.mode.tapNext) },
             )
         }
