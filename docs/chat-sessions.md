@@ -202,7 +202,7 @@ To change a skill's state, pipe `{"name":"foo","state":"off"}` (optional `handle
 
 ### Starting stdio servers on the phone
 
-The launcher unsets `LD_PRELOAD` (the bionic `libtermux-exec` would crash the glibc binary) and `/usr/bin/env` doesn't exist on Android, so anything that relies on Termux rewriting shebang paths fails. Measured:
+The launcher unsets `LD_PRELOAD` (the bionic `libtermux-exec` would crash the glibc binary) and `/usr/bin/env` doesn't exist on Android, so anything that relies on Termux rewriting shebang paths fails. (The Bash tool's shells get the helper back from `pocketrocket-bash`, `docs/tool-sweep.md` Phase 0; stdio servers are started by Claude Code directly and don't.) Measured:
 
 | Server command | Result in `mcp_status` |
 |---|---|

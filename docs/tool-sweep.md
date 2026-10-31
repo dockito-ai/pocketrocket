@@ -29,6 +29,28 @@ Plan: the launcher sets `CLAUDE_CODE_SHELL` to a small PocketRocket bash wrapper
 
 Phase 0 ships on its own, before the sweep, because it changes the result for about half of the list.
 
+### Phase 0 result (31 Oct 2026, branch `fix/env-shebang`)
+
+Done as planned, with `CLAUDE_CODE_SHELL`; no fallback was needed. Claude Code (2.1.316) takes the variable only when the path is executable and contains `bash` or `zsh`, otherwise it logs "is not a valid bash/zsh path" and falls back to detection, so the wrapper is `setup/pocketrocket-bash`, installed as `$PREFIX/bin/pocketrocket-bash`. It sets `LD_PRELOAD=$PREFIX/lib/libtermux-exec.so` (unless one is set) and execs `$PREFIX/bin/bash "$@"`. `setup/claude` points `CLAUDE_CODE_SHELL` at it when it exists and the user hasn't set one; Claude Code itself still runs with `LD_PRELOAD` unset.
+
+Measured on the phone with a nested `claude -p` through copies of both launchers in a temp folder, the Bash tool printed:
+
+```
+shell=<tmp>/bin/pocketrocket-bash
+LD_PRELOAD=/data/data/app.pocket/files/usr/lib/libtermux-exec.so
+env-shebang-ok                         # a #!/usr/bin/env sh script
+node_modules/.bin ok, node v24.22.1    # a #!/usr/bin/env node bin in a temp npm project
+npx 12.2.1
+git version 2.56.0
+ripgrep 15.2.0
+Flutter 3.47.9 • channel [user-branch] • https://github.com/flutter/flutter.git
+Dart SDK version: 3.13.7 (stable) (Thu Oct 22 14:28:57 2026 -0700) on "linux_arm64"
+```
+
+A second run: a background shell (`run_in_background`) ran the env-shebang script, and a git `pre-commit` hook with `#!/usr/bin/env sh` ran on commit. Without the wrapper the same script fails with `/usr/bin/env: bad interpreter`. Flutter is unaffected: its launcher keeps or sets the helper for Flutter's scripts and its wrappers drop it before Dart and the engine tools. glibc programs a Claude shell starts now get the helper, as they do in a terminal; the ones PocketRocket ships drop it themselves (`claude`, `dockito`, Flutter's wrappers). MCP servers are spawned by Claude Code directly, so `McpConfig.kt`'s `LD_PRELOAD` advice stays.
+
+Reaching phones already set up: the setup script writes both launchers in full setup, `--only claude` and `--switch`; the app also copies them from its assets at every start when they differ (`Launchers.refreshClaude`, only where `$PREFIX/bin/claude` exists), the way it already installs `pocketrocket-workspace`. So installing the new APK and opening it is enough; sessions started after that get the wrapper. `ClaudeLauncherTest` covers the launcher (wrapper set, a user's own shell kept, none without the wrapper) and the wrapper.
+
 ## Phase 1: the sweep
 
 `spikes/tool-sweep/` (removed after the spike, as other spikes):

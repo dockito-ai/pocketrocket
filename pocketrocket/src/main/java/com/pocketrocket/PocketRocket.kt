@@ -36,8 +36,8 @@ object PocketRocket {
     /**
      * App start: brings back saved sessions (paused) and their notifications and keep-alive, and
      * re-generates the account wiring (git and shell config) in case an older version wrote it,
-     * remakes ~/storage if storage access is given but the links are missing, and starts answering
-     * `pocketrocket-workspace` requests.
+     * remakes ~/storage if storage access is given but the links are missing, starts answering
+     * `pocketrocket-workspace` requests, and brings the claude launcher up to this APK's.
      */
     @JvmStatic
     fun init(context: Context) {
@@ -52,6 +52,8 @@ object PocketRocket {
         // pocketrocket-workspace in a shell: install the script and answer its requests (decision 73).
         thread(name = "pocketrocket-workspace-cli", isDaemon = true) { com.pocketrocket.workspaces.WorkspaceRequests.start(context) }
         thread(name = "pocketrocket-accounts", isDaemon = true) { AccountWiring.refresh() }
+        // The claude launcher and its shell from this APK (docs/tool-sweep.md, Phase 0).
+        thread(name = "pocketrocket-launchers", isDaemon = true) { com.pocketrocket.setup.Launchers.refreshClaude(context) }
         thread(name = "pocketrocket-storage", isDaemon = true) { SharedStorage.linkIfNeeded(context) }
     }
 }
