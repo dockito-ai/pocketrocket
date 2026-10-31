@@ -78,7 +78,7 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
     var picked by remember { mutableStateOf<Draft?>(null) }
     val rows = state.items.size + if (working) 1 else 0
     val dictator = rememberDictator()
-    // Settings over the session's own process, for the effort on the model chip and in the controls.
+    // Settings over the session's own process, for the effort in the status line and in the controls.
     val scope = rememberCoroutineScope()
     val setupPanel = remember(session.id) { SetupPanel(SessionMcpHost(context.applicationContext, session), scope) }
     val alive by session.alive.collectAsState()
@@ -173,15 +173,15 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
                 onSend = session::send,
                 commands = state.commands, draft = state.draft, insert = picked, active = active,
                 dictator = dictator,
-                chip = ComposerChip(
-                    modelChipText(
-                        state.modelName, settings.settings?.appliedEffort,
-                        SetupChoices.effortLevels(state.models, settings.settings?.appliedModel ?: state.model),
-                    ),
-                ) { controlsAtModel = true; controls = true },
             )
             StatusLine(
-                state, onOpenControls = { controlsAtModel = false; controls = true }, onShowBackground = { background = true },
+                state,
+                model = modelChipText(
+                    state.modelName, settings.settings?.appliedEffort,
+                    SetupChoices.effortLevels(state.models, settings.settings?.appliedModel ?: state.model),
+                ),
+                onOpenModel = { controlsAtModel = true; controls = true },
+                onOpenControls = { controlsAtModel = false; controls = true }, onShowBackground = { background = true },
                 onOpenBranches = { GitHead.repoRoot(state.folder)?.let { GitScreens.openBranches(context, it.path) } },
                 onSwitchMode = { session.setMode(state.mode.tapNext) },
             )
