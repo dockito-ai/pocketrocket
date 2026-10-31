@@ -16,6 +16,7 @@ import com.pocketrocket.sessions.store.SessionStore
 import com.pocketrocket.sessions.transport.ClaudeProcessTransport
 import com.pocketrocket.sessions.transport.FakeClaudeTransport
 import com.pocketrocket.termux.Termux
+import com.pocketrocket.workspaces.WorkspaceCli
 import com.termux.shared.termux.TermuxConstants.TERMUX_HOME_DIR_PATH
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -168,14 +169,21 @@ object SessionManager {
         hidden -= session
     }
 
-    /** The real process: a fresh conversation, or `--resume` when Claude Code already has it on disk. */
-    private fun connect(state: SessionState): ClaudeProcessTransport = connect(state, AgentHook.arguments(app))
+    /**
+     * The real process: a fresh conversation, or `--resume` when Claude Code already has it on disk.
+     * An ordinary session gets the agent hook, and the note on `pocketrocket-workspace` in Claude's system prompt (decision 72).
+     * Rocket's hidden session leaves the note out: it clones with its own `clone_repo` tool and delegates other work to sessions.
+     */
+    private fun connect(state: SessionState): ClaudeProcessTransport =
+        connect(state, AgentHook.arguments(app) + listOf("--append-system-prompt", WorkspaceCli.CLAUDE_NOTE))
 
     private fun connect(state: SessionState, arguments: List<String>, extraEnvironment: Map<String, String> = emptyMap()): ClaudeProcessTransport {
         Termux.startForegroundService(app)
         val resume = Transcript.exists(state)
-        // The session's Claude account, plus the GitHub account its folder is bound to (GH_CONFIG_DIR).
-        val environment = state.profile.environment + AccountWiring.toolEnvFor(state.folder) + AndroidBuild.environment() + extraEnvironment
+        // The session's Claude account, plus the GitHub account its folder is bound to (GH_CONFIG_DIR), and its
+        // folder for pocketrocket-workspace, which takes accounts from the session's workspace (decision 72).
+        val environment = state.profile.environment + AccountWiring.toolEnvFor(state.folder) + AndroidBuild.environment() +
+            (WorkspaceCli.SESSION_FOLDER_ENV to state.folder) + extraEnvironment
         return ClaudeProcessTransport(app, File(state.folder), state.conversationId, resume, environment, extraArguments = arguments)
     }
 

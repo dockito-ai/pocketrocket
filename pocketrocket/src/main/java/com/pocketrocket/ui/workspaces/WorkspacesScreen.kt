@@ -25,6 +25,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -50,29 +51,43 @@ import com.pocketrocket.ui.components.mockText
 import com.pocketrocket.workspaces.RepoStatus
 import com.pocketrocket.workspaces.RepoSummary
 import com.pocketrocket.workspaces.Workspace
+import com.pocketrocket.workspaces.RepoScan
 import com.pocketrocket.workspaces.Workspaces
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /** A folder heading in the tree with the workspaces right under it, or a plain folder holding none. */
 private sealed interface TreeNode {
     val key: String
-    /** A folder with workspaces in it ("work/"); [label] is empty for ~/projects itself. */
-    data class Group(override val key: String, val label: String, val folder: String, val workspaces: List<Workspace>) : TreeNode
+    /**
+     * A folder with workspaces in it ("work/"); [label] is empty for ~/projects itself. [repos] are repos in it
+     * that aren't workspaces (decision 71), offered as "Make workspace".
+     */
+    data class Group(override val key: String, val label: String, val folder: String, val workspaces: List<Workspace>, val repos: List<File>) : TreeNode
     /** A folder under ~/projects without workspaces, collapsed with its subfolder count. */
     data class Folder(override val key: String, val label: String, val folder: File, val children: List<File>) : TreeNode
 }
 
+/** Reads folders (repos at any depth, decision 71): call it off the main thread. */
 private fun tree(workspaces: List<Workspace>): List<TreeNode> {
     val root = Workspaces.projectsRoot
-    val groups = workspaces.groupBy { File(it.path).parent.orEmpty() }.map { (parent, list) ->
+    val repos = RepoScan.notWorkspaces(root, workspaces.map { it.path })
+    val byParent = workspaces.groupBy { File(it.path).parent.orEmpty() }
+    val reposByParent = repos.groupBy { it.parent.orEmpty() }
+    val groups = (byParent.keys + reposByParent.keys).map { parent ->
         val label = when {
             parent == root.path -> ""
             parent.startsWith(root.path + "/") -> parent.removePrefix(root.path + "/") + "/"
             else -> Workspaces.tilde(parent) + "/"
         }
-        TreeNode.Group("g:$parent", label, parent, list.sortedBy { it.name.lowercase() })
+        TreeNode.Group(
+            "g:$parent", label, parent,
+            byParent[parent].orEmpty().sortedBy { it.name.lowercase() },
+            reposByParent[parent].orEmpty().sortedBy { it.name.lowercase() },
+        )
     }.sortedBy { it.label }
-    val taken = workspaces.map { it.path }
+    val taken = workspaces.map { it.path } + repos.map { it.path }
     val folders = root.listFiles().orEmpty()
         .filter { it.isDirectory && !it.name.startsWith(".") }
         .filter { dir -> taken.none { it == dir.path || it.startsWith(dir.path + "/") } }
@@ -102,7 +117,8 @@ fun WorkspacesScreen(navigate: (String) -> Unit) {
         onPauseOrDispose {}
     }
     LaunchedEffect(workspaces, refresh) { RepoStatus.refreshAll(context, workspaces) }
-    val nodes = remember(workspaces, refresh) { tree(workspaces) }
+    // The walk for repos outside workspaces reads folders: off the main thread, keeping the last tree meanwhile.
+    val nodes by produceState<List<TreeNode>?>(null, workspaces, refresh) { value = withContext(Dispatchers.IO) { tree(workspaces) } }
 
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -123,14 +139,14 @@ fun WorkspacesScreen(navigate: (String) -> Unit) {
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            if (nodes.isEmpty()) item {
+            if (nodes?.isEmpty() == true) item {
                 Text(
                     "No workspaces yet. A workspace is a folder under ~/projects that holds one or more repos. Clone a repo or make a new workspace to start.",
                     style = mockText(13.sp, color = c.textMuted).copy(lineHeight = 19.sp),
                     modifier = Modifier.padding(4.dp),
                 )
             }
-            nodes.forEachIndexed { index, node ->
+            nodes.orEmpty().forEachIndexed { index, node ->
                 when (node) {
                     is TreeNode.Group -> {
                         val expanded = node.key !in closed
@@ -148,6 +164,11 @@ fun WorkspacesScreen(navigate: (String) -> Unit) {
                                     onClick = { navigate(Routes.workspace(ws.path)) },
                                     onLongClick = { editing = ws.path to ws },
                                 )
+                            }
+                        }
+                        if (expanded) node.repos.forEach { repo ->
+                            item(key = "r:" + repo.path) {
+                                NotWorkspaceRow(repo.name, Modifier.padding(start = indent)) { navigate(Routes.newWorkspace(repo.path)) }
                             }
                         }
                     }
@@ -246,6 +267,24 @@ private fun SubfolderRow(label: String, onClick: () -> Unit) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(label, style = mockText(13.sp, color = c.textSoft, mono = true), modifier = Modifier.weight(1f))
             Text("Make workspace", style = mockText(12.sp, color = c.accent))
+        }
+    }
+}
+
+/** A repo that isn't a workspace (decision 71): "Not a workspace · Make workspace" opens New workspace on it. */
+@Composable
+private fun NotWorkspaceRow(name: String, modifier: Modifier, onClick: () -> Unit) {
+    val c = PrTheme.colors
+    MockBox(modifier.fillMaxWidth(), radius = 12.dp, background = c.background, border = BorderStroke(1.dp, c.iconTile), onClick = onClick) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(name, style = mockText(13.sp, color = c.textSoft, mono = true), modifier = Modifier.weight(1f), maxLines = 1)
+            Text(
+                buildAnnotatedString {
+                    append("Not a workspace · ")
+                    withStyle(SpanStyle(color = c.accent)) { append("Make workspace") }
+                },
+                style = mockText(12.sp, color = c.textMuted),
+            )
         }
     }
 }

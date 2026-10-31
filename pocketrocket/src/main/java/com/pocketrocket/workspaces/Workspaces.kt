@@ -32,10 +32,7 @@ object Workspaces {
     fun get(path: String): Workspace? = AccountPaths.normalize(path).let { p -> all.firstOrNull { it.path == p } }
 
     /** The workspace [folder] is in (itself or the nearest one above it), or null. */
-    fun containing(folder: String): Workspace? {
-        val p = AccountPaths.normalize(folder)
-        return all.filter { p == it.path || p.startsWith(it.path + "/") }.maxByOrNull { it.path.length }
-    }
+    fun containing(folder: String): Workspace? = WorkspaceCli.containing(all, AccountPaths.normalize(folder))
 
     /** Marks [path] as a workspace, creating the folder, and binds it to the given accounts (null: default). */
     fun add(path: String, name: String, claude: String?, github: String?, dockito: String? = null): Workspace {

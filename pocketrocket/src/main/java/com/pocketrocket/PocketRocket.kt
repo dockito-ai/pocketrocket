@@ -36,7 +36,8 @@ object PocketRocket {
     /**
      * App start: brings back saved sessions (paused) and their notifications and keep-alive, and
      * re-generates the account wiring (git and shell config) in case an older version wrote it,
-     * and remakes ~/storage if storage access is given but the links are missing.
+     * remakes ~/storage if storage access is given but the links are missing, and starts answering
+     * `pocketrocket-workspace` requests.
      */
     @JvmStatic
     fun init(context: Context) {
@@ -45,6 +46,9 @@ object PocketRocket {
         SessionManager.init(context)
         com.pocketrocket.notifications.CloneNotifier.init(context)
         com.pocketrocket.assistant.WakeWord.init(context)
+        com.pocketrocket.notifications.WorkspaceNotifier.init(context)
+        // pocketrocket-workspace in a shell: install the script and answer its requests (decision 72).
+        thread(name = "pocketrocket-workspace-cli", isDaemon = true) { com.pocketrocket.workspaces.WorkspaceRequests.start(context) }
         thread(name = "pocketrocket-accounts", isDaemon = true) { AccountWiring.refresh() }
         thread(name = "pocketrocket-storage", isDaemon = true) { SharedStorage.linkIfNeeded(context) }
     }
