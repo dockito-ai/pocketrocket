@@ -83,6 +83,8 @@ internal object KeepAliveNotification {
             if (strip.isNotEmpty()) strip.append("  ")
             coloured(strip, group, "$count${group.letter}")
         }
+        val shells = shown.sumOf { it.shells }
+        if (shells > 0) strip.append("   ·  ").append(shellCount(shells)).append(" running")
         if (terminals > 0) strip.append("   ·  $terminals terminal${if (terminals == 1) "" else "s"}")
 
         val inbox = Notification.InboxStyle().setBigContentTitle(headline)
@@ -92,6 +94,7 @@ internal object KeepAliveNotification {
             dot(line, group)
             bold(line, session.title)
             line.append("  ").append(group.words(1))
+            if (session.shells > 0) line.append(" · ").append(shellCount(session.shells))
             inbox.addLine(line)
         }
         if (shown.size > MAX_LINES) inbox.setSummaryText("+${shown.size - MAX_LINES} more")
@@ -113,6 +116,9 @@ internal object KeepAliveNotification {
         }
         return true
     }
+
+    /** "1 shell", "3 shells": background shells, as the status line under the chat box counts them. */
+    fun shellCount(n: Int): String = if (n == 1) "1 shell" else "$n shells"
 
     private fun dot(text: SpannableStringBuilder, group: Group) {
         val start = text.length

@@ -33,24 +33,33 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pocketrocket.sessions.ChatItem
+import com.pocketrocket.sessions.shellRunning
 
 /**
  * A compact tool call (Session.dc.html): the tool name and its target in JetBrains Mono, then ✓ (or ✗, or a spinner
  * while it runs). Edits show their added and removed line counts. Tap for the full input and output.
+ *
+ * A Bash call run as a shell task shows its own state ("background · 1:02", "✗ exit 1 · 0:08") and, in the
+ * background, its latest output line; tapping it opens the output ([onOpenOutput]) once there is a file to show. A
+ * foreground one running past [MOVE_AFTER_MS] offers [onMoveToBackground].
  */
 @Composable
-fun ToolCallCard(tool: ChatItem.Tool) {
+fun ToolCallCard(tool: ChatItem.Tool, onOpenOutput: () -> Unit = {}, onMoveToBackground: () -> Unit = {}) {
     val c = PrTheme.colors
     var expanded by rememberSaveable(tool.id) { mutableStateOf(false) }
     val shape = RoundedCornerShape(12.dp)
     val counts = remember(tool.inputJson) { editCounts(tool.name, tool.inputJson) }
+    val shell = tool.shell
+    val running = tool.shellRunning
+    val now by tickingNow(running && shell?.background == false)
+    val movable = shell != null && running && !shell.background && (shell.elapsedMs(now) ?: 0) >= MOVE_AFTER_MS
     Column(
         Modifier
             .fillMaxWidth()
             .clip(shape)
             .background(c.card)
-            .border(1.dp, c.border, shape)
-            .clickable { expanded = !expanded }
+            .border(1.dp, if (running && shell?.background == true) c.blue.copy(alpha = 0.35f) else c.border, shape)
+            .clickable { if (shell?.outputFile != null) onOpenOutput() else expanded = !expanded }
             .animateContentSize(),
     ) {
         Row(
@@ -59,14 +68,22 @@ fun ToolCallCard(tool: ChatItem.Tool) {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(tool.name, style = PrType.code, color = c.textMuted, maxLines = 1)
-            Text(tool.summary, style = PrType.code, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            if (counts != null && tool.result != null && !tool.isError) {
+            Text(if (shell != null) shellTitle(tool) else tool.summary, style = PrType.code, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            if (shell != null) {
+                ShellMark(tool, shell)
+            } else if (counts != null && tool.result != null && !tool.isError) {
                 Text("+${counts.first}", style = PrType.code, color = c.green)
                 Text("−${counts.second}", style = PrType.code, color = c.red)
                 Text("›", style = PrType.small, color = c.textMuted)
             } else {
                 ResultMark(tool)
             }
+        }
+        if (shell != null && running && shell.background) {
+            Box(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 10.dp)) { ShellTailLine(shell, running) }
+        }
+        if (movable) {
+            Box(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 10.dp)) { MoveToBackgroundButton(onMoveToBackground) }
         }
         AnimatedVisibility(expanded) {
             Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -15,7 +15,7 @@ object Briefing {
     fun headline(sessions: List<SessionState>): String {
         val needs = sessions.count { it.permission != null }
         val failed = sessions.count { it.status == SessionStatus.Error }
-        val working = sessions.count { it.status == SessionStatus.Working || it.status == SessionStatus.Starting }
+        val working = sessions.count { it.shownStatus == SessionStatus.Working || it.shownStatus == SessionStatus.Starting }
         return when {
             needs > 0 -> "${count(needs)} ${if (needs == 1) "thing needs" else "things need"} you."
             failed > 0 -> "${count(failed)} ${if (failed == 1) "session" else "sessions"} failed."

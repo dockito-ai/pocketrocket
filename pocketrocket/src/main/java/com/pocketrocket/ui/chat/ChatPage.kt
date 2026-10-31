@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -54,7 +56,6 @@ import com.pocketrocket.ui.git.GitScreens
 import androidx.compose.ui.platform.LocalContext
 import com.pocketrocket.sessions.Session
 import com.pocketrocket.sessions.SessionStatus
-import com.pocketrocket.sessions.agentRunning
 import com.pocketrocket.ui.claudeconfig.SessionSetupSheet
 import com.pocketrocket.ui.claudeconfig.SessionStatusSheet
 
@@ -69,6 +70,8 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
     var controls by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf(false) }
     var setup by remember { mutableStateOf(false) }
+    var background by remember { mutableStateOf(false) }
+    var openShell by remember { mutableStateOf<String?>(null) }
     var picked by remember { mutableStateOf<Draft?>(null) }
     val rows = state.items.size + if (working) 1 else 0
 
@@ -108,7 +111,9 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
                         UserBubble(item.text, item.attachments, menu = menu)
                     }
                     is ChatItem.Assistant -> AssistantMessage(item.text)
-                    is ChatItem.Tool -> if (item.agent != null) AgentCard(item, item.agent) else ToolCallCard(item)
+                    is ChatItem.Tool -> if (item.agent != null) AgentCard(item, item.agent) else ToolCallCard(
+                        item, onOpenOutput = { openShell = item.id }, onMoveToBackground = { session.moveToBackground(item.id) },
+                    )
                     is ChatItem.Error -> ErrorRow(item.text)
                     is ChatItem.Notice -> NoticeRow(item.text, item.byRocket)
                 }
@@ -141,18 +146,22 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
             AnimatedVisibility(state.queued.isNotEmpty()) { QueuedMessages(state.queued, onSendNow = session::sendNow) }
             // An Edit stays open to Undo for a few seconds, until the CLI is told.
             AnimatedVisibility(state.rewind != null) { UndoBar(onUndo = session::undoEdit) }
+            // Claude Code's guess at the next message: tap sends it, long-press puts it in the box to edit.
+            val suggestion = state.suggestion?.takeIf { !working && state.permission == null && state.rewind == null && state.queued.isEmpty() }
+            AnimatedVisibility(suggestion != null) {
+                SuggestionChip(
+                    suggestion.orEmpty(),
+                    onSend = { session.send(suggestion.orEmpty()) },
+                    onEdit = { picked = Draft(suggestion.orEmpty(), (picked?.key ?: 0) + 1); session.dropSuggestion() },
+                )
+            }
             Composer(
                 state.id, working = working, onStop = session::interrupt,
                 onSend = session::send,
                 commands = state.commands, draft = state.draft, insert = picked, active = active,
             )
             StatusLine(
-                state, onOpenControls = { controls = true }, onCycleMode = session::cycleMode,
-                // Items are the list's first rows while any exist, so an item's index is its row.
-                onShowAgents = {
-                    val first = state.items.indexOfFirst { it is ChatItem.Tool && it.agentRunning }
-                    if (first >= 0) scope.launch { list.animateScrollToItem(first) }
-                },
+                state, onOpenControls = { controls = true }, onShowBackground = { background = true },
                 onOpenBranches = { GitHead.repoRoot(state.folder)?.let { GitScreens.openBranches(context, it.path) } },
             )
         }
@@ -168,8 +177,45 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
             onOpenSetup = { controls = false; setup = true },
         )
     }
+    if (background) {
+        BackgroundSheet(
+            state, onDismiss = { background = false },
+            onOpenShell = { openShell = it.id },
+            // Items are the list's first rows while any exist, so an item's index is its row.
+            onShowAgent = { agent ->
+                background = false
+                val at = state.items.indexOfFirst { it.id == agent.id }
+                if (at >= 0) scope.launch { list.animateScrollToItem(at) }
+            },
+            onStop = session::stopTask,
+        )
+    }
+    // Looked up on each change, so the screen follows the shell to its end.
+    (state.items.firstOrNull { it.id == openShell } as? ChatItem.Tool)?.let { tool ->
+        ShellOutputScreen(tool, onStop = session::stopTask, onDismiss = { openShell = null })
+    }
     if (status) SessionStatusSheet(session, state, onDismiss = { status = false })
     if (setup) SessionSetupSheet(session, state, onDismiss = { setup = false })
+}
+
+/** One suggested reply, as a pill at the left above the chat box: "↳ go ahead". */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SuggestionChip(text: String, onSend: () -> Unit, onEdit: () -> Unit, modifier: Modifier = Modifier) {
+    val c = PrTheme.colors
+    val shape = RoundedCornerShape(999.dp)
+    Row(modifier.fillMaxWidth()) {
+        Text(
+            "↳  $text",
+            style = PrType.body,
+            color = c.text,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.clip(shape).background(c.accentSurface).border(1.dp, c.accentBorder, shape)
+                .combinedClickable(onClick = onSend, onLongClick = onEdit, onClickLabel = "Send", onLongClickLabel = "Edit first")
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+        )
+    }
 }
 
 /** Shown while an Edit can still be taken back, before the CLI is told (Session.edit). */
