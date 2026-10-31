@@ -36,7 +36,7 @@ We wanted a workstation in our pocket. A laptop is great at a desk, but we're no
 
 It's about comfort and convenience. It isn't meant to replace the laptop; it just means you don't have to depend on it for everything.
 
-Phones are powerful enough now: the one we build on has 24 GB of RAM and 512 GB of storage. What was missing was a comfortable way to work on one. The Claude app runs Claude Code in Anthropic's cloud, not on your own folders and accounts. A raw Termux terminal is painful on a phone screen. So PocketRocket brings the parts we rely on at the laptop (several sessions, workspaces with repos, git, multiple accounts) onto the phone, made for the screen in your hand.
+Phones are powerful enough now: the one we build on has 16 GB of RAM and 512 GB of storage. What was missing was a comfortable way to work on one. The Claude app runs Claude Code in Anthropic's cloud, not on your own folders and accounts. A raw Termux terminal is painful on a phone screen. So PocketRocket brings the parts we rely on at the laptop (several sessions, workspaces with repos, git, multiple accounts) onto the phone, made for the screen in your hand.
 
 ## What it does
 
