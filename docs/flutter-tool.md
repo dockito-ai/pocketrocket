@@ -4,7 +4,7 @@ Decision 74. An optional tool for checking code on the phone, from a terminal or
 
 ## Install and remove
 
-Settings → Tools → Flutter & Rust. Nothing is bundled and first-run setup never installs it. Install takes the newest stable Flutter (it becomes the default) and Rust: about 580 MB to download, about 1.7 GB on the phone (1.1 GB per Flutter version, 590 MB for Rust). A project's packages come on top: Nimbus's `~/.pub-cache` is 1.1 GB, a Rust crate's `target/` a few hundred MB.
+Settings → Tools → Flutter & Rust. Nothing is bundled and first-run setup never installs it. Install takes the newest stable Flutter (it becomes the default) and Rust: about 580 MB to download, about 1.7 GB on the phone (1.1 GB per Flutter version, 590 MB for Rust). A project's packages come on top: a large app's `~/.pub-cache` is 1.1 GB, a Rust crate's `target/` a few hundred MB.
 
 It does not need the Android tool. Compile checks need no Android SDK, so the tile installs on its own; `flutter doctor` reports the missing Android toolchain, which is expected.
 

@@ -7,16 +7,16 @@ Decision 74. 31 Oct 2026, on Shankar's phone (Xiaomi, arm64, Android 15), from a
 | Check | Project | Result | Time |
 |---|---|---|---|
 | `flutter --version` | Flutter 3.44.1, Dart 3.12.1 | Works | 57 s the first time (builds the tool), then instant |
-| `flutter pub get` | Nimbus (path deps `nats_flutter`, `project_arwen` on `dev`) | Works | 167 s cold |
-| `dart run build_runner build` | Nimbus, 7,410 inputs | Works, 2,918 outputs | 539 s cold |
-| `flutter analyze` | Nimbus | Works, 0 errors, 748 warnings, 1,487 infos | 207 s cold, 42 s warm |
-| `flutter test` | Nimbus | Works, 20 pass, 7 fail, all 7 in Nimbus itself (stale expected strings, a test file without `main`) | 88 s |
-| `cargo check --all-targets` | `nats_flutter/rust` (tokio, async-nats, flutter_rust_bridge) | Works, 0 errors | 211 s cold |
+| `flutter pub get` | A large Flutter app (two sibling path dependencies) | Works | 167 s cold |
+| `dart run build_runner build` | Same app, 7,410 inputs | Works, 2,918 outputs | 539 s cold |
+| `flutter analyze` | Same app | Works, 0 errors, 748 warnings, 1,487 infos | 207 s cold, 42 s warm |
+| `flutter test` | Same app | Works, 20 pass, 7 fail, all 7 in the app itself (stale expected strings, a test file without `main`) | 88 s |
+| `cargo check --all-targets` | A plugin's Rust crate (tokio, flutter_rust_bridge) | Works, 0 errors | 211 s cold |
 | `cargo clippy --all-targets` | same | Works, real lints | 12 s warm |
 | `flutter create`, engine downloads | hello app | Works | |
 | `flutter build apk --debug` | hello app | Fails: Flutter execs `gradlew` (`#!/usr/bin/env bash`) directly. Not pursued | |
 
-The first `analyze` showed 13 errors, all from `nats_flutter` being on `main`. Nimbus's Codemagic clones its path dependencies on the flavor's branch, `dev` by default (`DEPS_BRANCH="${FLAVOR:-dev}"`). Worth telling the user when a project has sibling path dependencies.
+The first `analyze` showed 13 errors, all from a path dependency checked out on the wrong branch. Worth telling the user when a project has sibling path dependencies: they must be on the branch the project's CI uses.
 
 ## Flutter: what it took
 
@@ -36,10 +36,10 @@ The first `analyze` showed 13 errors, all from `nats_flutter` being on `main`. N
 | What | Size |
 |---|---|
 | Flutter 3.44.1 with Dart SDK and engine artifacts | 1.1 GB |
-| Nimbus's pub cache (`~/.pub-cache`) | 1.1 GB |
+| The app's pub cache (`~/.pub-cache`) | 1.1 GB |
 | Rust (`rust`, `rust-std-aarch64-linux-android`) | 590 MB |
 | `~/.cargo` after one crate's dependencies | 150 MB |
-| `nats_flutter` `target/` after check and clippy | 405 MB |
+| The crate's `target/` after check and clippy | 405 MB |
 
 ## For the tile
 
