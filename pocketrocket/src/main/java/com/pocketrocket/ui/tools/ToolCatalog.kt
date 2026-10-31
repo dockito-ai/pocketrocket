@@ -111,7 +111,7 @@ object ToolStates {
         checked = s.checked,
         job = ToolModel.job(s.running, s.failed, s.removing),
         progress = s.job?.progress,
-        versions = listOf("Wrangler" to WranglerTool.VERSION),
+        versions = listOf("Wrangler" to WranglerTool.VERSION, "workerd" to WranglerTool.WORKERD_VERSION),
         signedIn = if (s.signedIn) s.account ?: "Signed in" else null,
     )
 

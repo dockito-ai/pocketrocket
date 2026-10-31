@@ -35,7 +35,7 @@
 #                     POCKETROCKET_DOCKITO_URL and POCKETROCKET_DOCKITO_SHA256.
 #   --only android-build / android-build-remove  the optional Android build tool, Settings > Tools (decision 45)
 #   --only android-ndk / android-ndk-remove  the optional Android NDK tool, on top of it (decision 50)
-#   --only wrangler / wrangler-remove  the optional Wrangler tool, Settings > Tools (decision 49)
+#   --only wrangler / wrangler-remove  the optional Wrangler tool, Settings > Tools (decisions 49, 82)
 #   --only git-check  refresh the package index and print `apt-cache policy git` (its Installed and
 #                     Candidate lines) for the Updates screen; no steps, no lock, no [done]
 #   --only git-update upgrade git alone (and only what the new git needs) with the apt progress
@@ -1361,28 +1361,41 @@ dockito_check() {
 
 # The app's Claude Code screen (R9) runs only the Claude Code part, with its own log.
 # Settings > Updates runs the Claude Code, Dockito and Git parts. Settings > Tools runs only the Chromium or Android build part.
-# Wrangler, an optional tool (decision 49): Cloudflare's CLI for deploying and managing Workers, from npm at a pinned
-# version. workerd, its local runtime, has no Android build, so `wrangler dev` is left out: its install script is
-# skipped and its loader, which throws on Android when Wrangler starts, is pointed at a stub that says so. Node comes
-# with the base set, so the tool installs no packages. npm's download cache stays in a temp folder and goes when done.
+# Wrangler, an optional tool (decisions 49 and 82): Cloudflare's CLI for deploying and managing Workers, from npm at a
+# pinned version, with local dev. workerd, its local runtime, has no Android build: the stock linux-arm64 one uses
+# tcmalloc, which needs a 48-bit address space, and Android gives apps 39 bits. So workerd's install script is skipped,
+# its loader is pointed at a wrapper, and the wrapper runs a build of the same workerd version with tcmalloc off
+# (github.com/dockito-ai/workerd-android) through the glibc loader. Node and glibc come with the base set, so the
+# tool installs no packages. npm's download cache and the workerd download stay in temp folders and go when done.
 WRANGLER_VERSION="4.156.0"
 WRANGLER_NODE_MIN=22
 WRANGLER_DIR="${PREFIX:-}/lib/node_modules/wrangler"
 WRANGLER_MARKER=".pocketrocket-installed"
 WRANGLER_CONFIG="$HOME/.config/.wrangler"   # Wrangler's own folder, with its login, logs and telemetry choice
+# The workerd that wrangler@WRANGLER_VERSION pins. Bumping Wrangler means building its workerd there first.
+WORKERD_VERSION="1.20261023.1"
+WORKERD_URL="https://github.com/dockito-ai/workerd-android/releases/download/v${WORKERD_VERSION}/workerd-linux-arm64-notcmalloc-${WORKERD_VERSION}.tar.gz"
+WORKERD_SHA256="e2a7a6d99dc6998506436995880b64db0b561d6652a7f3ca6509bcbf04a59b5a"
+WORKERD_BYTES=40968480
 
-# Makes workerd's loader survive on Android: $1 is workerd/lib/main.js. Safe to run twice.
+# Points workerd's loader at the Android wrapper: $1 is workerd/lib/main.js. The wrapper runs lib/workerd-glibc, which
+# step_wrangler_workerd puts there. Safe to run twice.
 wrangler_patch_workerd() {
-  local main="$1" stub
-  stub="$(dirname "$main")/no-workerd"
-  grep -q '"no-workerd"' "$main" || grep -q '^function generateBinPath() {$' "$main" || return 1
-  printf '#!%s\necho "Local Workers (wrangler dev) is not available here: workerd has no Android build." >&2\nexit 1\n' \
-    "${PREFIX:-}/bin/sh" > "$stub"
-  chmod 700 "$stub"
-  grep -q '"no-workerd"' "$main" && return 0
-  sed -i.orig 's|^function generateBinPath() {$|function generateBinPath() {\n  if (process.platform === "android") return { binPath: require("path").join(__dirname, "no-workerd") };|' "$main"
+  local main="$1" dir wrapper
+  dir="$(cd "$(dirname "$main")" && pwd)"; wrapper="$dir/workerd-android"
+  grep -q '"workerd-android"' "$main" || grep -q '^function generateBinPath() {$' "$main" || return 1
+  # LD_PRELOAD is the bionic termux-exec, which breaks glibc programs. The certificates aren't where glibc expects.
+  cat > "$wrapper" <<EOF
+#!${PREFIX:-}/bin/sh
+unset LD_PRELOAD
+export SSL_CERT_FILE="\${SSL_CERT_FILE:-${PREFIX:-}/etc/tls/cert.pem}"
+exec "${PREFIX:-}/glibc/lib/ld-linux-aarch64.so.1" --library-path "${PREFIX:-}/glibc/lib" "$dir/workerd-glibc" "\$@"
+EOF
+  chmod 700 "$wrapper"
+  grep -q '"workerd-android"' "$main" && return 0
+  sed -i.orig 's|^function generateBinPath() {$|function generateBinPath() {\n  if (process.platform === "android") return { binPath: require("path").join(__dirname, "workerd-android") };|' "$main"
   rm -f "$main.orig"
-  grep -q '"no-workerd"' "$main"
+  grep -q '"workerd-android"' "$main"
 }
 
 step_wrangler_install() {
@@ -1401,6 +1414,43 @@ step_wrangler_install() {
   ok "wrangler ${WRANGLER_VERSION}"
 }
 
+# Downloads the Android build of workerd, checks it against the pinned SHA-256 and that it starts, then puts it in place.
+step_wrangler_workerd() {
+  step "Downloading the local runtime"
+  local wd="$WRANGLER_DIR/node_modules/workerd" dl="$TMPDIR/workerd-download" have out
+  have="$(jq -r .version "$wd/package.json" 2>/dev/null || true)"
+  [ "$have" = "$WORKERD_VERSION" ] || fail "wrangler ${WRANGLER_VERSION} wants workerd ${have:-unknown}, this setup has ${WORKERD_VERSION}"
+  [ -f "${PREFIX:-}/glibc/lib/ld-linux-aarch64.so.1" ] || fail "glibc loader missing (run the full setup first)"
+  rm -rf "$dl"; mkdir -p "$dl"
+  download_with_progress "$WORKERD_URL" "$dl/workerd.tar.gz" "$WORKERD_BYTES" || { rm -rf "$dl"; fail "workerd download failed"; }
+  verify_sha256 "$dl/workerd.tar.gz" "$WORKERD_SHA256" >>"$PR_LOG" 2>&1 || { rm -rf "$dl"; fail "workerd download failed its checksum"; }
+  tar -xzf "$dl/workerd.tar.gz" -C "$dl" workerd || { rm -rf "$dl"; fail "could not unpack workerd"; }
+  rm -f "$dl/workerd.tar.gz"
+  chmod 700 "$dl/workerd"
+  mv -f "$dl/workerd" "$wd/lib/workerd-glibc" || { rm -rf "$dl"; fail "could not put workerd in place"; }
+  rm -rf "$dl"
+  out="$(timeout 60 "$wd/lib/workerd-android" --version 2>&1)" || out="FAILED: $out"
+  printf '%s\n' "$out" >>"$PR_LOG"
+  printf '%s' "$out" | grep -q '^workerd ' || fail "workerd does not start here: $out"
+  ok "$out"
+}
+
+# wrangler_dev_check <project dir>: starts `wrangler dev` on a spare port, asks it for the check Worker's "ok", stops it.
+wrangler_dev_check() {
+  local d="$1" port=18787 pid got="" i
+  ( cd "$d" && WRANGLER_SEND_METRICS=false WRANGLER_LOG_PATH="$d/wrangler.log" \
+      exec timeout 120 wrangler dev --ip 127.0.0.1 --port "$port" ) >>"$PR_LOG" 2>&1 &
+  pid=$!
+  for i in $(seq 1 60); do
+    got="$(curl -fsS --max-time 3 "http://127.0.0.1:$port/" 2>/dev/null || true)"
+    [ "$got" = ok ] && break
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 1
+  done
+  kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null || true
+  [ "$got" = ok ]
+}
+
 step_wrangler_check() {
   step "Checking Wrangler"
   local out d="$TMPDIR/wrangler-check"
@@ -1413,9 +1463,10 @@ step_wrangler_check() {
   ( cd "$d" && WRANGLER_SEND_METRICS=false WRANGLER_LOG_PATH="$d/wrangler.log" wrangler deploy --dry-run --outdir out ) >>"$PR_LOG" 2>&1 \
     || { rm -rf "$d"; fail "wrangler deploy --dry-run failed"; }
   [ -s "$d/out/index.js" ] || { rm -rf "$d"; fail "wrangler deploy --dry-run built nothing"; }
+  wrangler_dev_check "$d" || { rm -rf "$d"; fail "wrangler dev did not answer a request"; }
   rm -rf "$d"
   : > "$WRANGLER_DIR/$WRANGLER_MARKER"
-  ok "wrangler deploy --dry-run works"
+  ok "wrangler deploy --dry-run and wrangler dev work"
   printf '[done]\n'
 }
 
@@ -1499,9 +1550,10 @@ main() {
         return 0
       fi
       if [ "$2" = wrangler ]; then
-        TOTAL_STEPS=3; PR_LOG="$PR_HOME/wrangler.log"
+        TOTAL_STEPS=4; PR_LOG="$PR_HOME/wrangler.log"
         step "Checking the device"; preflight_checks; ok "Termux on aarch64"
         step_wrangler_install
+        step_wrangler_workerd
         step_wrangler_check
         return 0
       fi
