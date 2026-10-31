@@ -201,7 +201,7 @@ private fun group(states: List<Pair<Session, SessionState>>): List<SessionGroup>
 private fun SummaryPill(states: List<SessionState>) {
     val c = PrTheme.colors
     val waiting = states.count { it.status == SessionStatus.WaitingForPermission }
-    val working = states.count { it.status == SessionStatus.Working || it.status == SessionStatus.Starting }
+    val working = states.count { it.shownStatus == SessionStatus.Working || it.shownStatus == SessionStatus.Starting }
     val parts = buildList {
         if (waiting > 0) add(c.amber to "$waiting needs you")
         if (working > 0) add(c.blue to "$working working")

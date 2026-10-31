@@ -31,6 +31,13 @@ class BriefingTest {
         assertEquals("No sessions yet.", Briefing.headline(emptyList()))
     }
 
+    @Test fun aFinishedTurnWithAnAgentRunningCountsAsWorking() {
+        val agent = session(SessionStatus.Done).copy(
+            items = listOf(com.pocketrocket.sessions.ChatItem.Tool("t", "Agent", "explore", "{}", agent = com.pocketrocket.sessions.AgentRun("explore"))),
+        )
+        assertEquals("One session is working.", Briefing.headline(listOf(agent, session(SessionStatus.Done))))
+    }
+
     @Test fun requestsAreSaidInWords() {
         assertEquals("x wants to run a command", Briefing.request("x", asked("Bash")))
         assertEquals("x has a plan to approve", Briefing.request("x", asked("ExitPlanMode")))

@@ -308,6 +308,15 @@ class AssistantToolsTest {
         assertNull(null)
     }
 
+    @Test fun aSessionWithAnAgentStillRunningIsListedAsWorking() {
+        host.live[0] = host.live[0].copy(
+            status = com.pocketrocket.sessions.SessionStatus.Done,
+            items = listOf(com.pocketrocket.sessions.ChatItem.Tool("t", "Agent", "explore", "{}", agent = com.pocketrocket.sessions.AgentRun("explore"))),
+        )
+        val line = call("list_sessions").text.lines().first { "nimbus" in it }
+        assertTrue(line, "| Working |" in line && "still running: 1 agent" in line)
+    }
+
     private companion object {
         fun state(id: String, title: String, folder: String) = SessionState(id, folder, title, demo = false, profile = ClaudeProfile.Default, conversationId = id)
     }
