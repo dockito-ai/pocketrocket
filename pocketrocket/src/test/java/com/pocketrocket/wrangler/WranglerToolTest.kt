@@ -15,7 +15,7 @@ class WranglerToolTest {
     private fun shell(code: String, vararg args: String): Pair<Int, String> {
         val p = ProcessBuilder(
             listOf("bash", "-c", "PREFIX=/tmp/pr-none POCKETROCKET_SETUP_SOURCE_ONLY=1 . \"$1\"; shift; $code", "_", script.path) + args,
-        ).redirectErrorStream(true).start()
+        ).redirectErrorStream(true).apply { environment()["PREFIX"] = "/tmp/pr-none" }.start() // stays set after sourcing
         val out = p.inputStream.bufferedReader().readText()
         return p.waitFor() to out
     }
