@@ -10,7 +10,7 @@ package com.pocketrocket.ui.tools
  * Built in tools come with PocketRocket (first-run setup installs them, they can't be removed) and show under
  * Included; optional ones are installed from Tools and show under Add-ons (decision 87).
  */
-enum class ToolKind(val tab: String) { BuiltIn("Included"), Optional("Add-ons") }
+enum class ToolKind(val tab: String) { Optional("Add-ons"), BuiltIn("Included") }
 
 /** The parts of a tool page, in page order. Each is shown only when it applies. */
 enum class ToolSection { Header, Version, Accounts, Storage, Install }
@@ -105,7 +105,7 @@ object ToolModel {
         else -> ToolJob.None
     }
 
-    /** Settings' Tools row: "4 included · 3 add-ons". */
+    /** Settings' Tools row, add-ons first like the tabs: "3 add-ons · 4 included". */
     fun summary(tools: List<Pair<ToolSpec, ToolState>>): String {
         val builtIn = tools.count { (spec, _) -> spec.kind == ToolKind.BuiltIn }
         val installed = tools.count { (spec, state) -> spec.kind == ToolKind.Optional && state.installed }
@@ -114,7 +114,7 @@ object ToolModel {
             1 -> "1 add-on"
             else -> "$installed add-ons"
         }
-        return "$builtIn included · $addOns"
+        return "$addOns · $builtIn included"
     }
 
     /** Whether [spec]'s name holds [query], ignoring case and spaces around it. A blank query matches every tool. */

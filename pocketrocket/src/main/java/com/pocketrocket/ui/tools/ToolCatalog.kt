@@ -87,6 +87,19 @@ enum class Tool(val spec: ToolSpec, val route: String) {
     }
 }
 
+/**
+ * An Updates row's icon: the same brand mark as its tool, and PocketRocket's own rocket (the launcher mark cropped)
+ * in its orange.
+ */
+val UpdateComponent.icon: ToolGlyph get() = when (this) {
+    UpdateComponent.PocketRocket -> ToolGlyph(R.drawable.ic_pr_notification, 0xFFFF7A1A)
+    UpdateComponent.ClaudeCode -> Tool.ClaudeCode.icon
+    UpdateComponent.Git -> Tool.Git.icon
+    UpdateComponent.Dockito -> Tool.Dockito.icon
+    UpdateComponent.Flutter -> Tool.Flutter.icon
+    UpdateComponent.Rust -> Tool.Rust.icon
+}
+
 /** How each module's state reads as a [ToolState]. */
 object ToolStates {
     fun node(s: NodeState) = ToolState(
