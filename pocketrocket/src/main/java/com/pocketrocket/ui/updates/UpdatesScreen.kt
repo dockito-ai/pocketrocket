@@ -81,7 +81,7 @@ object UpdatesRow {
 
 /**
  * Settings › Updates (docs/ux-mockup/Updates.dc.html): one row per component with its version, "Up to date"
- * or "Update to X" and Update; Check now for all four; Update all when more than one is out of date. A
+ * or "Update to X" and Update; Check now for all of them; Update all when more than one is out of date. A
  * running update opens its row to show its steps and live progress, as a tool page does. Full screen, no
  * bottom nav. The Claude Code row opens the Claude Code page (Switch back, Restart stale sessions).
  */
@@ -170,7 +170,7 @@ fun UpdatesScreen(onBack: () -> Unit, onClaudeCode: () -> Unit) {
             val foot = when {
                 s.updating -> "You can leave this page. Updates keep going."
                 s.available > 0 -> "Running sessions keep the version they started with until they restart."
-                else -> "PocketRocket checks when the app opens. Check now looks again for all four."
+                else -> "PocketRocket checks when the app opens. Check now looks again for all of them."
             }
             Text(foot, style = mockText(11.sp).copy(lineHeight = 16.sp), color = c.textMuted)
             when {
@@ -289,6 +289,7 @@ private fun UpdateIcon(component: UpdateComponent, busy: Boolean) {
                 when (component) {
                     UpdateComponent.PocketRocket -> MockIcons.Rocket
                     UpdateComponent.Git -> MockIcons.Branch
+                    UpdateComponent.Flutter, UpdateComponent.Rust -> MockIcons.Code
                     else -> MockIcons.Doc
                 },
                 contentDescription = null, tint = tint, modifier = Modifier.size(18.dp),

@@ -48,6 +48,7 @@ import com.pocketrocket.sessions.SessionManager
 import com.pocketrocket.sessions.SessionStatus
 import com.pocketrocket.sessions.history.EarlierConversations
 import com.pocketrocket.termux.Termux
+import com.pocketrocket.ui.LocalRouteOnTop
 import com.pocketrocket.ui.Routes
 import com.pocketrocket.ui.chat.SessionActivity
 import com.pocketrocket.ui.components.Caps
@@ -76,7 +77,9 @@ fun WorkspaceScreen(path: String, onBack: () -> Unit, navigate: (String) -> Unit
     val workspaces by Workspaces.state.collectAsState()
     val ws = workspaces.firstOrNull { it.path == path }
     if (ws == null) {
-        LaunchedEffect(Unit) { onBack() }
+        // Gone (removed, or moved by the file manager above, which then fixes this route): leave only when on top,
+        // since back always takes the top screen.
+        if (LocalRouteOnTop.current) LaunchedEffect(Unit) { onBack() }
         return
     }
     val bindings by AccountWiring.bindings.collectAsState()

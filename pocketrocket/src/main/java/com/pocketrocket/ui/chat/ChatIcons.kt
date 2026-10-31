@@ -20,6 +20,7 @@ internal object ChatIcons {
     val Photo = line("Photo", 1.8f, "M6,4h12a3,3 0 0 1 3,3v10a3,3 0 0 1 -3,3h-12a3,3 0 0 1 -3,-3v-10a3,3 0 0 1 3,-3z" + circle(9f, 10f, 2f) + "M21,16l-5,-5 -9,9")
     val File = line("File", 1.8f, "M14,3h-7a2,2 0 0 0 -2,2v14a2,2 0 0 0 2,2h10a2,2 0 0 0 2,-2v-11zM14,3v5h5")
     val Camera = line("Camera", 1.8f, "M4,8h3l2,-3h6l2,3h3v11h-16z" + circle(12f, 13f, 3.5f))
+    val Check = line("Check", 2.6f, "M5,12.5l4.5,4.5 9.5,-10")
     val Close = line("Close", 2.2f, "M7,7l10,10M17,7l-10,10")
 
     private fun circle(cx: Float, cy: Float, r: Float) = "M${cx - r},${cy}a$r,$r 0 1,0 ${2 * r},0a$r,$r 0 1,0 ${-2 * r},0"

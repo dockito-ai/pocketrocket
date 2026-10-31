@@ -37,8 +37,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * The terminal-style lines under the chat box: `folder │ branch │ model │ 160k/1M`, then the permission mode with
- * `│ 2 agents │ 1 shell` beside it while subagents or background shells run. Tapping the branch opens the repo's
+ * The terminal-style lines under the chat box: `branch │ 160k/1M` (decision 81: the folder is in the top bar and the
+ * model on the box's chip), then the permission mode with `│ 0 agents │ 0 shells` beside it. Tapping the branch opens the repo's
  * branches; tapping a count opens the Background sheet; tapping the mode switches it (auto, manual, plan); tapping
  * anywhere else, or long-pressing, opens the controls.
  */
@@ -56,14 +56,12 @@ fun StatusLine(state: SessionState, onOpenControls: () -> Unit, onShowBackground
     val green = c.green
     val line = buildAnnotatedString {
         val parts = listOfNotNull(
-            folderName(state.folder) to dim,
             branch?.let { it to green },
-            state.modelName?.let { it to dim },
             state.context?.let { contextText(it.used, it.window) to contextColor(it.used, it.window, dim) },
         )
         parts.forEachIndexed { i, (text, color) ->
             if (i > 0) withStyle(SpanStyle(color = bar)) { append(" │ ") }
-            if (text == branch && i == 1) {
+            if (text == branch && i == 0) {
                 // The branch takes its own taps (R17); the rest of the line opens the controls.
                 withLink(LinkAnnotation.Clickable("branch") { onOpenBranches() }) {
                     withStyle(SpanStyle(color = color)) { append(text) }
@@ -78,7 +76,7 @@ fun StatusLine(state: SessionState, onOpenControls: () -> Unit, onShowBackground
     val counts = backgroundCounts(state.runningAgents, state.runningShells)
     Column(modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
         // As before: the branch link takes its own taps, the row around it opens the controls.
-        Row(Modifier.fillMaxWidth().combinedClickable(onClick = onOpenControls, onLongClick = onOpenControls)) {
+        if (line.isNotEmpty()) Row(Modifier.fillMaxWidth().combinedClickable(onClick = onOpenControls, onLongClick = onOpenControls)) {
             Text(line, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         // The mode and the counts take their own taps; the rest of the row opens the controls.

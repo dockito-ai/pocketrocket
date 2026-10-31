@@ -9,7 +9,7 @@ object WranglerTool {
     const val INSTALLED_MARKER = ".pocketrocket-installed"
     const val PACKAGE_RELATIVE = "lib/node_modules/wrangler"
 
-    /** The workerd Wrangler pins, built for Android with tcmalloc off (github.com/dockito-ai/workerd-android). */
+    /** The workerd Wrangler pins, built for Android with tcmalloc off (ports/workerd). */
     const val WORKERD_VERSION = "1.20261023.1"
 
     /** The Android build of workerd inside the package folder, put there by the setup script. */

@@ -93,7 +93,7 @@ private fun StyleSection(setup: SetupState, panel: SetupPanel) {
             setup.styles.isEmpty() -> Note("This version of Claude Code doesn't list its styles.")
             else -> {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    setup.styles.forEach { style -> Choice(style, on = style == current, enabled = !setup.busy) { panel.pickStyle(style) } }
+                    setup.styles.forEach { style -> ChoicePill(style, on = style == current, enabled = !setup.busy) { panel.pickStyle(style) } }
                 }
                 Note("A pick lasts for this session and isn't saved.")
                 OutlineButton("Save $current for this folder", onClick = { panel.saveStyleForFolder(current) }, enabled = !setup.busy, modifier = Modifier.fillMaxWidth())
@@ -114,7 +114,7 @@ private fun EffortSection(setup: SetupState, panel: SetupPanel, levels: List<Str
             levels.isEmpty() -> Note("Claude Code doesn't list effort levels for this model.")
             else -> {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    levels.forEach { level -> Choice(level, on = level == current, enabled = !setup.busy) { panel.pickEffort(level) } }
+                    levels.forEach { level -> ChoicePill(level, on = level == current, enabled = !setup.busy) { panel.pickEffort(level) } }
                 }
                 Note("A pick lasts for this session and isn't saved.")
                 if (current != null && current in levels) {
@@ -127,7 +127,7 @@ private fun EffortSection(setup: SetupState, panel: SetupPanel, levels: List<Str
 
 /** One option as a pill, the current one tinted and outlined in orange like the mode cards. */
 @Composable
-private fun Choice(label: String, on: Boolean, enabled: Boolean, onClick: () -> Unit) {
+internal fun ChoicePill(label: String, on: Boolean, enabled: Boolean, onClick: () -> Unit) {
     val c = PrTheme.colors
     val shape = RoundedCornerShape(8.dp)
     Text(

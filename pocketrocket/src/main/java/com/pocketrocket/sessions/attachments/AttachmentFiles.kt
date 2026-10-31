@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.core.content.FileProvider
+import com.pocketrocket.files.FileKinds
 import com.termux.shared.termux.TermuxConstants.TERMUX_FILES_DIR_PATH
 import java.io.File
 
@@ -35,7 +36,7 @@ object AttachmentFiles {
     fun open(context: Context, attachment: Attachment): Boolean {
         // Viewing hands the file over read-only, so a script only shows as text. An APK would start Android's
         // installer, and this app may install apps (its own updates), so packages are never opened from a chat.
-        if (isPackage(attachment)) return false
+        if (FileKinds.isPackage(attachment.path, attachment.mime)) return false
         // A file outside the shared folder has no content URI; say no app could open it rather than crash.
         val uri = runCatching { uriFor(context, File(attachment.path)) }.getOrElse { return false }
         val intent = Intent(Intent.ACTION_VIEW)
@@ -47,10 +48,4 @@ object AttachmentFiles {
             false
         }
     }
-
-    private val PACKAGE_EXTENSIONS = setOf("apk", "apks", "apkm", "xapk", "aab")
-
-    private fun isPackage(attachment: Attachment) =
-        attachment.mime == "application/vnd.android.package-archive" ||
-            attachment.path.substringAfterLast('.', "").lowercase() in PACKAGE_EXTENSIONS
 }

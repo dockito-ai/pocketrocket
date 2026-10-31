@@ -1,5 +1,7 @@
 package com.pocketrocket.ui
 
+import com.pocketrocket.files.FileRules
+
 /**
  * Route strings for [PocketRocketApp]'s back stack. Routes that carry a folder use `|` between parts,
  * since paths have slashes.
@@ -14,6 +16,7 @@ object Routes {
     const val TOOL_ANDROID_BUILD = "tool-android-build"
     const val TOOL_ANDROID_NDK = "tool-android-ndk"
     const val TOOL_WRANGLER = "tool-wrangler"
+    const val TOOL_FLUTTER = "tool-flutter"
     /** Settings › Updates › Claude Code: versions, rollback, sessions on the old version (R9). */
     const val CLAUDE_CODE = "claude-code"
     /** Settings › Health: checks with Fix buttons and the last stop (R15). */
@@ -45,6 +48,12 @@ object Routes {
     fun workspace(path: String) = "ws|$path"
     fun workspaceSettings(path: String) = "ws-settings|$path"
 
+    /** The file manager at [folder] (decision 80): home from the Workspaces tab, a workspace's folder from it. */
+    fun files(folder: String) = "files|$folder"
+
+    /** A file in the file manager's read-only viewer. */
+    fun file(path: String) = "file|$path"
+
     /** The `CLAUDE.md` of a Claude account, or of a folder. */
     fun accountMemory(id: String) = "memory-account|$id"
     fun folderMemory(path: String) = "memory-folder|$path"
@@ -54,4 +63,17 @@ object Routes {
 
     /** New session in [folder] (blank: pick one), on the Resume earlier tab when [resume]. */
     fun newSession(folder: String = "", resume: Boolean = false) = "session-new|$folder|${if (resume) "resume" else "new"}"
+
+    /** The folder [route] is about (`ws|<path>`, `clone|<path>`, `files|<path>`...), or null. */
+    private fun pathOf(route: String): String? = route.substringAfter('|', "").substringBefore('|').ifEmpty { null }
+
+    /** [route] with its folder moved from [from] to [to] when it is [from] or inside it. */
+    fun moved(route: String, from: String, to: String): String {
+        val path = pathOf(route) ?: return route
+        if (!FileRules.isInside(path, from)) return route
+        return route.replaceFirst("|$path", "|" + to + path.removePrefix(from))
+    }
+
+    /** Whether [route] is about [folder] or something inside it. */
+    fun inside(route: String, folder: String): Boolean = pathOf(route)?.let { FileRules.isInside(it, folder) } == true
 }

@@ -35,6 +35,14 @@ class UpdatesTest {
         )
     }
 
+    @Test fun optionalToolsShowOnlyOnceInstalled() {
+        assertTrue(UpdateRow(UpdateComponent.Git, installed = null, latest = null, available = false, checking = false).shown)
+        assertFalse(UpdateRow(UpdateComponent.Flutter, installed = null, latest = "3.47.9", available = false, checking = false).shown)
+        assertTrue(UpdateRow(UpdateComponent.Flutter, installed = "3.44.1", latest = "3.47.9", available = true, checking = false).shown)
+        assertFalse(UpdateRow(UpdateComponent.Rust, installed = null, latest = "1.99.1", available = false, checking = false).shown)
+        assertEquals(listOf(UpdateComponent.Flutter, UpdateComponent.Rust, UpdateComponent.PocketRocket), updateOrder(listOf(UpdateComponent.PocketRocket, UpdateComponent.Rust, UpdateComponent.Flutter)))
+    }
+
     @Test fun appDownloadShowsAsARunningStepWithProgress() {
         val job = AppUpdateJob.of(AppUpdateState(installed = "0.2.0", latest = "0.3.0", step = AppUpdateState.Step.Downloading, downloaded = 50L shl 20, total = 100L shl 20))!!
         assertEquals(SetupPhase.Running, job.phase)

@@ -10,8 +10,7 @@
 # with the release key (~/.pocketrocket-keys/pocketrocket-release.jks, password from the login Keychain, never
 # printed), checks the signer with apksigner, names it pocketrocket-vX.Y.Z-arm64.apk and computes its SHA-256.
 # Then commits the bump, tags the code repo vX.Y.Z, pushes both, and creates the prerelease in the public
-# ShankarKakumani/pocketrocket-releases repo (where the app looks) with the SHA-256 line in its notes, plus the
-# same release on the private code repo's tag so both Releases pages list it.
+# dockito-ai/pocketrocket repo (where the app looks) with the SHA-256 line in its notes.
 # --dry-run does the checks and the signed build, prints what it would publish, and puts app/build.gradle
 # back; it never commits, tags, pushes or touches GitHub.
 set -euo pipefail
@@ -32,7 +31,6 @@ done
 VERSION="${VERSION#v}"
 TAG="v$VERSION"
 CODE_REPO="dockito-ai/pocketrocket"
-RELEASES_REPO="ShankarKakumani/pocketrocket-releases"
 KEYSTORE="${POCKETROCKET_KEYSTORE:-$HOME/.pocketrocket-keys/pocketrocket-release.jks}"
 KEY_ALIAS="pocketrocket"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -113,7 +111,6 @@ if [ "$DRY" = 1 ]; then
   echo "  git commit -m 'Release $TAG' app/build.gradle"
   echo "  git tag -a $TAG -m 'PocketRocket $VERSION'"
   echo "  git push origin main $TAG"
-  echo "  gh release create $TAG $APK --repo $RELEASES_REPO --prerelease --title 'PocketRocket $VERSION' --notes-file $NOTES"
   echo "  gh release create $TAG $APK --repo $CODE_REPO --verify-tag --prerelease --title 'PocketRocket $VERSION' --notes-file $NOTES"
   echo "  notes:"; sed 's/^/    /' "$NOTES"
   exit 0
@@ -127,6 +124,5 @@ git tag -a "$TAG" -m "PocketRocket $VERSION"
 git push -q origin main "$TAG"
 
 say "Creating the GitHub prerelease"
-gh release create "$TAG" "$APK" --repo "$RELEASES_REPO" --prerelease --title "PocketRocket $VERSION" --notes-file "$NOTES"
 gh release create "$TAG" "$APK" --repo "$CODE_REPO" --verify-tag --prerelease --title "PocketRocket $VERSION" --notes-file "$NOTES"
-say "Done: https://github.com/$RELEASES_REPO/releases/tag/$TAG (code: $CODE_REPO@$TAG)"
+say "Done: https://github.com/$CODE_REPO/releases/tag/$TAG"

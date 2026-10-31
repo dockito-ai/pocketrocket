@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -99,12 +101,20 @@ fun RouteStack(
                     if (enter.value != 0f) enter.animateTo(0f, tween(StackMotion.DURATION, easing = FastOutSlowInEasing))
                 }
                 Box(Modifier.fillMaxSize().graphicsLayer { translationX = enter.value + if (isTop) motion.back.value else 0f }) {
-                    states.SaveableStateProvider(stateKey) { content(route) }
+                    CompositionLocalProvider(LocalRouteOnTop provides isTop) {
+                        states.SaveableStateProvider(stateKey) { content(route) }
+                    }
                 }
             }
         }
     }
 }
+
+/**
+ * Whether the screen reading it is the top of the stack. The screen under it stays composed, so a screen's own
+ * BackHandler should be enabled only while this is true, or it would take a back meant for the screen above.
+ */
+val LocalRouteOnTop = compositionLocalOf { true }
 
 /** The key of the entry at [index] of the stack: its position plus its route, so a route can repeat. */
 fun entryKey(index: Int, route: String) = "$index:$route"

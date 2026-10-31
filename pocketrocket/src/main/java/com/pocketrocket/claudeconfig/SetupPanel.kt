@@ -62,6 +62,9 @@ class SetupPanel(private val host: McpHost, private val scope: CoroutineScope) {
         _state.update { it.copy(loaded = true) }
     }
 
+    /** Only the settings (for the effort on the chat box's model chip). */
+    fun refreshSettings() = work { channel -> readSettings(channel) }
+
     /** `reload_skills`, then the list again: skills changed on disk don't show before it. */
     fun reloadSkills() {
         if (!host.live) return

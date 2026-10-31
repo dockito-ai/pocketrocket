@@ -12,12 +12,11 @@ GH_TOKEN=$(gh auth token -u ShankarKakumani) gh workflow run release.yml -R dock
   --ref main -f version=X.Y.Z -f notes="$(cat notes.md)" [-f dry_run=true]
 ```
 
-Shankar usually runs `scripts/ship.sh`, which pulls, asks the version, drafts notes in $EDITOR, offers a dry run and starts and follows the workflow. `scripts/release.sh X.Y.Z --notes FILE [--dry-run]` (or `scripts/ship.sh --local`) is the local fallback when Actions can't run; it needs the keystore and the Keychain password on the Mac. Background: decisions 26, 30, 63, 65, 66 and 67 in `docs/decisions.md`, plus `docs/app-updates.md`.
+Shankar usually runs `scripts/ship.sh`, which pulls, asks the version, drafts notes in $EDITOR, offers a dry run and starts and follows the workflow. `scripts/release.sh X.Y.Z --notes FILE [--dry-run]` (or `scripts/ship.sh --local`) is the local fallback when Actions can't run; it needs the keystore and the Keychain password on the Mac. Background: decisions 26, 30, 63, 65, 67 and 83 in `docs/decisions.md`, plus `docs/app-updates.md`.
 
 ## Where releases go
 
 - **`dockito-ai/pocketrocket`**: the code repo. The workflow publishes the prerelease here on tag `vX.Y.Z`. The updater reads it first (`ReleaseSource.REPO`) once it's public.
-- **`ShankarKakumani/pocketrocket-releases`**: the old public releases repo, the updater's fallback while the code repo is private (`OLD_REPO`, decision 66). The workflow publishes there too only when the `RELEASES_REPO_TOKEN` secret is set, and skips it quietly otherwise. Once the public repo replaces the private one, that secret can be deleted.
 
 Both are prereleases with the title `PocketRocket X.Y.Z` and the asset `pocketrocket-vX.Y.Z-arm64.apk`.
 
