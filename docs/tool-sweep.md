@@ -74,6 +74,28 @@ Source order per tool: Termux package first (updated with the other packages); t
 
 Already in the base set, so not swept: git, gh, ssh, node, npm, rg, jq, curl, zellij.
 
+## Evaluation (desk, 31 Oct 2026)
+
+Shankar wanted a technical evaluation, not a full install run, so the sweep harness was run on 9 tools only and the rest were judged from Termux package metadata (`apt-cache`), npm metadata (`npm view`) and upstream docs. Details and sources: `spikes/tool-sweep/results/eval-languages-db-utils.md` and `eval-js-cloud.md`. Package lists were not refreshed (apt was locked), so versions may lag by a little.
+
+**Works from a Termux package** (no glibc loader, no fix needed beyond Phase 0): Python + pip (33 MB installed), uv, bun (measured), deno, Go (224 MB + clang), Java 17/21/25, Kotlin, Ruby, PHP, Zig (407 MB), Elixir + Erlang, sqlite3 (measured), Redis, PostgreSQL and MariaDB (each needs a one-time init and a start command, no service manager; Android may kill them in the background), make, fd, bat, fzf, yq, httpie, tmux, ffmpeg, ImageMagick, pnpm, yarn, esbuild, awscli (208 MB), flyctl.
+
+**Works from npm** once Phase 0 is in: eslint (measured), prettier, vite (rolldown, rollup, lightningcss, tailwind's oxide and @parcel/watcher all publish `android-arm64` packages), vercel, netlify, firebase, TypeScript 5.
+
+**Works with a known fix**
+- Next 16: no Android SWC; falls back to `@next/swc-wasm-nodejs`, webpack only, slower.
+- sharp: `@img/sharp-wasm32`, slower.
+- Playwright: Termux `playwright` with Termux chromium; never `playwright install` (its browsers are glibc). Chromium only.
+- Prisma 7: the client works (wasm); migrate and `db push` need its glibc schema engine through the loader. Prisma 6 and older don't.
+
+**Doesn't, or unproven**
+- TypeScript 7 (native, no Android package): use TS 5.
+- MongoDB server: no Android build, only the `mongosh` client.
+- .NET: packaged, but old reports of GC crashes on Snapdragon; needs a probe.
+- terraform, supabase CLI, gcloud: linux-arm64 Go/Python builds hit one shared blocker, Go reading DNS and CA files from `/etc`, which Android lacks. One fix would unlock all three; `supabase start` needs Docker regardless.
+
+**Pattern.** A glibc `.node` addon can't load into Termux's bionic Node, so for npm native addons the route is `android-arm64` packages or wasm, not the glibc loader. The loader is for standalone executables only.
+
 ## Phase 2: decide per tool
 
 Using the results, each tool becomes one of:
