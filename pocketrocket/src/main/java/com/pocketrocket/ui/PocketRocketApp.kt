@@ -40,6 +40,7 @@ import com.pocketrocket.ui.settings.UsageScreen
 import androidx.compose.runtime.CompositionLocalProvider
 import com.pocketrocket.ui.tools.AndroidBuildToolPage
 import com.pocketrocket.ui.tools.AndroidNdkToolPage
+import com.pocketrocket.ui.tools.FlutterToolPage
 import com.pocketrocket.ui.tools.WranglerToolPage
 import com.pocketrocket.ui.tools.ChromiumToolPage
 import com.pocketrocket.ui.tools.DockitoToolPage
@@ -157,6 +158,7 @@ fun PocketRocketApp(startScreen: AppScreen, onOpenTerminal: () -> Unit, showSess
             r == Routes.TOOL_ANDROID_BUILD -> AndroidBuildToolPage(onBack = ::pop)
             r == Routes.TOOL_ANDROID_NDK -> AndroidNdkToolPage(onBack = ::pop, onOpenAndroid = { push(Routes.TOOL_ANDROID_BUILD) })
             r == Routes.TOOL_WRANGLER -> WranglerToolPage(onBack = ::pop)
+            r == Routes.TOOL_FLUTTER -> FlutterToolPage(onBack = ::pop)
             r == Routes.CLAUDE_CODE -> ClaudeCodeScreen(onBack = ::pop)
             r == Routes.UPDATES -> UpdatesScreen(onBack = ::pop, onClaudeCode = { push(Routes.CLAUDE_CODE) })
             r == Routes.BACKUP -> BackupScreen(onBack = ::pop, onRestore = { push(Routes.RESTORE) })

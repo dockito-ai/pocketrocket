@@ -1,0 +1,332 @@
+#!/data/data/app.pocket/files/usr/bin/bash
+# PocketRocket launcher for Flutter, Dart and FVM (decision 75, docs/flutter-tool.md), installed as
+# $PREFIX/bin/flutter, with $PREFIX/bin/dart and $PREFIX/bin/fvm links to it.
+#
+# Which Flutter: the nearest .fvmrc up from the current folder (FVM's project pin; FVM 2's
+# .fvm/fvm_config.json too), else FVM's global default, the link ~/fvm/default. Versions are official
+# Flutter clones in ~/fvm/versions/<version>, FVM's own layout, so `fvm` and this launcher agree.
+#
+# Official Flutter's Dart SDK and engine tools are glibc programs. Before running, this prepares any that
+# are not ready yet (a new Dart SDK after `fvm install` or `flutter upgrade`, engine tools Flutter just
+# downloaded): their ELF interpreter goes to Termux's glibc loader, as for Claude Code, and each becomes
+# <name>.glibc behind a small wrapper that drops Termux's bionic exec helper (LD_PRELOAD), which a glibc
+# program can't load. Flutter's own scripts need that helper (#!/usr/bin/env bash), so it is set before
+# running them, also from Claude sessions, where LD_PRELOAD is empty.
+#
+# Flutter's scripts in bin (bin/flutter, bin/dart, bin/internal/*.sh) start with #!/usr/bin/env bash, which
+# only works with that helper. FVM is a glibc program and runs them without it, so their first lines are
+# pointed at Termux's bash, and git is told to ignore that change (assume-unchanged). Git refuses to move a
+# checkout over such a file when the new revision changes it, so before the commands that move it (flutter
+# upgrade, channel, downgrade; only in a channel folder such as ~/fvm/versions/stable, since a release folder has to
+# stay that release for FVM) the scripts are put back as git has them; afterwards they are pointed again, and
+# when the checkout moved, the new version's Dart SDK and tool are set up here, since Flutter's own second half
+# of the upgrade starts bin/flutter from Dart, which can't run the original first line.
+#
+# The check is cheap: the stamps Flutter writes in bin/cache when it downloads something are compared with
+# what they were when this launcher last prepared that version, and bin/flutter's first line is read.
+#
+# As fvm, it runs FVM (whose own Dart was prepared by the setup script) and makes the versions it touches
+# ready before and after: install, use and global finish their setup here, and run again once if FVM's own
+# setup failed before the version was ready.
+#
+# Internal modes for the setup script: POCKETROCKET_FLUTTER_PREPARE=<folder> prepares that folder and exits;
+# POCKETROCKET_FLUTTER_ROOT=<flutter folder> runs that Flutter whatever the pin.
+
+PREFIX="${PREFIX:-/data/data/app.pocket/files/usr}"
+PR_BASH="$PREFIX/bin/bash"
+PR_PATCHELF="$PREFIX/glibc/bin/patchelf"
+PR_GLIBC_LD="$PREFIX/glibc/lib/ld-linux-aarch64.so.1"
+PR_FVM_HOME="$HOME/fvm"
+PR_STAMP=.pocketrocket-prepared   # in bin/cache, which git ignores
+PR_NAME="${0##*/}"
+PR_FVM_DIR="$PREFIX/opt/fvm"
+case "$PR_NAME" in dart*) PR_NAME=dart ;; fvm*) PR_NAME=fvm ;; *) PR_NAME=flutter ;; esac
+
+pr_say() { printf '[%s] %s\n' "$PR_NAME" "$*" >&2; }
+
+# pr_pin_from <text>: the Flutter version in an .fvmrc ("flutter") or FVM 2 config ("flutterSdkVersion"), in PR_PIN.
+pr_pin_from() {
+  local re='"(flutter|flutterSdkVersion)"[[:space:]]*:[[:space:]]*"([^"]+)"'
+  PR_PIN=""
+  [[ $1 =~ $re ]] || return 1
+  PR_PIN="${BASH_REMATCH[2]}"
+}
+
+# pr_find_pin [folder]: walks up from the folder (default: the current one) to the nearest pin. Sets PR_PIN and
+# PR_PIN_FILE; 1 when no folder up the tree pins a version.
+pr_find_pin() {
+  local d="${1:-$PWD}" f text
+  PR_PIN=""; PR_PIN_FILE=""
+  while :; do
+    for f in "$d/.fvmrc" "$d/.fvm/fvm_config.json"; do
+      [ -f "$f" ] || continue
+      text="$(<"$f")" || continue
+      if pr_pin_from "$text"; then PR_PIN_FILE="$f"; return 0; fi
+    done
+    [ -n "$d" ] && [ "$d" != / ] || return 1
+    d="${d%/*}"
+  done
+}
+
+# pr_signature <flutter root>: the names and first lines of bin/cache/*.stamp, in PR_SIG.
+pr_signature() {
+  local f line
+  PR_SIG=""
+  for f in "$1"/bin/cache/*.stamp; do
+    [ -f "$f" ] || continue
+    line=""; read -r line <"$f" || true
+    PR_SIG+="${f##*/}=$line;"
+  done
+}
+
+# pr_scripts_ready <flutter root>: 1 when bin/flutter still starts with #!/usr/bin/env (a new clone, or an upgrade).
+pr_scripts_ready() {
+  local line=""
+  [ -f "$1/bin/flutter" ] || return 0
+  read -r line <"$1/bin/flutter" || true
+  case "$line" in '#!/usr/bin/env'*|'#!/bin/'*) return 1 ;; esac
+}
+
+# pr_fix_scripts <flutter root>: the shell scripts in bin and bin/internal start Termux's own interpreter.
+# Already done is a no-op.
+pr_fix_scripts() {
+  local f line prog want
+  for f in "$1"/bin/* "$1"/bin/internal/*; do
+    [ -f "$f" ] || continue
+    line=""; read -r line <"$f" 2>/dev/null || continue
+    case "$line" in
+      '#!/usr/bin/env '*) prog="${line#'#!/usr/bin/env '}" ;;
+      '#!/bin/'*) prog="${line#'#!/bin/'}" ;;
+      *) continue ;;
+    esac
+    prog="${prog%% *}"
+    want="$PREFIX/bin/$prog"
+    [ -x "$want" ] || continue
+    sed -i "1s|.*|#!$want|" "$f" || return 1
+    git -C "$1" update-index --assume-unchanged -- "${f#"$1"/}" >/dev/null 2>&1 || true
+  done
+}
+
+# pr_restore_scripts <flutter root>: the scripts pr_fix_scripts changed go back to git's version, so git can move the
+# checkout. pr_needs_prepare then sees an unready bin/flutter and the next prepare points them again.
+pr_restore_scripts() {
+  local files=()
+  mapfile -t files < <(git -C "$1" ls-files -v -- bin 2>/dev/null | sed -n 's/^h //p')
+  [ "${#files[@]}" -gt 0 ] || return 0
+  git -C "$1" update-index --no-assume-unchanged -- "${files[@]}" && git -C "$1" checkout -q -- "${files[@]}"
+}
+
+# pr_moves_checkout <flutter arguments>: 0 when the command moves Flutter's checkout with git (upgrade, downgrade,
+# channel <name>; channel alone only lists).
+pr_moves_checkout() {
+  local a cmd=""
+  for a in "$@"; do
+    case "$a" in -*) continue ;; esac
+    [ -z "$cmd" ] || return 0
+    case "$a" in
+      upgrade|downgrade) return 0 ;;
+      channel) cmd=channel ;;
+      *) return 1 ;;
+    esac
+  done
+  return 1
+}
+
+# pr_needs_prepare <flutter root>: 0 when something in bin/cache, or a script in bin, may not be ready.
+pr_needs_prepare() {
+  local cache="$1/bin/cache" saved=""
+  pr_scripts_ready "$1" || return 0
+  [ -e "$cache/dart-sdk/bin/dart" ] && [ ! -e "$cache/dart-sdk/bin/dart.glibc" ] && return 0
+  [ -f "$cache/$PR_STAMP" ] || return 0
+  read -r saved <"$cache/$PR_STAMP" || true
+  pr_signature "$1"
+  [ "$saved" != "$PR_SIG" ]
+}
+
+# pr_prepare <folder>: every glibc program under it gets Termux's glibc loader and a wrapper without the bionic
+# preload. A program already done is a wrapper script, not an ELF file, so running this again changes nothing.
+pr_prepare() {
+  local f magic interp
+  [ -x "$PR_PATCHELF" ] && [ -f "$PR_GLIBC_LD" ] || { pr_say "Termux's glibc is missing. Run PocketRocket setup again."; return 1; }
+  while IFS= read -r -d '' f; do
+    case "$f" in *.glibc) continue ;; esac
+    magic=""
+    LC_ALL=C read -r -n 4 magic <"$f" 2>/dev/null || true
+    [ "$magic" = $'\x7fELF' ] || continue
+    interp="$(LD_PRELOAD='' "$PR_PATCHELF" --print-interpreter "$f" 2>/dev/null)" || continue
+    case "$interp" in
+      /lib/ld-linux-aarch64.so.1)
+        LD_PRELOAD='' "$PR_PATCHELF" --set-interpreter "$PR_GLIBC_LD" "$f" || { pr_say "could not patch $f"; return 1; } ;;
+      "$PR_GLIBC_LD") ;;
+      *) continue ;;
+    esac
+    mv -f "$f" "$f.glibc" || return 1
+    printf '#!%s\n# Written by PocketRocket: runs the glibc program without the bionic exec helper.\nunset LD_PRELOAD\nexec %q "$@"\n' \
+      "$PR_BASH" "$f.glibc" >"$f" || return 1
+    chmod 755 "$f"
+  done < <(find "$1" -type f -perm -u+x -print0 2>/dev/null)
+}
+
+# pr_prepare_root <flutter root>: fixes bin's scripts, prepares bin/cache and records the stamps it saw. One at a
+# time per version.
+pr_prepare_root() {
+  local cache="$1/bin/cache" lock="$1/bin/cache/.pocketrocket-lock" i=0 rc=0
+  mkdir -p "$cache"
+  until mkdir "$lock" 2>/dev/null; do
+    i=$((i + 1)); [ "$i" -lt 600 ] || rm -rf "$lock"
+    sleep 0.1
+  done
+  pr_fix_scripts "$1" || { pr_say "could not fix the scripts in $1/bin"; rc=1; }
+  [ "$rc" = 1 ] || pr_prepare "$cache" || rc=1
+  if [ "$rc" = 0 ]; then
+    pr_signature "$1"
+    printf '%s\n' "$PR_SIG" >"$cache/$PR_STAMP"
+  fi
+  rmdir "$lock" 2>/dev/null
+  return "$rc"
+}
+
+# pr_dart_sdk <flutter root>: fetches the Dart SDK when Flutter's own check says it is missing or old, the way
+# bin/flutter would, but before it runs so the new SDK is prepared before its first use.
+pr_dart_sdk() {
+  local internal="$1/bin/internal" want="" have=""
+  if [ -f "$internal/engine.version" ]; then
+    read -r want <"$internal/engine.version" || true
+    [ -f "$1/bin/cache/engine-dart-sdk.stamp" ] && read -r have <"$1/bin/cache/engine-dart-sdk.stamp"
+    [ -n "$want" ] && [ "$want" = "$have" ] && [ -e "$1/bin/cache/dart-sdk/bin/dart" ] && return 0
+  fi
+  "$PR_BASH" "$internal/update_engine_version.sh" >&2 && "$PR_BASH" "$internal/update_dart_sdk.sh" >&2
+}
+
+pr_bionic_preload() {
+  local lib
+  [ -n "${LD_PRELOAD:-}" ] && return 0
+  for lib in "$PREFIX/lib/libtermux-exec-ld-preload.so" "$PREFIX/lib/libtermux-exec.so"; do
+    if [ -f "$lib" ]; then export LD_PRELOAD="$lib"; return 0; fi
+  done
+}
+
+# pr_ready <flutter root> [setup]: makes a version ready for FVM. Scripts and anything new in bin/cache always;
+# with setup, a version that has no Dart SDK yet (cloned by fvm install) also gets it, prepared, and the flutter
+# tool built, which is FVM's own setup step. 0 when it set something up.
+pr_ready() {
+  local root="$1" out
+  if [ -e "$root/bin/cache/dart-sdk/bin/dart" ]; then
+    pr_needs_prepare "$root" || return 1
+    pr_prepare_root "$root" >&2 || return 1
+    return 0
+  fi
+  pr_scripts_ready "$root" || pr_fix_scripts "$root"
+  [ "${2:-}" = setup ] || return 1
+  pr_say "Setting up Flutter ${root##*/} for this phone"
+  pr_dart_sdk "$root" || { pr_say "Could not download the Dart SDK for ${root##*/}. Check the connection and try again."; return 1; }
+  pr_prepare_root "$root" >&2 || return 1
+  out="$(cd "$HOME" && "$PR_BASH" "$root/bin/flutter" --version 2>&1)" || { printf '%s\n' "$out" >&2; return 1; }
+  pr_needs_prepare "$root" && pr_prepare_root "$root" >&2
+  return 0
+}
+
+# pr_ready_all [setup]: pr_ready for every version in FVM's cache. 0 when it set any up.
+pr_ready_all() {
+  local d any=1
+  for d in "$PR_FVM_HOME"/versions/*/; do
+    d="${d%/}"
+    case "${d##*/}" in .*) continue ;; esac
+    [ -f "$d/bin/flutter" ] || continue
+    if pr_ready "$d" "${1:-}"; then any=0; fi
+  done
+  return "$any"
+}
+
+# pr_fvm <fvm arguments>: FVM, with the versions it runs or sets up made ready around it.
+pr_fvm() {
+  local rc=0
+  [ -f "$PR_FVM_DIR/src/fvm.snapshot" ] || { pr_say "FVM isn't installed: Settings → Tools → Flutter & Rust."; return 127; }
+  pr_bionic_preload
+  case "${1:-}" in
+    install|i|use|global|flutter|dart|spawn|exec) pr_ready_all setup ;;
+  esac
+  # fvm flutter upgrade (or channel, downgrade): FVM would start the restored bin/flutter without the exec helper.
+  if [ "${1:-}" = flutter ] && pr_moves_checkout "${@:2}"; then PR_NAME=flutter; pr_flutter "${@:2}"; return; fi
+  "$PR_FVM_DIR/src/dart" "$PR_FVM_DIR/src/fvm.snapshot" "$@" || rc=$?
+  case "${1:-}" in
+    install|i|use|global)
+      # A version FVM just cloned: its setup failed or was skipped; finish it, and run the command again if it failed.
+      if pr_ready_all setup && [ "$rc" != 0 ]; then
+        pr_say "Flutter is set up for this phone now; running fvm $1 again."
+        rc=0; "$PR_FVM_DIR/src/dart" "$PR_FVM_DIR/src/fvm.snapshot" "$@" || rc=$?
+      fi ;;
+    flutter|dart|spawn|exec) pr_ready_all ;;
+  esac
+  return "$rc"
+}
+
+# pr_flutter <arguments>: flutter or dart, from the pinned or default version.
+pr_flutter() {
+  local root rc=0 head=""
+  if [ -n "${POCKETROCKET_FLUTTER_ROOT:-}" ]; then
+    root="$POCKETROCKET_FLUTTER_ROOT"
+  elif pr_find_pin; then
+    root="$PR_FVM_HOME/versions/$PR_PIN"
+    if [ ! -f "$root/bin/flutter" ]; then
+      pr_say "Flutter $PR_PIN isn't installed ($PR_PIN_FILE pins it): Settings → Tools → Flutter & Rust, or \`fvm install $PR_PIN\`."
+      return 127
+    fi
+  else
+    root="$PR_FVM_HOME/default"
+    if [ ! -f "$root/bin/flutter" ]; then
+      pr_say "No default Flutter version: Settings → Tools → Flutter & Rust, or \`fvm global <version>\`."
+      return 127
+    fi
+    root="$(cd -P "$root" && pwd)"
+  fi
+
+  pr_bionic_preload
+  pr_dart_sdk "$root" || { pr_say "Could not download the Dart SDK for $root. Check the connection and try again."; return 1; }
+  if pr_needs_prepare "$root"; then pr_prepare_root "$root" || return 1; fi
+
+  if [ "$PR_NAME" = flutter ] && pr_moves_checkout "$@"; then
+    # A release folder (~/fvm/versions/3.47.9) has to stay that release: FVM checks it, and when it changed stops at
+    # a question, which a Claude session can't answer. Channel folders (stable, beta, master) move.
+    case "${root##*/}" in
+      [0-9]*.*)
+        pr_say "Flutter ${root##*/} is a release and stays as it is. For a newer one: Settings › Updates, or \`fvm install <version>\` and \`fvm use <version>\`."
+        return 1 ;;
+    esac
+    head="$(git -C "$root" rev-parse HEAD 2>/dev/null)"
+    pr_restore_scripts "$root" || { pr_say "could not put back Flutter's scripts in $root/bin for git"; return 1; }
+  fi
+
+  # Not exec: Flutter may download engine tools during this run and start them at once, before they are
+  # prepared. Afterwards they are, and the next run works.
+  "$PR_BASH" "$root/bin/$PR_NAME" "$@" || rc=$?
+  if [ -n "$head" ] && [ "$rc" != 0 ] && [ "$(git -C "$root" rev-parse HEAD 2>/dev/null)" != "$head" ]; then
+    # The checkout moved, then Flutter's second half (bin/flutter started from Dart) failed: finish it here.
+    pr_say "Setting up the new Flutter for this phone"
+    pr_dart_sdk "$root" || { pr_say "Could not download the Dart SDK for $root. Check the connection and try again."; return 1; }
+    pr_prepare_root "$root" || return 1
+    rc=0; "$PR_BASH" "$root/bin/flutter" --version || rc=$?
+    if pr_needs_prepare "$root"; then pr_prepare_root "$root" || return 1; fi
+    return "$rc"
+  fi
+  if pr_needs_prepare "$root"; then
+    pr_prepare_root "$root" || return "$rc"
+    [ "$rc" = 0 ] || [ -n "$head" ] || pr_say "Flutter downloaded tools during this run and they are now set up for this phone. Run the command again."
+  fi
+  return "$rc"
+}
+
+pr_main() {
+  if [ "$PR_NAME" = fvm ]; then pr_fvm "$@"; return; fi
+  if [ -n "${POCKETROCKET_FLUTTER_PREPARE:-}" ]; then
+    if [ -d "$POCKETROCKET_FLUTTER_PREPARE/bin/cache" ]; then pr_prepare_root "$POCKETROCKET_FLUTTER_PREPARE"
+    else pr_prepare "$POCKETROCKET_FLUTTER_PREPARE"; fi
+    return
+  fi
+  pr_flutter "$@"
+}
+
+if [ "${POCKETROCKET_FLUTTER_SOURCE_ONLY:-0}" != 1 ]; then
+  pr_main "$@"
+  exit
+fi
