@@ -89,7 +89,7 @@ fun HomeScreen(
                     HomeTab.Rocket -> RocketScreen(navigate)
                     HomeTab.Sessions -> SessionsScreen(navigate, onOpenTerminal)
                     HomeTab.Workspaces -> WorkspacesScreen(navigate)
-                    HomeTab.Settings -> SettingsScreen(onClaudeAccounts, onGitHubAccounts, onTools, onUpdates, onBackup, onAssistant = { navigate(Routes.ASSISTANT) })
+                    HomeTab.Settings -> SettingsScreen(onClaudeAccounts, onGitHubAccounts, onTools, onUpdates, onBackup, onAssistant = { navigate(Routes.ASSISTANT) }, onAbout = { navigate(Routes.ABOUT) })
                 }
             }
         }

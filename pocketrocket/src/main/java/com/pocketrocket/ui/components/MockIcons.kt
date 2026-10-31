@@ -37,6 +37,12 @@ object MockIcons {
     val Sliders = icon("Sliders", "M4 7h9M17 7h3M4 17h3M11 17h9" + circle(15f, 7f, 2f) + circle(9f, 17f, 2f))
     val Mic = icon("Mic", "M12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM5 11a7 7 0 0 0 14 0M12 18v3", stroke = 2.2f)
     val Code = icon("Code", "M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16")
+    val Sun = icon("Sun", circle(12f, 12f, 4f) + "M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8")
+    val Moon = icon("Moon", "M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z")
+    /** Half-filled circle: follow the system (theme). */
+    val Auto = icon("Auto", circle(12f, 12f, 8.5f) + "M12 3.5v17M12 6h4M12 10h7M12 14h7M12 18h4")
+    val Info = icon("Info", circle(12f, 12f, 9f) + "M12 11v6M12 7v1.5")
+    val Download = icon("Download", "M12 4v11M7 10l5 5 5-5M5 20h14")
 
     private fun circle(cx: Float, cy: Float, r: Float) =
         "M${cx - r} ${cy}a$r $r 0 1 0 ${2 * r} 0a$r $r 0 1 0 ${-2 * r} 0z"
