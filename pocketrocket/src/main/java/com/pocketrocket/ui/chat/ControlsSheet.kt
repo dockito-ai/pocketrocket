@@ -29,15 +29,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.collectAsState
+import com.pocketrocket.claudeconfig.SetupChoices
+import com.pocketrocket.claudeconfig.SetupPanel
+import com.pocketrocket.claudeconfig.SetupState
 import com.pocketrocket.sessions.ChatItem
+import com.pocketrocket.ui.claudeconfig.ChoicePill
 import com.pocketrocket.sessions.PermissionMode
 import com.pocketrocket.sessions.Session
 import com.pocketrocket.sessions.SessionState
 import com.pocketrocket.sessions.SessionStatus
 
 /**
- * The session's Claude controls, from the status line: mode, model, context with Compact / Rewind / Stop, and the
- * commands the CLI reports. Everything goes to the running CLI through its control protocol.
+ * The session's Claude controls, from the status line: mode, model and effort, context with Compact / Rewind / Stop,
+ * and the commands the CLI reports. Everything goes to the running CLI through its control protocol. Opened from the
+ * chat box's model chip ([modelFirst]), the model and effort come first.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,14 +55,19 @@ fun ControlsSheet(
     onRewind: (ChatItem.User) -> Unit,
     onOpenStatus: () -> Unit,
     onOpenSetup: () -> Unit,
+    setup: SetupPanel,
+    modelFirst: Boolean = false,
 ) {
+    val settings by setup.state.collectAsState()
     var picking by remember { mutableStateOf(false) }
     ChatSheet(onDismiss) {
         if (picking) {
             RewindPicker(state, onPick = { onRewind(it); onDismiss() }, onBack = { picking = false })
         } else {
-            ModeSection(state.mode) { session.setMode(it) }
+            if (!modelFirst) ModeSection(state.mode) { session.setMode(it) }
             ModelSection(state) { session.setModel(it) }
+            EffortSection(state, settings, onPick = setup::pickEffort)
+            if (modelFirst) ModeSection(state.mode) { session.setMode(it) }
             ContextSection(
                 state,
                 onCompact = { session.compact(); onDismiss() },
@@ -103,6 +114,27 @@ private fun ModelSection(state: SessionState, onPick: (String) -> Unit) {
             note = current?.description,
             options = options.map { option -> SheetOption(option.displayName, option.description, option == current) { onPick(option.value) } },
         )
+    }
+}
+
+/** The model's thinking levels as pills, when it has any; the pick lasts for this session (as in the setup sheet). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun EffortSection(state: SessionState, setup: SetupState, onPick: (String) -> Unit) {
+    val levels = SetupChoices.effortLevels(state.models, setup.settings?.appliedModel ?: state.model)
+    if (levels.isEmpty()) return
+    val current = setup.settings?.appliedEffort
+    val managed = setup.settings?.isManaged(SetupChoices.EFFORT_KEY) == true
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SheetHeading("EFFORT", current)
+        if (managed) {
+            Text("Managed by your organization.", style = PrType.caption, color = PrTheme.colors.textMuted)
+        } else {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                levels.forEach { level -> ChoicePill(level, on = level == current, enabled = !setup.busy) { onPick(level) } }
+            }
+        }
+        setup.notice?.let { Text(it, style = PrType.caption, color = if (setup.noticeIsProblem) PrTheme.colors.redSoft else PrTheme.colors.textMuted) }
     }
 }
 

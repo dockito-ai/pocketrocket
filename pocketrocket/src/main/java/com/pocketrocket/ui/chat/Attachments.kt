@@ -62,14 +62,14 @@ import kotlinx.coroutines.withContext
 
 /** The composer's "+" (Attachments.html, option A): opens [AttachSheet]. Replaces the old "/" button. */
 @Composable
-fun PlusButton(onClick: () -> Unit) {
+fun PlusButton(onClick: () -> Unit, size: Dp = 44.dp) {
     val c = PrTheme.colors
     Box(
-        Modifier.size(44.dp).clip(CircleShape).border(1.dp, c.border, CircleShape)
+        Modifier.size(size).clip(CircleShape).border(1.dp, c.border, CircleShape)
             .clickable(role = Role.Button, onClickLabel = "Attach or run a command", onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(ChatIcons.Plus, contentDescription = "Attach", tint = c.textSoft, modifier = Modifier.size(22.dp))
+        Icon(ChatIcons.Plus, contentDescription = "Attach", tint = c.textSoft, modifier = Modifier.size(size / 2))
     }
 }
 

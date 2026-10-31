@@ -2,12 +2,8 @@ package com.pocketrocket.dictation
 
 import android.content.Context
 import android.content.Intent
-import android.media.AudioManager
-import android.media.ToneGenerator
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -29,6 +25,9 @@ class Dictation(private val context: Context, private val listener: Listener) {
 
         /** Listening ended: finished, stopped or failed. [error] is a short user-facing reason, or null. */
         fun onEnd(error: String?)
+
+        /** The recognizer heard the start of speech. */
+        fun onSpeech() {}
     }
 
     private var recognizer: SpeechRecognizer? = null
@@ -36,6 +35,12 @@ class Dictation(private val context: Context, private val listener: Listener) {
     private var heardSomething = false
     private var stopping = false
     private var firstTry = true
+    /** The on-device recognizer failed here once; later starts go straight to the default service. */
+    private var onDeviceFailed = false
+
+    /** The recognizer's error code for the last [Listener.onEnd], or null when it ended with a result or a stop. */
+    var lastError: Int? = null
+        private set
 
     val isAvailable: Boolean
         get() = SpeechRecognizer.isRecognitionAvailable(context) || onDeviceAvailable()
@@ -43,30 +48,22 @@ class Dictation(private val context: Context, private val listener: Listener) {
     private fun onDeviceAvailable() =
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
 
-    fun start() {
-        release()
-        startCue()
-        start(preferOnDevice = true)
-    }
-
     /**
-     * A short beep so you know it is listening: the recognizer beeps when it stops but, on many phones, not when it
-     * starts. Played before the mic opens so it is not heard as speech; follows the system sounds volume (silent mode
-     * mutes it).
+     * Starts listening. [cue]: a soft sound first so you know it is listening (the recognizer sounds when it stops but,
+     * on many phones, not when it starts); continuous dictation plays its own and passes false.
      */
-    private fun startCue() {
-        runCatching {
-            val tone = ToneGenerator(AudioManager.STREAM_SYSTEM, 80)
-            tone.startTone(ToneGenerator.TONE_PROP_BEEP, 120)
-            Handler(Looper.getMainLooper()).postDelayed({ tone.release() }, 300)
-        }
+    fun start(cue: Boolean = true) {
+        release()
+        if (cue) SoftCue.play(SoftCue.Kind.Start)
+        open(preferOnDevice = !onDeviceFailed)
     }
 
-    private fun start(preferOnDevice: Boolean) {
+    private fun open(preferOnDevice: Boolean) {
         firstTry = preferOnDevice
         onDevice = preferOnDevice && onDeviceAvailable()
         heardSomething = false
         stopping = false
+        lastError = null
         val created = if (onDevice && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
         } else {
@@ -96,7 +93,7 @@ class Dictation(private val context: Context, private val listener: Listener) {
 
     private val callbacks = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) {}
-        override fun onBeginningOfSpeech() { heardSomething = true }
+        override fun onBeginningOfSpeech() { heardSomething = true; listener.onSpeech() }
         override fun onBufferReceived(buffer: ByteArray?) {}
         override fun onEndOfSpeech() {}
         override fun onEvent(eventType: Int, params: Bundle?) {}
@@ -118,9 +115,11 @@ class Dictation(private val context: Context, private val listener: Listener) {
             release()
             // The on-device (or offline) model may be missing for this language; the default service online can still do it.
             if (firstTry && !stopping && error in fallbackErrors()) {
-                start(preferOnDevice = false)
+                if (onDevice) onDeviceFailed = true
+                open(preferOnDevice = false)
                 return
             }
+            lastError = error
             listener.onEnd(message(error))
         }
     }
