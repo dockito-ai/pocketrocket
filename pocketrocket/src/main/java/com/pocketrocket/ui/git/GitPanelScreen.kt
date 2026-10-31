@@ -102,6 +102,7 @@ fun GitPanelScreen(model: GitPanelModel, onBack: () -> Unit, onOpen: (GitRoute) 
             if (model.loading || model.busy != null) LinearProgressIndicator(Modifier.fillMaxWidth().height(2.dp), color = PrTheme.colors.accent, trackColor = PrTheme.colors.background)
             else Spacer(Modifier.height(2.dp))
             BranchCard(model, onOpen)
+            WorktreesCard(model, onOpen)
             Tabs(
                 listOf(
                     TabItem("Changes · ${status.changes.distinctBy { it.path }.size}", model.tab == PanelTab.Changes) { model.tab = PanelTab.Changes },

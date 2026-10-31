@@ -167,6 +167,44 @@ object GitParsers {
         return BranchList(local, remoteOnly)
     }
 
+    /**
+     * `git worktree list --porcelain -z`: one NUL-ended line per attribute (`worktree <path>`, `HEAD <sha>`,
+     * `branch refs/heads/<name>`, `detached`, `locked [reason]`, `prunable [reason]`), an empty one between worktrees.
+     * The first is the main checkout.
+     */
+    fun worktrees(output: String): List<Worktree> {
+        val result = mutableListOf<Worktree>()
+        var current: Worktree? = null
+        fun flush() { current?.let { result += it.copy(main = result.isEmpty()) }; current = null }
+        for (line in output.split(NUL)) {
+            val key = line.substringBefore(' ')
+            val value = if (' ' in line) line.substringAfter(' ') else ""
+            when (key) {
+                "" -> flush()
+                "worktree" -> { flush(); current = Worktree(value, "", null) }
+                "HEAD" -> current = current?.copy(head = value)
+                "branch" -> current = current?.copy(branch = value.removePrefix("refs/heads/"))
+                "locked" -> current = current?.copy(locked = value)
+                "prunable" -> current = current?.copy(prunable = value.ifEmpty { "folder is gone" })
+            }
+        }
+        flush()
+        return result
+    }
+
+    /** Files in `git status --porcelain -z`: a rename or copy (`R`, `C`) is followed by its old path, which isn't counted. */
+    fun changeCount(output: String): Int {
+        var count = 0
+        var skip = false
+        for (entry in output.split(NUL)) {
+            if (skip) { skip = false; continue }
+            if (entry.length < 4) continue
+            count++
+            if (entry[0] == 'R' || entry[0] == 'C') skip = true
+        }
+        return count
+    }
+
     /** The stash message that keeps a branch's uncommitted changes while it is switched away from. */
     const val STASH_MARKER = "pocketrocket:"
 
