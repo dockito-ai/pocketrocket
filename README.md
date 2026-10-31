@@ -32,11 +32,11 @@ PocketRocket is a fork of [Termux](https://github.com/termux/termux-app), licens
 
 ## Why I made it
 
-I do most of my work with Claude Code on a laptop. When I'm away from it (at a stop, travelling, waiting somewhere) I wanted to keep going: hand Claude a task, let it run for an hour, check back, answer a question, review the diff, push.
+I wanted a workstation in my pocket. A laptop is great at a desk, but I'm not always at one, and I didn't want my work to wait until I was. With PocketRocket the phone is enough. I can start a task, let Claude work on it, check in, answer a question, look over the diff and push, whether I'm on the sofa, travelling or out somewhere.
 
-The Claude mobile app can run Claude Code, but only in Anthropic's cloud, not on my own folders and accounts. Plain Termux stopped running Claude Code once it became a glibc-only binary. Even with the community workaround, a raw terminal on a phone is painful to use.
+It's about comfort and convenience. It isn't meant to replace the laptop; I just don't want to depend on it for everything.
 
-My phone has 24 GB of RAM and 512 GB of storage, which makes it a perfectly good computer. PocketRocket treats it like one. The parts of Claude Code I use on the laptop (several sessions, workspaces with repos, git, multiple accounts) are rebuilt for a phone screen.
+Phones are powerful enough now: mine has 24 GB of RAM and 512 GB of storage. What was missing was a comfortable way to work on one. The Claude app runs Claude Code in Anthropic's cloud, not on my own folders and accounts. A raw Termux terminal is painful on a phone screen. So PocketRocket brings the parts I rely on at the laptop (several sessions, workspaces with repos, git, multiple accounts) onto the phone, made for the screen in your hand.
 
 ## What it does
 
