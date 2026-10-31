@@ -1,5 +1,6 @@
 package com.pocketrocket.ui.tools
 
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -14,7 +15,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pocketrocket.setup.SetupState
@@ -28,7 +28,10 @@ import com.pocketrocket.ui.components.mockText
 import com.pocketrocket.ui.setup.StepList
 import com.pocketrocket.ui.setup.StepListStyle
 import com.pocketrocket.ui.theme.PrTheme
+import com.pocketrocket.updates.UpdateComponent
 import com.pocketrocket.updates.UpdateRow
+import com.pocketrocket.updates.Updates
+import com.pocketrocket.updates.UpdatesState
 
 /** An optional tool's install and uninstall: its job, its steps and what the buttons do. */
 class ToolInstall(
@@ -53,6 +56,17 @@ class ToolInstall(
 /** A tool that updates from the Updates page: its row there, and Update on it. */
 class ToolUpdate(val row: UpdateRow, val queued: Boolean, val blocked: Boolean, val onUpdate: () -> Unit)
 
+/** [component]'s Updates row as a [ToolUpdate] that updates through the Updates flow, or null while it has no row. */
+fun toolUpdate(context: Context, updates: UpdatesState, component: UpdateComponent): ToolUpdate? =
+    updates.rows.firstOrNull { it.component == component }?.let {
+        ToolUpdate(
+            it,
+            queued = component in updates.queued,
+            blocked = updates.updating && updates.current != component,
+            onUpdate = { Updates.update(context, component) },
+        )
+    }
+
 /**
  * Settings → Tools → a tool (decision 64): one layout for every tool. In order, each only when [ToolModel.sections]
  * says it applies: the header (name, what it's for, Built in / Installed / Not installed) with the tool's own
@@ -63,7 +77,7 @@ class ToolUpdate(val row: UpdateRow, val queued: Boolean, val blocked: Boolean, 
 fun ToolPage(
     spec: ToolSpec,
     state: ToolState,
-    icon: ImageVector,
+    icon: ToolGlyph,
     purpose: String,
     onBack: () -> Unit,
     install: ToolInstall? = null,

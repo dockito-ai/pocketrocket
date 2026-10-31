@@ -6,7 +6,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import com.pocketrocket.androidbuild.AndroidBuild
 import com.pocketrocket.androidbuild.AndroidBuildState
@@ -16,10 +15,11 @@ import com.pocketrocket.androidbuild.AndroidNdkTool
 import com.pocketrocket.browser.Chromium
 import com.pocketrocket.browser.ChromiumMcp
 import com.pocketrocket.browser.ChromiumState
+import com.pocketrocket.R
 import com.pocketrocket.dockito.Dockito
 import com.pocketrocket.dockito.DockitoCli
 import com.pocketrocket.dockito.DockitoState
-import com.pocketrocket.fluttertool.FlutterAction
+import com.pocketrocket.fluttertool.FlutterPart
 import com.pocketrocket.fluttertool.FlutterRust
 import com.pocketrocket.fluttertool.FlutterRustState
 import com.pocketrocket.fluttertool.FlutterTool
@@ -27,7 +27,6 @@ import com.pocketrocket.node.NodeJs
 import com.pocketrocket.node.NodeState
 import com.pocketrocket.profiles.DockitoAccounts
 import com.pocketrocket.ui.Routes
-import com.pocketrocket.ui.components.MockIcons
 import com.pocketrocket.updates.UpdateComponent
 import com.pocketrocket.updates.UpdateRow
 import com.pocketrocket.updates.Updates
@@ -39,11 +38,13 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Every tool in Settings → Tools (decision 64): what it declares and how its module's state reads as a
- * [ToolState]. Built in: Node.js and npm, Dockito. Optional: Headless Chrome, Android, Android NDK, Wrangler,
- * Flutter & Rust.
+ * Every tool in Settings → Tools (decisions 64 and 87): what it declares and how its module's state reads as a
+ * [ToolState]. Included (built in): Claude Code, Dockito, Git, Node.js and npm. Add-ons (optional): Android,
+ * Android NDK, Flutter & Dart, Headless Chrome, Rust, Wrangler. The screen orders them by name.
  */
 enum class Tool(val spec: ToolSpec, val route: String) {
+    ClaudeCode(ToolSpec("Claude Code", ToolKind.BuiltIn, hasVersion = true, canUpdate = true), Routes.CLAUDE_CODE),
+    Git(ToolSpec("Git", ToolKind.BuiltIn, hasVersion = true, canUpdate = true), Routes.TOOL_GIT),
     Node(ToolSpec("Node.js and npm", ToolKind.BuiltIn, hasVersion = true), Routes.TOOL_NODE),
     Dockito(ToolSpec("Dockito", ToolKind.BuiltIn, hasVersion = true, canUpdate = true, needsLogin = true), Routes.TOOL_DOCKITO),
     Chromium(
@@ -58,21 +59,31 @@ enum class Tool(val spec: ToolSpec, val route: String) {
     ),
     Flutter(
         ToolSpec(
-            "Flutter & Rust", ToolKind.Optional,
-            downloadMb = FlutterTool.FLUTTER_DOWNLOAD_MB + FlutterTool.RUST_DOWNLOAD_MB,
-            installedMb = FlutterTool.FLUTTER_INSTALLED_MB + FlutterTool.RUST_INSTALLED_MB,
+            "Flutter & Dart", ToolKind.Optional, hasVersion = true, canUpdate = true,
+            downloadMb = FlutterTool.FLUTTER_DOWNLOAD_MB, installedMb = FlutterTool.FLUTTER_INSTALLED_MB,
         ),
         Routes.TOOL_FLUTTER,
     ),
+    Rust(
+        ToolSpec(
+            "Rust", ToolKind.Optional, hasVersion = true, canUpdate = true,
+            downloadMb = FlutterTool.RUST_DOWNLOAD_MB, installedMb = FlutterTool.RUST_INSTALLED_MB,
+        ),
+        Routes.TOOL_RUST,
+    ),
     ;
 
-    val icon: ImageVector get() = when (this) {
-        Node -> MockIcons.Wrench
-        Dockito -> MockIcons.Doc
-        Chromium -> MockIcons.Globe
-        Android, AndroidNdk -> MockIcons.Android
-        Wrangler -> MockIcons.Cloud
-        Flutter -> MockIcons.Code
+    /** Its brand mark (decision 87), bundled as a VectorDrawable; sources in docs/third-party-icons.md. */
+    val icon: ToolGlyph get() = when (this) {
+        ClaudeCode -> ToolGlyph(R.drawable.ic_tool_claude, 0xFFD97757)
+        Git -> ToolGlyph(R.drawable.ic_tool_git, 0xFFF03C2E)
+        Node -> ToolGlyph(R.drawable.ic_tool_nodedotjs, 0xFF5FA04E)
+        Dockito -> ToolGlyph(R.drawable.ic_tool_dockito, 0xFF1A6DFF)
+        Chromium -> ToolGlyph(R.drawable.ic_tool_googlechrome, 0xFF4285F4)
+        Android, AndroidNdk -> ToolGlyph(R.drawable.ic_tool_android, 0xFF3DDC84)
+        Wrangler -> ToolGlyph(R.drawable.ic_tool_cloudflareworkers, 0xFFF38020)
+        Flutter -> ToolGlyph(R.drawable.ic_tool_flutter, 0xFF02569B)
+        Rust -> ToolGlyph(R.drawable.ic_tool_rust, 0xFF000000)
     }
 }
 
@@ -129,20 +140,49 @@ object ToolStates {
         signedIn = if (s.signedIn) s.account ?: "Signed in" else null,
     )
 
+    /** A tool that is only an Updates row (Claude Code, Git): its versions and update come from the row. */
+    fun fromRow(row: UpdateRow?) = ToolState(
+        installed = row?.installed != null,
+        checked = row != null,
+        versions = listOfNotNull(row?.installed?.let { "Installed" to it }),
+        latest = row?.latest,
+        updateAvailable = row?.available == true,
+        updating = row?.running == true,
+    )
+
     /**
-     * Installing everything or uninstalling everything is the tool's job; adding a version, setting the default or
-     * Rust alone shows as Updating on the tile and runs inside the page's own cards.
+     * Flutter & Dart (decision 87). Installing or uninstalling it is the tool's job; adding a version, setting the
+     * default or removing one shows as Updating on the tile and runs inside the page's own cards. Rust's jobs aren't
+     * its own. [row] is Flutter's Updates row (a newer stable for the default).
      */
-    fun flutter(s: FlutterRustState): ToolState {
-        val whole = s.action == FlutterAction.InstallAll || s.action == FlutterAction.UninstallAll
-        val flutterMb = FlutterTool.flutterSizeMb(s.flutterInstalled, s.versions.size, s.flutterBytes)
+    fun flutter(s: FlutterRustState, row: UpdateRow? = null): ToolState {
+        val mine = s.isFor(FlutterPart.Flutter)
+        val whole = mine && s.action?.whole == true
         return ToolState(
-            installed = s.installed,
+            installed = s.flutterInstalled,
             checked = s.checked,
             job = if (whole) ToolModel.job(s.running, s.failed, s.removing) else ToolJob.None,
             progress = if (whole) s.job?.progress else null,
-            updating = s.running && !whole,
-            sizeMb = (flutterMb + if (s.rustInstalled) FlutterTool.RUST_INSTALLED_MB else 0).takeIf { s.installed },
+            versions = listOfNotNull(s.defaultVersion?.let { "Default" to it }, "FVM" to FlutterTool.FVM_VERSION),
+            latest = row?.latest,
+            updateAvailable = row?.available == true,
+            updating = (mine && s.running && !whole) || row?.running == true,
+            sizeMb = FlutterTool.flutterSizeMb(s.flutterInstalled, s.versions.size, s.flutterBytes).takeIf { s.flutterInstalled },
+        )
+    }
+
+    /** Rust (decision 87): installing and removing are its jobs; its version and update come from its Updates row. */
+    fun rust(s: FlutterRustState, row: UpdateRow?): ToolState {
+        val mine = s.isFor(FlutterPart.Rust)
+        return ToolState(
+            installed = s.rustInstalled,
+            checked = s.checked,
+            job = if (mine) ToolModel.job(s.running, s.failed, s.removing) else ToolJob.None,
+            progress = if (mine) s.job?.progress else null,
+            versions = listOfNotNull(row?.installed?.let { "Rust" to it }),
+            latest = row?.latest,
+            updateAvailable = row?.available == true,
+            updating = row?.running == true,
         )
     }
 
@@ -169,15 +209,18 @@ fun rememberTools(): List<Pair<Tool, ToolState>> {
     val flutter by FlutterRust.state.collectAsState()
     LaunchedEffect(Unit) { refreshAll(context) }
     val dockitoSize by produceState<Int?>(null, dockito.installed) { value = withContext(Dispatchers.IO) { ToolStates.dockitoSizeMb(dockito.installed) } }
-    val dockitoRow = updates.rows.firstOrNull { it.component == UpdateComponent.Dockito }
+    fun row(c: UpdateComponent) = updates.rows.firstOrNull { it.component == c }
     return listOf(
+        Tool.ClaudeCode to ToolStates.fromRow(row(UpdateComponent.ClaudeCode)),
+        Tool.Git to ToolStates.fromRow(row(UpdateComponent.Git)),
         Tool.Node to ToolStates.node(node),
-        Tool.Dockito to ToolStates.dockito(dockito, dockitoRow, dockitoAccounts.default?.email, dockitoSize),
+        Tool.Dockito to ToolStates.dockito(dockito, row(UpdateComponent.Dockito), dockitoAccounts.default?.email, dockitoSize),
         Tool.Chromium to ToolStates.chromium(chromium),
         Tool.Android to ToolStates.android(android),
         Tool.AndroidNdk to ToolStates.ndk(ndk, android.installed),
         Tool.Wrangler to ToolStates.wrangler(wrangler),
-        Tool.Flutter to ToolStates.flutter(flutter),
+        Tool.Flutter to ToolStates.flutter(flutter, row(UpdateComponent.Flutter)),
+        Tool.Rust to ToolStates.rust(flutter, row(UpdateComponent.Rust)),
     )
 }
 

@@ -1,13 +1,14 @@
 package com.pocketrocket.fluttertool
 
 import org.json.JSONObject
+import java.io.File
 import java.util.Locale
 
 /** One Flutter release from Flutter's own list: its version and the day it came out ("2026-10-29"). */
 data class FlutterRelease(val version: String, val date: String)
 
 /**
- * The fixed facts of the Flutter & Rust tool (decision 75, docs/flutter-tool.md), and the pure parts: Flutter's release
+ * The fixed facts of the Flutter & Dart and Rust tools (decisions 75 and 87, docs/flutter-tool.md), and the pure parts: Flutter's release
  * list, version order, sizes, and which script option each action runs. Sizes are from the spike (docs/flutter-spike.md).
  */
 object FlutterTool {
@@ -56,7 +57,6 @@ object FlutterTool {
 
     // ---- script options and their steps
 
-    fun installAllSteps(version: String?) = flutterSteps(version) + "Installing Rust"
     fun flutterSteps(version: String?) = listOf(
         "Checking the device",
         "Installing FVM and helpers",
@@ -69,20 +69,6 @@ object FlutterTool {
     val FLUTTER_REMOVE_STEPS = listOf("Checking the device", "Removing Flutter, Dart and FVM")
     fun removeVersionSteps(version: String) = listOf("Checking the device", "Removing Flutter $version")
     fun defaultSteps(version: String) = listOf("Checking the device", "Making Flutter $version the default")
-
-    /** Uninstall all: the script option that takes what is on the phone, or null when nothing is. */
-    fun uninstallOption(flutter: Boolean, rust: Boolean): String? = when {
-        flutter && rust -> "flutter-rust-remove"
-        flutter -> "flutter-remove"
-        rust -> "rust-remove"
-        else -> null
-    }
-
-    fun uninstallSteps(flutter: Boolean, rust: Boolean): List<String> = when {
-        flutter && rust -> FLUTTER_REMOVE_STEPS + "Removing Rust"
-        flutter -> FLUTTER_REMOVE_STEPS
-        else -> RUST_REMOVE_STEPS
-    }
 
     // ---- Flutter's release list
 
@@ -164,6 +150,13 @@ object FlutterTool {
             else -> "Under 1 MB"
         }
     }
+
+    /**
+     * Flutter apps among [folders] (workspaces) that keep Rust in a `rust/` crate, as flutter_rust_bridge does: a
+     * pubspec.yaml beside rust/Cargo.toml. Two file checks each, so cheap enough for the page to run as it opens.
+     */
+    fun rustBridgeProjects(folders: List<File>): List<File> =
+        folders.filter { File(it, "pubspec.yaml").isFile && File(it, "rust/Cargo.toml").isFile }
 
     /** Megabytes as the page shows them: "1.1 GB" from 1100. */
     fun sizeMb(mb: Int): String = size(mb * 1_000_000L)

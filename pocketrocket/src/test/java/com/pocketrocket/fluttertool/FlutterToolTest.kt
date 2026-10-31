@@ -74,14 +74,35 @@ class FlutterToolTest {
         assertEquals("1.1 GB", FlutterTool.sizeMb(FlutterTool.FLUTTER_INSTALLED_MB))
     }
 
-    @Test fun uninstallAllTakesOnlyWhatIsThere() {
-        assertEquals("flutter-rust-remove", FlutterTool.uninstallOption(flutter = true, rust = true))
-        assertEquals("flutter-remove", FlutterTool.uninstallOption(flutter = true, rust = false))
-        assertEquals("rust-remove", FlutterTool.uninstallOption(flutter = false, rust = true))
-        assertNull(FlutterTool.uninstallOption(flutter = false, rust = false))
-        assertEquals(3, FlutterTool.uninstallSteps(flutter = true, rust = true).size)
+    @Test fun flutterAndRustJobsBelongToTheirOwnTool() {
+        val flutter = FlutterAction.entries.filter { it.part == FlutterPart.Flutter }
+        val rust = FlutterAction.entries.filter { it.part == FlutterPart.Rust }
+        assertEquals(setOf(FlutterAction.InstallFlutter, FlutterAction.UninstallFlutter), flutter.filter { it.whole }.toSet())
+        assertEquals(setOf(FlutterAction.InstallRust, FlutterAction.RemoveRust), rust.toSet())
+        assertTrue(rust.all { it.whole })
+        assertTrue(FlutterRustState(action = FlutterAction.RemoveRust).isFor(FlutterPart.Rust))
+        assertFalse(FlutterRustState(action = FlutterAction.RemoveRust).isFor(FlutterPart.Flutter))
+        assertFalse(FlutterRustState().isFor(FlutterPart.Flutter))
+        assertEquals(5, FlutterTool.flutterSteps(null).size)
         assertEquals("Downloading Flutter 3.47.9", FlutterTool.flutterSteps("3.47.9")[2])
-        assertEquals(6, FlutterTool.installAllSteps(null).size)
+        assertTrue(FlutterTool.FLUTTER_REMOVE_STEPS.none { "Rust" in it })
+    }
+
+    @Test fun rustBridgeAppsAreFlutterAppsWithARustCrate() {
+        val root = java.nio.file.Files.createTempDirectory("ws").toFile()
+        try {
+            fun app(name: String, pubspec: Boolean, crate: Boolean) = File(root, name).apply {
+                mkdirs()
+                if (pubspec) File(this, "pubspec.yaml").writeText("name: $name\n")
+                if (crate) File(this, "rust").apply { mkdirs(); File(this, "Cargo.toml").writeText("[package]\n") }
+            }
+            val bridge = app("bridge", pubspec = true, crate = true)
+            val plain = app("plain", pubspec = true, crate = false)
+            val crateOnly = app("crate", pubspec = false, crate = true)
+            assertEquals(listOf(bridge), FlutterTool.rustBridgeProjects(listOf(plain, bridge, crateOnly, File(root, "missing"))))
+        } finally {
+            root.deleteRecursively()
+        }
     }
 
     @Test fun theScriptReadsTheSameReleaseList() {

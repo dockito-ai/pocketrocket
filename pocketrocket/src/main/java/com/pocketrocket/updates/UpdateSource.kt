@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * What the Updates screen keeps current (decision 41), in the screen's order. Optional ones come from an optional
- * tool and show only while it's installed (Flutter and Rust, decision 75).
+ * tool and show only while it's installed (Flutter and Rust, decisions 75 and 87).
  */
 enum class UpdateComponent(val label: String, val optional: Boolean = false) {
     PocketRocket("PocketRocket"),
