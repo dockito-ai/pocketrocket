@@ -41,7 +41,11 @@ object Subagents {
             it.added(ChatItem.Assistant("${event.parentToolUseId}-m${it.dropped + it.log.size}", event.text))
         }
         is StreamEvent.SubagentUpdate -> state.updateAgent(event.toolUseId) {
+            // Stopped or failed mid-step: that step will never answer, so it stops spinning.
+            val cut = event.status in setOf("stopped", "killed", "failed")
+            val log = if (!cut) it.log else it.log.map { e -> if (e is ChatItem.Tool && e.result == null) e.copy(result = "Not finished", isError = true) else e }
             it.copy(
+                log = log,
                 taskId = event.taskId ?: it.taskId,
                 activity = event.activity ?: it.activity, status = event.status ?: it.status, summary = event.summary ?: it.summary,
                 tokens = event.tokens ?: it.tokens, toolUses = event.toolUses ?: it.toolUses, durationMs = event.durationMs ?: it.durationMs,

@@ -94,6 +94,7 @@ class SubagentsTest {
         val state = start().feed(
             agentCall("toolu_A", "First", "a"), started("toolu_A", "ta"),
             text("toolu_A", "Started"),
+            use("toolu_A", "toolu_A1", "Read", "/w/a.txt"),
             ended("toolu_A", "ta", "stopped"),
             result(null, "toolu_A", "[Request interrupted by user for tool use]", error = true),
         )
@@ -101,6 +102,7 @@ class SubagentsTest {
         assertEquals(AgentState.Stopped, tool.agentState)
         assertNull(Subagents.finalAnswer(tool))
         assertEquals(0, state.runningAgents)
+        assertTrue(tool.agent!!.steps.single().isError)
     }
 
     @Test fun aLongAgentKeepsOnlyItsLatestSteps() {
