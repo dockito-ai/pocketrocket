@@ -1,0 +1,10 @@
+date	tool	group	source	verdict	cause	install_s	probe_s	download_kb	installed_kb	pre	notes
+2026-10-31	sqlite3	Databases	termux pkg	works	-	4	1	663	1599	no	
+2026-10-31	fd	Utilities	termux pkg	works	-	3	0	935	3259	no	
+2026-10-31	yq	Utilities	termux pkg	works	-	4	1	3730	14035	no	
+2026-10-31	pnpm	JS tooling	termux pkg	works	-	14	1	13582	45975	no	
+2026-10-31	bun	Languages	termux pkg	works	-	9	0	25020	86911	no	
+2026-10-31	tsc	JS tooling	npm	fails	D	6	0	18517	3710	no	also A under plain shell;             throw new Error("Unable to resolve " + platformPackageName + ". Either your platform is unsupported, or you are missing the package on disk."); Error: Unable to resolve @typescript/typescript-android-arm64. E
+2026-10-31	eslint	JS tooling	npm	works-with-fix	A	11	1	14098	14930	no	plain: sh: 1: eslint: not found 
+2026-10-31	make	Utilities	termux pkg	works	-	0	0	0	-	yes	
+2026-10-31	rust-wasm	Known gaps	termux pkg	works	-	0	0	0	-	yes	

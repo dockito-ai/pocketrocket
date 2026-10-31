@@ -2,7 +2,7 @@
 
 Read `README.md`, then `docs/BRD.md` (what we are building and why), `docs/PROGRESS.md` (where it stands) and `docs/decisions.md` (decisions win over everything else). Log every new decision Shankar confirms in decisions.md, numbered and dated.
 
-PocketRocket is Shankar's tool, open source under Dockito's GitHub org (decision 68). Direction and product calls are his. It lives in Dockito's org but stays isolated from Dockito and from his other work: never pull their code, accounts or content into this repo (decision 71). The one exception is Dockito's public CLI, which is installed by first-run setup and updated from Settings (decisions 38 and 40); it is downloaded from Dockito's Homebrew tap at that moment, never bundled.
+PocketRocket is a Dockito Labs project, open source under Dockito's GitHub org (decisions 68 and 91). Public-facing text (README, release notes, store-style copy) speaks as "we" and names Dockito Labs, which has no website, so never link it. Direction and product calls are Shankar's. It lives in Dockito's org but stays isolated from Dockito and from his other work: never pull their code, accounts or content into this repo (decision 71). The one exception is Dockito's public CLI, which is installed by first-run setup and updated from Settings (decisions 38 and 40); it is downloaded from Dockito's Homebrew tap at that moment, never bundled.
 
 ## Hard rules
 

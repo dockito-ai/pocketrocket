@@ -48,4 +48,12 @@ fi
 # glibc binary it crashes it. The ELF interpreter was already set to Termux's
 # glibc loader at install time, so nothing else is needed.
 unset LD_PRELOAD
+# The shells Claude starts get the helper back from pocketrocket-bash, so
+# `#!/usr/bin/env` scripts run there as in a terminal. A user's own
+# CLAUDE_CODE_SHELL stays.
+pr_shell="${PREFIX:-/data/data/app.pocket/files/usr}/bin/pocketrocket-bash"
+if [ -z "${CLAUDE_CODE_SHELL:-}" ] && [ -x "$pr_shell" ]; then
+  export CLAUDE_CODE_SHELL="$pr_shell"
+fi
+unset pr_shell
 exec "$bin" "$@"

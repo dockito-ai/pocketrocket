@@ -709,9 +709,17 @@ install_launcher() {
   ok "launcher at $PREFIX/bin/$1"
 }
 
+# claude_launchers: `claude`, and `pocketrocket-bash`, the shell it gives Claude Code's Bash tool (with Termux's exec
+# helper, so `#!/usr/bin/env` scripts run). Updates and rollbacks write them again, so a phone set up by an
+# older APK gets the current ones then.
+claude_launchers() {
+  install_launcher claude
+  install_launcher pocketrocket-bash
+}
+
 step_defaults() {
   step "Writing launcher and defaults"
-  install_launcher claude
+  claude_launchers
 
   write_claude_defaults "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
   ok "Claude settings: autoUpdates false, USE_BUILTIN_RIPGREP=0"
@@ -1950,6 +1958,7 @@ main() {
       fi
       step_download
       step_patch_and_test
+      claude_launchers
       step_final_check
       printf '[done]\n'
       ;;
@@ -1958,6 +1967,7 @@ main() {
       TOTAL_STEPS=3; PR_LOG="$PR_HOME/update.log"
       step "Checking the device"; preflight_checks; locate_glibc_tools; ok "Termux on aarch64"
       step_switch "$2"
+      claude_launchers
       step_final_check
       printf '[done]\n'
       ;;
