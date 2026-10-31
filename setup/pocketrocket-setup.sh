@@ -1766,7 +1766,7 @@ step_rust_install() {
 step_rust_remove() {
   step "Removing Rust"
   if [ -f "$RUST_BASELINE_FILE" ]; then packages_record "$RUST_BASELINE_FILE" "$RUST_ADDED_FILE"; fi
-  [ -s "$RUST_ADDED_FILE" ] || info "Rust was on the phone before this tool, so it stays"
+  if [ ! -s "$RUST_ADDED_FILE" ] && pkg_installed rust; then info "Rust was on the phone before this tool, so it stays"; fi
   android_purge_added "$RUST_ADDED_FILE"
   rm -f "$RUST_ADDED_FILE" "$RUST_BASELINE_FILE"
   rm -rf "$HOME/.cargo"
