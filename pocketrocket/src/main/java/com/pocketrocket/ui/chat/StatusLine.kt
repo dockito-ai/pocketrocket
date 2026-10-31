@@ -2,128 +2,136 @@ package com.pocketrocket.ui.chat
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.text.TextStyle
 import com.pocketrocket.ui.theme.JetBrainsMono
 import com.pocketrocket.ui.theme.PrTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.pocketrocket.sessions.GitHead
 import com.pocketrocket.sessions.PermissionMode
 import com.pocketrocket.sessions.SessionReducer
 import com.pocketrocket.sessions.SessionState
-import com.pocketrocket.sessions.SessionStatus
 import com.termux.shared.termux.TermuxConstants.TERMUX_HOME_DIR_PATH
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /**
- * The terminal-style lines under the chat box: `Opus · medium │ branch │ 160k/1M` (decision 85: the model and effort
- * lead the first line, the folder is in the top bar), then the permission mode with `│ 0 agents │ 0 shells` beside it.
- * Tapping the model opens the controls at Model and Effort; tapping the branch opens the repo's branches; tapping a
- * count opens the Background sheet; tapping the mode switches it (auto, manual, plan); tapping anywhere else, or
- * long-pressing, opens the controls.
+ * The one terminal-style row under the chat box (decision 89): `▸▸ auto mode │ Opus · medium │ 160k/1M │ 0 agents │ 0 shells`.
+ * The branch is in the top bar. Tapping the mode switches it (auto, manual, plan); tapping the model opens the controls
+ * at Model and Effort; tapping a count opens the Background sheet; tapping anywhere else, or long-pressing, opens the
+ * controls. When the row is too wide for the screen it shortens step by step ([statusLevels]) until it fits on one line.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun StatusLine(state: SessionState, model: String?, onOpenModel: () -> Unit, onOpenControls: () -> Unit, onShowBackground: () -> Unit, onOpenBranches: () -> Unit, onSwitchMode: () -> Unit, modifier: Modifier = Modifier) {
-    var branch by remember(state.folder) { mutableStateOf<String?>(null) }
-    // Re-read after each turn: Claude may have switched branches.
-    LaunchedEffect(state.folder, state.status == SessionStatus.Done) {
-        branch = withContext(Dispatchers.IO) { GitHead.branch(state.folder) }
-    }
+fun StatusLine(state: SessionState, model: String?, onOpenModel: () -> Unit, onOpenControls: () -> Unit, onShowBackground: () -> Unit, onSwitchMode: () -> Unit, modifier: Modifier = Modifier) {
     val c = PrTheme.colors
     val dim = c.textMuted
     val bar = c.textFaint
-    val green = c.green
-    val line = buildAnnotatedString {
-        var first = true
-        fun gap() { if (!first) withStyle(SpanStyle(color = bar)) { append(" │ ") }; first = false }
-        // The model and the branch take their own taps (R17); the rest of the line opens the controls.
-        model?.let<String, Unit> { text ->
-            gap()
-            withLink(LinkAnnotation.Clickable("model") { onOpenModel() }) {
-                withStyle(SpanStyle(color = c.textSoft)) { append(text.substringBefore(" · ")) }
-                text.substringAfter(" · ", "").takeIf { it.isNotEmpty() }?.let<String, Unit> {
-                    withStyle(SpanStyle(color = dim)) { append(" · $it") }
-                }
+    val modeTint = modeColor(state.mode)
+    val tokens = state.context?.let { contextText(it.used, it.window) }
+    val tokenTint = state.context?.let { contextColor(it.used, it.window, dim) } ?: dim
+    // Session.dc.html: 11.5px JetBrains Mono, 4px in from the chat row.
+    val style = TextStyle(fontFamily = JetBrainsMono, fontSize = 11.5.sp, lineHeight = 15.sp)
+    val levels = statusLevels(
+        state.mode, model?.substringBefore(" · "), model?.substringAfter(" · ", "")?.takeIf { it.isNotEmpty() },
+        tokens, state.runningAgents, state.runningShells,
+    )
+    fun render(parts: List<StatusPart>): AnnotatedString = buildAnnotatedString {
+        parts.forEachIndexed { i, part ->
+            when (part.kind) {
+                StatusPart.Kind.Effort -> withStyle(SpanStyle(color = dim)) { append(" · ") }
+                else -> if (i > 0) withStyle(SpanStyle(color = bar)) { append(" │ ") }
             }
-        }
-        branch?.let { text ->
-            gap()
-            withLink(LinkAnnotation.Clickable("branch") { onOpenBranches() }) {
-                withStyle(SpanStyle(color = green)) { append(text) }
+            val color = when (part.kind) {
+                StatusPart.Kind.Mode -> modeTint
+                StatusPart.Kind.Model -> c.textSoft
+                StatusPart.Kind.Effort -> dim
+                StatusPart.Kind.Tokens -> tokenTint
+                StatusPart.Kind.Agents -> if (part.text.startsWith("0 ")) dim else c.lilac
+                StatusPart.Kind.Shells -> if (part.text.startsWith("0 ")) dim else c.teal
             }
-        }
-        state.context?.let {
-            gap()
-            withStyle(SpanStyle(color = contextColor(it.used, it.window, dim))) { append(contextText(it.used, it.window)) }
+            val tap: (() -> Unit)? = when (part.kind) {
+                StatusPart.Kind.Mode -> onSwitchMode
+                StatusPart.Kind.Model, StatusPart.Kind.Effort -> onOpenModel
+                StatusPart.Kind.Agents, StatusPart.Kind.Shells -> onShowBackground
+                StatusPart.Kind.Tokens -> null
+            }
+            if (tap == null) withStyle(SpanStyle(color = color)) { append(part.text) }
+            else withLink(LinkAnnotation.Clickable(part.kind.name, TextLinkStyles(SpanStyle(color = color))) { tap() }) { append(part.text) }
         }
     }
-    // Session.dc.html: two lines of 11.5px JetBrains Mono, 3px apart, 4px in from the chat row.
-    val style = TextStyle(fontFamily = JetBrainsMono, fontSize = 11.5.sp, lineHeight = 15.sp)
-    val counts = backgroundCounts(state.runningAgents, state.runningShells)
-    Column(modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        // As before: the branch link takes its own taps, the row around it opens the controls.
-        if (line.isNotEmpty()) Row(Modifier.fillMaxWidth().combinedClickable(onClick = onOpenControls, onLongClick = onOpenControls)) {
-            Text(line, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        // The mode and the counts take their own taps; the rest of the row opens the controls.
-        Row(Modifier.fillMaxWidth().combinedClickable(onClick = onOpenControls, onLongClick = onOpenControls)) {
-            Text(
-                modeLine(state.mode), style = style, color = modeColor(state.mode), maxLines = 1, softWrap = false,
-                modifier = Modifier.combinedClickable(onClick = onSwitchMode, onLongClick = onOpenControls),
-            )
-            if (counts.isNotEmpty()) {
-                Text(
-                    buildAnnotatedString {
-                        counts.forEach { (text, shell) ->
-                            withStyle(SpanStyle(color = bar)) { append(" │ ") }
-                            withStyle(SpanStyle(color = if (text.startsWith("0 ")) dim else if (shell) c.teal else c.lilac)) { append(text) }
-                        }
-                    },
-                    style = style,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.combinedClickable(onClick = onShowBackground, onLongClick = onOpenControls),
-                )
-            }
-        }
+    val measurer = rememberTextMeasurer()
+    BoxWithConstraints(
+        modifier.fillMaxWidth().padding(horizontal = 4.dp).combinedClickable(onClick = onOpenControls, onLongClick = onOpenControls),
+    ) {
+        val width = constraints.maxWidth
+        val line = fitStatus(levels) { measurer.measure(render(it), style, softWrap = false, maxLines = 1).size.width <= width }
+        Text(render(line), style = style, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
     }
 }
 
-/** "0 agents", "2 shells": what runs beside the conversation, always shown, each paired with whether it is a shell. */
-internal fun backgroundCounts(agents: Int, shells: Int): List<Pair<String, Boolean>> = listOf(
-    (if (agents == 1) "1 agent" else "$agents agents") to false,
-    (if (shells == 1) "1 shell" else "$shells shells") to true,
-)
+/** One piece of the status row; an [Kind.Effort] joins the model with " · ", the others are split by " │ ". */
+internal data class StatusPart(val kind: Kind, val text: String) {
+    enum class Kind { Mode, Model, Effort, Tokens, Agents, Shells }
+}
 
-/** How Claude Code shows each mode under its prompt, with ‖ and ▸▸ for its ⏸ and ⏵⏵. */
-fun modeLine(mode: PermissionMode): String = when (mode) {
-    PermissionMode.Manual -> "‖ manual mode on"
-    PermissionMode.AcceptEdits -> "▸▸ accept edits on"
+/**
+ * The status row from fullest to shortest. Each step keeps the previous ones: the counts become `0 A │ 0 S`, then
+ * the mode drops "mode", then the effort goes, then the model name is cut to its first word.
+ */
+internal fun statusLevels(mode: PermissionMode, model: String?, effort: String?, tokens: String?, agents: Int, shells: Int): List<List<StatusPart>> {
+    fun row(shortCounts: Boolean, shortMode: Boolean, withEffort: Boolean, shortModel: Boolean) = buildList {
+        add(StatusPart(StatusPart.Kind.Mode, modeText(mode, short = shortMode)))
+        model?.let { add(StatusPart(StatusPart.Kind.Model, if (shortModel) shortModelName(it) else it)) }
+        if (withEffort && model != null) effort?.let { add(StatusPart(StatusPart.Kind.Effort, it)) }
+        tokens?.let { add(StatusPart(StatusPart.Kind.Tokens, it)) }
+        add(StatusPart(StatusPart.Kind.Agents, if (shortCounts) "$agents A" else if (agents == 1) "1 agent" else "$agents agents"))
+        add(StatusPart(StatusPart.Kind.Shells, if (shortCounts) "$shells S" else if (shells == 1) "1 shell" else "$shells shells"))
+    }
+    return listOf(
+        row(shortCounts = false, shortMode = false, withEffort = true, shortModel = false),
+        row(shortCounts = true, shortMode = false, withEffort = true, shortModel = false),
+        row(shortCounts = true, shortMode = true, withEffort = true, shortModel = false),
+        row(shortCounts = true, shortMode = true, withEffort = false, shortModel = false),
+        row(shortCounts = true, shortMode = true, withEffort = false, shortModel = true),
+    ).distinct()
+}
+
+/** The first level that [fits], or the shortest one when none does. */
+internal fun <T> fitStatus(levels: List<T>, fits: (T) -> Boolean): T = levels.firstOrNull(fits) ?: levels.last()
+
+/** The row as plain text, as drawn. */
+internal fun statusText(parts: List<StatusPart>): String = buildString {
+    parts.forEachIndexed { i, part ->
+        if (part.kind == StatusPart.Kind.Effort) append(" · ") else if (i > 0) append(" │ ")
+        append(part.text)
+    }
+}
+
+/** "Claude Opus 5.5 (1M context)" → "Opus": the family name alone. */
+internal fun shortModelName(name: String): String =
+    name.substringBefore('(').trim().removePrefix("Claude ").trim().substringBefore(' ').ifEmpty { name }
+
+/** Claude Code's wording for each mode, with ‖ and ▸▸ for its ⏸ and ⏵⏵; [short] drops "mode". */
+internal fun modeText(mode: PermissionMode, short: Boolean = false): String = when (mode) {
+    PermissionMode.Manual -> if (short) "‖ manual" else "‖ manual mode"
+    PermissionMode.AcceptEdits -> "▸▸ accept edits"
     // Not ⏸: Android draws it as an emoji.
-    PermissionMode.Plan -> "‖ plan mode on"
-    PermissionMode.Auto -> "▸▸ auto mode on"
+    PermissionMode.Plan -> if (short) "‖ plan" else "‖ plan mode"
+    PermissionMode.Auto -> if (short) "▸▸ auto" else "▸▸ auto mode"
 }
 
 /** Claude Code's own colours for each mode (its `inactive`, `autoAccept`, `planMode` and `warning`), dark and light. */

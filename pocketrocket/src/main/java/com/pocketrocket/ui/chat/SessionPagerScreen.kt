@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.pocketrocket.git.GitRepo
+import com.pocketrocket.sessions.GitHead
 import com.pocketrocket.sessions.Session
 import com.pocketrocket.sessions.SessionManager
 import com.pocketrocket.sessions.SessionStatus
@@ -80,7 +81,7 @@ fun SessionPagerScreen(
     LaunchedEffect(current?.id) { current?.let(onCurrent) }
 
     Column(Modifier.fillMaxSize().background(PrTheme.colors.background)) {
-        current?.let { TopBar(it, sessions, onBack) }
+        current?.let { TopBar(it, onBack) }
         SessionSwitcher(
             sessions,
             current = pager.currentPage,
@@ -124,15 +125,17 @@ fun SessionPagerScreen(
     }
 }
 
-/** Back, the folder and how many sessions need you, the Git button with the change count, the terminal. */
+/** Back, the folder with its branch under it (tap for the branches), the Git button with the change count, the terminal. */
 @Composable
-private fun TopBar(session: Session, sessions: List<Session>, onBack: () -> Unit) {
+private fun TopBar(session: Session, onBack: () -> Unit) {
     val c = PrTheme.colors
     val context = LocalContext.current
     val state by session.state.collectAsState()
-    val needYou = sessions.count { it.state.collectAsState().value.status == SessionStatus.WaitingForPermission }
-    val subtitle = "${sessions.size} ${if (sessions.size == 1) "session" else "sessions"}" +
-        if (needYou > 0) " · $needYou needs you" else ""
+    // The branch from .git/HEAD (worktrees too), re-read after each turn: Claude may have switched branches (decision 89).
+    var branch by remember(state.folder) { mutableStateOf<String?>(null) }
+    LaunchedEffect(state.folder, state.status == SessionStatus.Done) {
+        branch = withContext(Dispatchers.IO) { GitHead.branch(state.folder) }
+    }
 
     // Changed files in the folder's repo; null when it is not a repo. Read on open (even mid-turn, or the
     // button stays hidden until the turn ends) and again after each turn. A read that fails once the
@@ -159,7 +162,14 @@ private fun TopBar(session: Session, sessions: List<Session>, onBack: () -> Unit
         }
         Column(Modifier.weight(1f)) {
             Text(folderName(state.folder), style = PrType.title, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(subtitle, style = PrType.caption, color = c.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            branch?.let {
+                Text(
+                    it, style = PrType.caption, color = c.green, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.clickable(role = Role.Button, onClickLabel = "Branches") {
+                        com.pocketrocket.workspaces.GitHead.repoRoot(state.folder)?.let { root -> GitScreens.openBranches(context, root.path) }
+                    },
+                )
+            }
         }
         changed?.let { count ->
             Row(
