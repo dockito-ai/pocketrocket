@@ -10,4 +10,4 @@ Screens: Main (Home: sessions with project tabs), Session, Controls, NewSession,
 
 `Backup.dc.html` (31 Oct 2026, plain HTML in this style): Settings › Backup, back up and restore in every state (decision 53).
 
-`BackgroundTasks.html` (31 Oct 2026, plain HTML in this style, with buttons that stand in for Claude Code's events): background Bash cards, the counts beside the mode, the Background sheet, a shell's output screen, Move to background, the End session warning and the service notification (decision 68).
+`BackgroundTasks.html` (31 Oct 2026, plain HTML in this style, with buttons that stand in for Claude Code's events): background Bash cards, the counts beside the mode, the Background sheet, a shell's output screen, Move to background, the End session warning and the service notification (decision 69).

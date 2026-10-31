@@ -2,11 +2,11 @@
 
 Read `README.md`, then `docs/BRD.md` (what we are building and why), `docs/PROGRESS.md` (where it stands) and `docs/decisions.md` (decisions win over everything else). Log every new decision Shankar confirms in decisions.md, numbered and dated.
 
-PocketRocket is Shankar's personal tool. Direction and product calls are his. It is separate from Dockito and from his other work: never pull their code, accounts or content into this repo. The one exception is Dockito's public CLI, which first-run setup installs and Settings updates (decisions 38 and 40); it is downloaded from Dockito's Homebrew tap at that moment, never bundled.
+PocketRocket is Shankar's tool, open source under Dockito's GitHub org (decision 68). Direction and product calls are his. Keep it separate from his other work: never pull its code, accounts or content into this repo. Dockito's public CLI is installed by first-run setup and updated from Settings (decisions 38 and 40); it is downloaded from Dockito's Homebrew tap at that moment, never bundled.
 
 ## Hard rules
 
-- GitHub: `ShankarKakumani/pocketrocket` (private) under the personal account only. `gh` is usually logged into another account, so use `GH_TOKEN=$(gh auth token -u ShankarKakumani) gh …`. SSH `git@github.com` already uses the personal key.
+- GitHub: `dockito-ai/pocketrocket` (public), reached with the personal account, an admin of the org. `gh` is usually logged into another account, so use `GH_TOKEN=$(gh auth token -u ShankarKakumani) gh …`. SSH `git@github.com` already uses the personal key.
 - Git identity in this repo: `Shankar Kakumani <ShankarKakumani@users.noreply.github.com>`. No Co-Authored-By or AI attribution lines in commits or PRs.
 - Package id is `app.pocket` (decision 36, replaces decision 2). Termux class names and intent actions keep the `com.termux` namespace; installed packages get their prefix rewritten at install time.
 - Never bundle Anthropic's Claude Code binary in the repo or the APK. It is downloaded from `downloads.claude.ai` at first run and checked against Anthropic's manifest.

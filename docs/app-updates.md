@@ -14,7 +14,7 @@ Minor and patch stay below 100. Every code is above Termux's 118 and grows with 
 
 ## Where releases come from
 
-The updater reads **`ShankarKakumani/pocketrocket`** (`ReleaseSource.REPO`) first and falls back to the old public **`ShankarKakumani/pocketrocket-releases`** (`OLD_REPO`) while the code repo is private or has no release (decision 66). The app reads `https://api.github.com/repos/<repo>/releases` over plain HTTPS, with no login and no gh. It picks the highest `vX.Y.Z` tag by semver, prereleases included and drafts skipped, and downloads the arm64 asset's `browser_download_url`. Each release is tagged `vX.Y.Z` in the code repo, so a release maps to a commit. The Release workflow publishes every release to the code repo, and to `pocketrocket-releases` as well while the `RELEASES_REPO_TOKEN` secret is set (decision 67).
+The updater reads **`dockito-ai/pocketrocket`** (`ReleaseSource.REPO`) first and falls back to the old public **`ShankarKakumani/pocketrocket-releases`** (`OLD_REPO`) while the code repo is private or has no release (decision 66). The app reads `https://api.github.com/repos/<repo>/releases` over plain HTTPS, with no login and no gh. It picks the highest `vX.Y.Z` tag by semver, prereleases included and drafts skipped, and downloads the arm64 asset's `browser_download_url`. Each release is tagged `vX.Y.Z` in the code repo, so a release maps to a commit. The Release workflow publishes every release to the code repo, and to `pocketrocket-releases` as well while the `RELEASES_REPO_TOKEN` secret is set (decision 67).
 
 ## The screen
 
@@ -60,7 +60,7 @@ To restore on a new Mac, copy the jks to `~/.pocketrocket-keys/` and add the Key
 **Release** (`.github/workflows/release.yml`) is started by hand, from main:
 
     scripts/ship.sh                       # asks version and notes, offers a dry run, starts and follows the workflow
-    GH_TOKEN=$(gh auth token -u ShankarKakumani) gh workflow run release.yml -R ShankarKakumani/pocketrocket \
+    GH_TOKEN=$(gh auth token -u ShankarKakumani) gh workflow run release.yml -R dockito-ai/pocketrocket \
       --ref main -f version=1.0.5 -f notes="$(cat notes.md)" [-f dry_run=true]
 
 Inputs: `version` (X.Y.Z, newer than `app/build.gradle`), `notes` (Markdown; the code link and SHA-256 line are added) and `dry_run`. One release runs at a time. The **build** job (read-only token):
@@ -78,15 +78,15 @@ The **publish** job (the only one with `contents: write`, real runs from main on
 
 ### Secrets (Shankar adds them; never through chat)
 
-Settings › Secrets and variables › Actions on `ShankarKakumani/pocketrocket`, or from the Mac without printing anything:
+Settings › Secrets and variables › Actions on `dockito-ai/pocketrocket`, or from the Mac without printing anything:
 
     export GH_TOKEN=$(gh auth token -u ShankarKakumani)
-    base64 -i ~/.pocketrocket-keys/pocketrocket-release.jks | gh secret set RELEASE_KEYSTORE_BASE64 -R ShankarKakumani/pocketrocket
-    security find-generic-password -s pocketrocket-release-key -a pocketrocket -w | tr -d '\n' | gh secret set RELEASE_KEYSTORE_PASSWORD -R ShankarKakumani/pocketrocket
+    base64 -i ~/.pocketrocket-keys/pocketrocket-release.jks | gh secret set RELEASE_KEYSTORE_BASE64 -R dockito-ai/pocketrocket
+    security find-generic-password -s pocketrocket-release-key -a pocketrocket -w | tr -d '\n' | gh secret set RELEASE_KEYSTORE_PASSWORD -R dockito-ai/pocketrocket
 
 - `RELEASE_KEYSTORE_BASE64`: the PKCS12 keystore, base64. Alias `pocketrocket`.
 - `RELEASE_KEYSTORE_PASSWORD`: its one password (store and key).
-- `RELEASES_REPO_TOKEN` (optional, only while the code repo is private): a fine-grained token limited to `ShankarKakumani/pocketrocket-releases` with Contents read and write, made at github.com › Settings › Developer settings › Fine-grained tokens. `gh secret set RELEASES_REPO_TOKEN -R ShankarKakumani/pocketrocket` asks for it without echoing. Delete the secret and the token once the public repo is up.
+- `RELEASES_REPO_TOKEN` (optional, only while the code repo is private): a fine-grained token limited to `ShankarKakumani/pocketrocket-releases` with Contents read and write, made at github.com › Settings › Developer settings › Fine-grained tokens. `gh secret set RELEASES_REPO_TOKEN -R dockito-ai/pocketrocket` asks for it without echoing. Delete the secret and the token once the public repo is up.
 
 Actions must be enabled on the repo (Settings › Actions › General › Allow all actions). Secrets don't move with the code: when the public repo replaces the private one (decisions 63 and 66), enable Actions there and run the first two commands again against it.
 
