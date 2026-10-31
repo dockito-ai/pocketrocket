@@ -97,11 +97,9 @@ object SessionNotifier {
             .setVisibility(Notification.VISIBILITY_PRIVATE)
             .setPublicVersion(publicVersion(context, needsYou, title))
         state.permission?.takeIf { needsYou }?.let { asked ->
-            // Always Deny, Allow, Review (decision 76). Allow answers from here only what the notification fully shows;
-            // otherwise the tap opens the session to approve there (NotificationRules.onAllowTap).
+            // Deny and Allow on every request; Allow answers it from here (decision 76).
             builder.addAction(action(context, state.id, asked.requestId, allow = false))
             builder.addAction(action(context, state.id, asked.requestId, allow = true))
-            builder.addAction(Notification.Action.Builder(null, "Review", openIntent(context, state.id)).build())
         }
         posted.add(state.id)
         manager.notify(idOf(state.id), builder.build())
