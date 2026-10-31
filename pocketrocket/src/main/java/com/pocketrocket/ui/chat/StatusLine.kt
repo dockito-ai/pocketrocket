@@ -37,14 +37,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * The terminal-style lines under the chat box: `branch │ 160k/1M` (decision 81: the folder is in the top bar and the
- * model on the box's chip), then the permission mode with `│ 0 agents │ 0 shells` beside it. Tapping the branch opens the repo's
- * branches; tapping a count opens the Background sheet; tapping the mode switches it (auto, manual, plan); tapping
- * anywhere else, or long-pressing, opens the controls.
+ * The terminal-style lines under the chat box: `Opus · medium │ branch │ 160k/1M` (decision 85: the model and effort
+ * lead the first line, the folder is in the top bar), then the permission mode with `│ 0 agents │ 0 shells` beside it.
+ * Tapping the model opens the controls at Model and Effort; tapping the branch opens the repo's branches; tapping a
+ * count opens the Background sheet; tapping the mode switches it (auto, manual, plan); tapping anywhere else, or
+ * long-pressing, opens the controls.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun StatusLine(state: SessionState, onOpenControls: () -> Unit, onShowBackground: () -> Unit, onOpenBranches: () -> Unit, onSwitchMode: () -> Unit, modifier: Modifier = Modifier) {
+fun StatusLine(state: SessionState, model: String?, onOpenModel: () -> Unit, onOpenControls: () -> Unit, onShowBackground: () -> Unit, onOpenBranches: () -> Unit, onSwitchMode: () -> Unit, modifier: Modifier = Modifier) {
     var branch by remember(state.folder) { mutableStateOf<String?>(null) }
     // Re-read after each turn: Claude may have switched branches.
     LaunchedEffect(state.folder, state.status == SessionStatus.Done) {
@@ -55,20 +56,27 @@ fun StatusLine(state: SessionState, onOpenControls: () -> Unit, onShowBackground
     val bar = c.textFaint
     val green = c.green
     val line = buildAnnotatedString {
-        val parts = listOfNotNull(
-            branch?.let { it to green },
-            state.context?.let { contextText(it.used, it.window) to contextColor(it.used, it.window, dim) },
-        )
-        parts.forEachIndexed { i, (text, color) ->
-            if (i > 0) withStyle(SpanStyle(color = bar)) { append(" │ ") }
-            if (text == branch && i == 0) {
-                // The branch takes its own taps (R17); the rest of the line opens the controls.
-                withLink(LinkAnnotation.Clickable("branch") { onOpenBranches() }) {
-                    withStyle(SpanStyle(color = color)) { append(text) }
+        var first = true
+        fun gap() { if (!first) withStyle(SpanStyle(color = bar)) { append(" │ ") }; first = false }
+        // The model and the branch take their own taps (R17); the rest of the line opens the controls.
+        model?.let<String, Unit> { text ->
+            gap()
+            withLink(LinkAnnotation.Clickable("model") { onOpenModel() }) {
+                withStyle(SpanStyle(color = c.textSoft)) { append(text.substringBefore(" · ")) }
+                text.substringAfter(" · ", "").takeIf { it.isNotEmpty() }?.let<String, Unit> {
+                    withStyle(SpanStyle(color = dim)) { append(" · $it") }
                 }
-            } else {
-                withStyle(SpanStyle(color = color)) { append(text) }
             }
+        }
+        branch?.let { text ->
+            gap()
+            withLink(LinkAnnotation.Clickable("branch") { onOpenBranches() }) {
+                withStyle(SpanStyle(color = green)) { append(text) }
+            }
+        }
+        state.context?.let {
+            gap()
+            withStyle(SpanStyle(color = contextColor(it.used, it.window, dim))) { append(contextText(it.used, it.window)) }
         }
     }
     // Session.dc.html: two lines of 11.5px JetBrains Mono, 3px apart, 4px in from the chat row.

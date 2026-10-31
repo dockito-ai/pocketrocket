@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -58,7 +57,6 @@ import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pocketrocket.sessions.Draft
 import com.pocketrocket.sessions.SlashCommand
@@ -70,11 +68,11 @@ import kotlinx.coroutines.delay
 
 /**
  * The message box (decision 81, Dictation.html; Attachments.html option A): one rounded box with the text on top
- * (grows to a few lines) and a row under it: `+` for Photos, Files and Commands, the model chip ([chip]), then the
- * dictation mic and Send, or Stop while Claude works and the box is empty (typed text still queues). The mic is always
+ * (grows to a few lines) and a row under it: `+` for Photos, Files and Commands, then the dictation
+ * mic and Send, or Stop while Claude works and the box is empty (typed text still queues). The mic is always
  * there; it raises [dictator]'s listening panel, and kept words go in at the cursor, briefly highlighted. Nothing is
  * sent automatically. Picked files are copied in at once and wait in a tray above the box.
- * Rocket's tab uses the same box with no `+` ([attachable] false), no chip, and its own talk button in the mic's
+ * Rocket's tab uses the same box with no `+` ([attachable] false) and its own talk button in the mic's
  * place ([voice]).
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -93,7 +91,6 @@ fun Composer(
     attachable: Boolean = true,
     voice: ComposerVoice? = null,
     dictator: Dictator? = null,
-    chip: ComposerChip? = null,
 ) {
     var field by rememberSaveable(sessionId, stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue("")) }
     val text = field.text
@@ -227,7 +224,6 @@ fun Composer(
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (attachable) PlusButton(onClick = { attaching = true }, size = 36.dp)
-                if (chip != null) ModelChip(chip, Modifier.weight(1f, fill = false))
                 Spacer(Modifier.weight(1f))
                 val round = Modifier.size(36.dp)
                 when {
@@ -280,37 +276,6 @@ fun Composer(
         onHint = { hint = it },
         onCommands = { if (!text.startsWith("/")) setText("/" + text); focus.requestFocus() },
     )
-}
-
-/** The model chip's words ([modelChipText]) and what a tap does (opens the controls at the model). */
-class ComposerChip(val text: String, val onClick: () -> Unit)
-
-/** "Opus 5.5 · medium ▾": the effort muted, the caret faint, like the mockup. */
-@Composable
-private fun ModelChip(chip: ComposerChip, modifier: Modifier = Modifier) {
-    val c = PrTheme.colors
-    val name = chip.text.substringBefore(" · ")
-    val effort = chip.text.substringAfter(" · ", "")
-    Row(
-        modifier.widthIn(min = 0.dp).height(32.dp).clip(RoundedCornerShape(16.dp))
-            .clickable(role = Role.Button, onClickLabel = "Change model and effort", onClick = chip.onClick)
-            .padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            buildAnnotatedString {
-                append(name)
-                if (effort.isNotEmpty()) {
-                    pushStyle(SpanStyle(color = c.textMuted)); append(" · $effort"); pop()
-                }
-                pushStyle(SpanStyle(color = c.textFaint)); append("  ▾"); pop()
-            },
-            style = PrType.small,
-            color = c.textSoft,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
 }
 
 /**
