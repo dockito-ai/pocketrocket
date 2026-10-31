@@ -1,6 +1,6 @@
 package com.pocketrocket.wrangler
 
-/** The fixed facts of the Wrangler tool (decision 49), and what its output means. Sizes are measured on the emulator. */
+/** The fixed facts of the Wrangler tool (decisions 49 and 82), and what its output means. Sizes are measured on the emulator. */
 object WranglerTool {
     /** The version the setup script pins; shown on the page. */
     const val VERSION = "4.156.0"
@@ -9,13 +9,20 @@ object WranglerTool {
     const val INSTALLED_MARKER = ".pocketrocket-installed"
     const val PACKAGE_RELATIVE = "lib/node_modules/wrangler"
 
+    /** The workerd Wrangler pins, built for Android with tcmalloc off (ports/workerd). */
+    const val WORKERD_VERSION = "1.20261023.1"
+
+    /** The Android build of workerd inside the package folder, put there by the setup script. */
+    const val WORKERD_RELATIVE = "node_modules/workerd/lib/workerd-glibc"
+
     /** Wrangler's own config file under the home folder. The login lives here and nowhere else. */
     const val CONFIG_RELATIVE = ".config/.wrangler/config/default.toml"
 
-    const val DOWNLOAD_MB = 78
-    const val INSTALLED_MB = 62
+    /** Wrangler from npm (78 MB, 62 MB on the phone) plus workerd (39 MB, 141 MB on the phone). */
+    const val DOWNLOAD_MB = 117
+    const val INSTALLED_MB = 203
 
-    val INSTALL_STEPS = listOf("Checking the device", "Installing Wrangler", "Checking Wrangler")
+    val INSTALL_STEPS = listOf("Checking the device", "Installing Wrangler", "Downloading the local runtime", "Checking Wrangler")
     val REMOVE_STEPS = listOf("Checking the device", "Removing Wrangler")
 
     private val ANSI = Regex("\u001B\\[[0-9;]*[A-Za-z]")
