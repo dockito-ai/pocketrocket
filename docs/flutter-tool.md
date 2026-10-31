@@ -1,4 +1,6 @@
-# Flutter & Rust
+# Flutter & Dart and Rust
+
+Since decision 87 these are two tools, Flutter & Dart and Rust, each installed and removed on its own; what follows describes both.
 
 Decision 75. An optional tool for checking code on the phone, from a terminal or a Claude session: `flutter pub get`, `dart run build_runner build`, `flutter analyze`, `flutter test`, `cargo check` and `cargo clippy`. No APKs on the phone; release builds need a Mac or CI. How it was worked out: `docs/flutter-spike.md`.
 
@@ -34,7 +36,7 @@ Why a clone and not Flutter's archive: the Linux archives in `releases_linux.jso
 
 `$PREFIX/bin/flutter` (`setup/flutter`), with `$PREFIX/bin/dart` a link to it:
 
-- Version: the nearest `.fvmrc` up from the current folder (`"flutter": "3.44.1"`; FVM 2's `.fvm/fvm_config.json` too), else FVM's default link `~/fvm/default`. A pinned version that isn't installed stops with "Flutter X isn't installed (… pins it): Settings → Tools → Flutter & Rust, or `fvm install X`."
+- Version: the nearest `.fvmrc` up from the current folder (`"flutter": "3.44.1"`; FVM 2's `.fvm/fvm_config.json` too), else FVM's default link `~/fvm/default`. A pinned version that isn't installed stops with "Flutter X isn't installed (… pins it): Settings → Tools → Flutter & Dart, or `fvm install X`."
 - Dart SDK: when `bin/internal/engine.version` and `bin/cache/engine-dart-sdk.stamp` differ (after `fvm install` or `flutter upgrade`), it runs Flutter's own Dart download first, so the new SDK is prepared before its first use.
 - Prepare: every glibc program in that version's `bin/cache` gets Termux's glibc loader (`patchelf`, `LD_PRELOAD` cleared) and becomes `<name>.glibc` behind a three-line bash wrapper with an absolute shebang that unsets `LD_PRELOAD`. A program already done is a script, so preparing again changes nothing. The check is cheap: the names and contents of the stamps Flutter writes in `bin/cache` (`*.stamp`) are saved in `bin/cache/.pocketrocket-prepared`; a new or changed stamp, or an unwrapped `dart`, means Flutter downloaded something.
 - Scripts: the first line of each script in that version's `bin` and `bin/internal` (`#!/usr/bin/env bash`) is pointed at Termux's bash, and git is told to ignore the change (`update-index --assume-unchanged`), so the checkout still looks clean. Programs that start Flutter's scripts without Termux's exec helper, FVM among them, can then run them. Pointing again changes nothing.

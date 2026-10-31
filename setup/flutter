@@ -241,7 +241,7 @@ pr_ready_all() {
 # pr_fvm <fvm arguments>: FVM, with the versions it runs or sets up made ready around it.
 pr_fvm() {
   local rc=0
-  [ -f "$PR_FVM_DIR/src/fvm.snapshot" ] || { pr_say "FVM isn't installed: Settings → Tools → Flutter & Rust."; return 127; }
+  [ -f "$PR_FVM_DIR/src/fvm.snapshot" ] || { pr_say "FVM isn't installed: Settings → Tools → Flutter & Dart."; return 127; }
   pr_bionic_preload
   case "${1:-}" in
     install|i|use|global|flutter|dart|spawn|exec) pr_ready_all setup ;;
@@ -269,13 +269,13 @@ pr_flutter() {
   elif pr_find_pin; then
     root="$PR_FVM_HOME/versions/$PR_PIN"
     if [ ! -f "$root/bin/flutter" ]; then
-      pr_say "Flutter $PR_PIN isn't installed ($PR_PIN_FILE pins it): Settings → Tools → Flutter & Rust, or \`fvm install $PR_PIN\`."
+      pr_say "Flutter $PR_PIN isn't installed ($PR_PIN_FILE pins it): Settings → Tools → Flutter & Dart, or \`fvm install $PR_PIN\`."
       return 127
     fi
   else
     root="$PR_FVM_HOME/default"
     if [ ! -f "$root/bin/flutter" ]; then
-      pr_say "No default Flutter version: Settings → Tools → Flutter & Rust, or \`fvm global <version>\`."
+      pr_say "No default Flutter version: Settings → Tools → Flutter & Dart, or \`fvm global <version>\`."
       return 127
     fi
     root="$(cd -P "$root" && pwd)"
