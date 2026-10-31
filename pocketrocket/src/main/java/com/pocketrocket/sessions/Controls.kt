@@ -14,6 +14,13 @@ enum class PermissionMode(val cli: String, val label: String, val description: S
     /** The next mode in the shift+tab cycle. */
     val next: PermissionMode get() = entries[(ordinal + 1) % entries.size]
 
+    /** The next mode when the mode under the chat box is tapped: auto, manual, plan and round again (decision 77). */
+    val tapNext: PermissionMode get() = when (this) {
+        Auto -> Manual
+        Manual -> Plan
+        Plan, AcceptEdits -> Auto
+    }
+
     companion object {
         /** `bypassPermissions` and `dontAsk` have no button here; they read as the nearest one. */
         fun of(cli: String?): PermissionMode? = when (cli) {

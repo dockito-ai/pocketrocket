@@ -163,6 +163,7 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
             StatusLine(
                 state, onOpenControls = { controls = true }, onShowBackground = { background = true },
                 onOpenBranches = { GitHead.repoRoot(state.folder)?.let { GitScreens.openBranches(context, it.path) } },
+                onSwitchMode = { session.setMode(state.mode.tapNext) },
             )
         }
     }
