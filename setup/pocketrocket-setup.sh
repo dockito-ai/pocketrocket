@@ -36,7 +36,7 @@
 #   --only android-build / android-build-remove  the optional Android build tool, Settings > Tools (decision 45)
 #   --only android-ndk / android-ndk-remove  the optional Android NDK tool, on top of it (decision 50)
 #   --only wrangler / wrangler-remove  the optional Wrangler tool, Settings > Tools (decision 49)
-#   --only flutter-rust / flutter-rust-remove  the optional Flutter & Rust tool, all of it (decision 74)
+#   --only flutter-rust / flutter-rust-remove  the optional Flutter & Rust tool, all of it (decision 75)
 #   --only flutter [version]  add a Flutter version (newest stable by default; POCKETROCKET_FLUTTER_VERSION
 #                     also works, POCKETROCKET_FLUTTER_DEFAULT=1 makes it the default)
 #   --only flutter-default <version> / flutter-remove-version <version> / flutter-remove
@@ -1326,7 +1326,7 @@ android_ndk_remove() {
   rm -f "$ANDROID_NDK_ADDED_FILE" "$ANDROID_NDK_BASELINE_FILE"
 }
 
-# Packages on the Updates screen (decision 41): Git, and Rust once the Flutter & Rust tool has it (decision 74).
+# Packages on the Updates screen (decision 41): Git, and Rust once the Flutter & Rust tool has it (decision 75).
 # apt-cache policy prints "Installed: X" and "Candidate: Y".
 apt_policy_field() { apt-cache policy "$1" 2>/dev/null | awk -v k="$2:" '$1 == k { print $2; exit }'; }
 
@@ -1444,7 +1444,7 @@ step_wrangler_remove() {
   printf '[done]\n'
 }
 
-# Flutter and Rust, an optional tool for checking code on the phone (decision 74, docs/flutter-tool.md): pub get,
+# Flutter and Rust, an optional tool for checking code on the phone (decision 75, docs/flutter-tool.md): pub get,
 # build_runner, analyze, test, cargo check and clippy. No APKs. Flutter is official: the release tag cloned from
 # github.com/flutter/flutter into FVM's layout (~/fvm/versions/<version>); its own script downloads the Dart SDK, and
 # the `flutter` launcher (setup/flutter) points the glibc programs at Termux's glibc loader and wraps them so they run
@@ -1529,7 +1529,7 @@ packages_record() {
 flutter_launchers() {
   install_launcher flutter
   ln -sf flutter "$PREFIX/bin/dart"
-  printf '#!%s\n# PocketRocket launcher for FVM %s (decision 74).\nexec %s %s "$@"\n' \
+  printf '#!%s\n# PocketRocket launcher for FVM %s (decision 75).\nexec %s %s "$@"\n' \
     "$PREFIX/bin/bash" "$FVM_VERSION" "$FVM_DIR/src/dart" "$FVM_DIR/src/fvm.snapshot" >"$PREFIX/bin/fvm"
   chmod 755 "$PREFIX/bin/fvm"
 }
@@ -1706,7 +1706,7 @@ step_rust_remove() {
   ok "Rust removed"
 }
 
-# The Flutter & Rust tool's options (decision 74). The version comes as the third argument or in
+# The Flutter & Rust tool's options (decision 75). The version comes as the third argument or in
 # POCKETROCKET_FLUTTER_VERSION (the app's way); flutter with no version installs the newest stable.
 main_flutter_rust() {
   local option="$1" version="${2:-${POCKETROCKET_FLUTTER_VERSION:-}}"

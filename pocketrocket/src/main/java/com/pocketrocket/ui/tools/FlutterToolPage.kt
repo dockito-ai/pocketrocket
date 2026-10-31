@@ -55,7 +55,7 @@ private sealed interface Ask {
 }
 
 /**
- * Settings → Tools → Flutter & Rust (decision 74): what it is for, the Flutter versions (sizes, default, Add version,
+ * Settings → Tools → Flutter & Rust (decision 75): what it is for, the Flutter versions (sizes, default, Add version,
  * Set default, Remove), Rust (version, Install or Remove), sizes, and Install or Uninstall all. Adding a version,
  * setting the default and Rust run inside their cards; installing or uninstalling everything is the page's job.
  */

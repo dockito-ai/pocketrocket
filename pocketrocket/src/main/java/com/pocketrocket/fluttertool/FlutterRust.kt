@@ -58,7 +58,7 @@ data class FlutterRustState(
 }
 
 /**
- * The optional Flutter & Rust tool (decision 74): Settings → Tools installs, adds and removes Flutter versions, sets
+ * The optional Flutter & Rust tool (decision 75): Settings → Tools installs, adds and removes Flutter versions, sets
  * the default and installs or removes Rust, each through the setup script. Nothing is bundled; first-run setup never
  * touches it. Sessions need nothing extra: `flutter`, `dart`, `fvm` and `cargo` are in $PREFIX/bin, and the launcher
  * finds the version itself.
