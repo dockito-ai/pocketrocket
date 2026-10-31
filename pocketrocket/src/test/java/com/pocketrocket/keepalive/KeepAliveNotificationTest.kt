@@ -49,4 +49,26 @@ class KeepAliveNotificationTest {
         assertEquals("need you", Group.NeedsYou.words(2))
         assertEquals("errors", Group.Error.words(2))
     }
+
+    @Test
+    fun `a finished turn with agents or shells running counts as in progress`() {
+        val agents = SessionKeepAlive.Live("api", "api", true, SessionStatus.Done, "api", agents = 1)
+        val both = SessionKeepAlive.Live("blog", "blog", true, SessionStatus.Done, "blog", shells = 2, agents = 1)
+        val done = live("docs", SessionStatus.Done)
+        assertEquals(SessionStatus.Working, agents.shown)
+        assertEquals(SessionStatus.Done, done.shown)
+        val shown = KeepAliveNotification.shown(listOf(done, agents))
+        assertEquals(listOf("api", "docs"), shown.map { it.title })
+        assertEquals("api is working", KeepAliveNotification.headline(shown))
+        assertEquals(listOf(Group.Working to 1, Group.Done to 1), KeepAliveNotification.counts(shown))
+        assertEquals("1 agent running", KeepAliveNotification.running(shown))
+        assertEquals("2 agents · 2 shells running", KeepAliveNotification.running(listOf(agents, both)))
+        assertEquals(null, KeepAliveNotification.running(listOf(done)))
+        assertEquals("working · 1 agent", KeepAliveNotification.detail(agents))
+        assertEquals("working · 1 agent · 2 shells", KeepAliveNotification.detail(both))
+        assertEquals("done", KeepAliveNotification.detail(done))
+        // A question still comes first and reads as one.
+        val asking = SessionKeepAlive.Live("ask", "ask", true, SessionStatus.WaitingForPermission, "ask", agents = 1)
+        assertEquals("ask needs you", KeepAliveNotification.headline(KeepAliveNotification.shown(listOf(agents, asking))))
+    }
 }

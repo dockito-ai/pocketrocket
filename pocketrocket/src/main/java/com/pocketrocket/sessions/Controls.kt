@@ -14,6 +14,13 @@ enum class PermissionMode(val cli: String, val label: String, val description: S
     /** The next mode in the shift+tab cycle. */
     val next: PermissionMode get() = entries[(ordinal + 1) % entries.size]
 
+    /** The next mode when the mode under the chat box is tapped: auto, manual, plan and round again (decision 77). */
+    val tapNext: PermissionMode get() = when (this) {
+        Auto -> Manual
+        Manual -> Plan
+        Plan, AcceptEdits -> Auto
+    }
+
     companion object {
         /** `bypassPermissions` and `dontAsk` have no button here; they read as the nearest one. */
         fun of(cli: String?): PermissionMode? = when (cli) {
@@ -61,12 +68,13 @@ data class SlashCommand(val name: String, val description: String = "", val argu
  */
 data class ContextUsage(val used: Long, val window: Long? = null, val afterCompact: Boolean = false)
 
-/** One tool call a subagent made, shown nested in its card. */
-data class AgentStep(val id: String, val name: String, val summary: String, val done: Boolean = false, val isError: Boolean = false)
-
 /**
- * What a Task/Agent tool call's subagent is doing: its [description], what it reports doing now ([activity]),
- * its own tool calls ([steps]) and, at the end, its [status] and [summary].
+ * What a Task/Agent tool call's subagent is doing: its [description] and [type], the [prompt] it was given, what it
+ * reports doing now ([activity]) and, at the end, its [status] and [summary]. [taskId] is its task in Claude Code, which
+ * `stop_task` takes.
+ *
+ * [log] is its own work in order, in the main chat's shapes: its tool calls with their results ([ChatItem.Tool]) and its
+ * messages ([ChatItem.Assistant]). Only the latest [Subagents.LOG_KEEP] are kept; [dropped] counts those let go.
  *
  * The numbers on its card: [tokens], [toolUses] and [durationMs] as the CLI reports them (null until it does), and
  * [startedAt]/[endedAt], wall-clock times [Session] stamps when it sees the agent start and end. A replayed agent has
@@ -75,8 +83,13 @@ data class AgentStep(val id: String, val name: String, val summary: String, val 
 data class AgentRun(
     val description: String,
     val type: String? = null,
+    val prompt: String? = null,
+    val taskId: String? = null,
     val activity: String? = null,
-    val steps: List<AgentStep> = emptyList(),
+    val log: List<ChatItem> = emptyList(),
+    val dropped: Int = 0,
+    /** Tool calls seen, those dropped from [log] included. */
+    val stepsSeen: Int = 0,
     val status: String? = null,
     val summary: String? = null,
     val background: Boolean = false,
@@ -86,8 +99,11 @@ data class AgentRun(
     val startedAt: Long? = null,
     val endedAt: Long? = null,
 ) {
-    /** Tool calls so far: the CLI's count, else the nested steps seen. */
-    val tools: Int get() = toolUses ?: steps.size
+    /** Its tool calls still kept, in order. */
+    val steps: List<ChatItem.Tool> get() = log.filterIsInstance<ChatItem.Tool>()
+
+    /** Tool calls so far: the CLI's count, else the ones seen. */
+    val tools: Int get() = toolUses ?: stepsSeen
 
     /** Time taken: the CLI's own figure once it ends, else the stamps ([now] while it runs); null when unknown. */
     fun elapsedMs(running: Boolean, now: Long): Long? {

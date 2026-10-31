@@ -127,7 +127,7 @@ fun ShellOutputScreen(tool: ChatItem.Tool, onStop: (taskId: String) -> Unit, onD
                     val path = run.outputFile ?: return@OutlineButton
                     scope.launch {
                         val text = withContext(Dispatchers.IO) { ShellOutput.all(path) }
-                        if (text != null) copy(context, shellTitle(tool), text)
+                        if (text != null) copyText(context, shellTitle(tool), text, "Copied the output")
                     }
                 }
                 if (running) OutlineButton("Stop", c.redSoft, c.redBorder) { onStop(run.taskId) }
@@ -137,7 +137,7 @@ fun ShellOutputScreen(tool: ChatItem.Tool, onStop: (taskId: String) -> Unit, onD
 }
 
 @Composable
-private fun OutlineButton(label: String, color: Color, border: Color, onClick: () -> Unit) {
+internal fun OutlineButton(label: String, color: Color, border: Color, onClick: () -> Unit) {
     val shape = RoundedCornerShape(12.dp)
     Text(
         label,
@@ -165,8 +165,8 @@ private val warning = Regex("""^w: |\bwarning\b""", RegexOption.IGNORE_CASE)
 private val error = Regex("""^e: |\berror\b|\bFAILED\b|\bFAILURE\b""", RegexOption.IGNORE_CASE)
 private val success = Regex("""BUILD SUCCESSFUL|\bPASSED\b|\bready in\b""")
 
-private fun copy(context: Context, label: String, text: String) {
+internal fun copyText(context: Context, label: String, text: String, toast: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
-    Toast.makeText(context, "Copied the output", Toast.LENGTH_SHORT).show()
+    Toast.makeText(context, toast, Toast.LENGTH_SHORT).show()
 }

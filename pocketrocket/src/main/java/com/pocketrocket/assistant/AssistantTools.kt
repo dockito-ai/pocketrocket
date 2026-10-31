@@ -5,6 +5,7 @@ import com.pocketrocket.sessions.PermissionMode
 import com.pocketrocket.sessions.SessionReducer
 import com.pocketrocket.sessions.SessionState
 import com.pocketrocket.sessions.SessionStatus
+import com.pocketrocket.sessions.runningWork
 import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
@@ -213,7 +214,9 @@ class AssistantTools(private val host: ToolHost) : ToolSet(), ToolCatalog {
         val all = host.sessions()
         if (all.isEmpty()) return ok("No sessions.")
         return ok(data("sessions", all.joinToString("\n") { s ->
-            "${s.title} | id ${s.id} | ${s.folder} | ${s.status} | ${s.mode.label} | ${s.modelName ?: "model unknown"}" + (s.permission?.let { " | waiting on him: ${it.toolName}" } ?: "")
+            "${s.title} | id ${s.id} | ${s.folder} | ${s.shownStatus} | ${s.mode.label} | ${s.modelName ?: "model unknown"}" +
+                runningWork(s.runningAgents, s.runningShells).let { if (it.isEmpty()) "" else " | still running: $it" } +
+                (s.permission?.let { " | waiting on him: ${it.toolName}" } ?: "")
         }))
     }
 

@@ -32,7 +32,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.pocketrocket.assistant.Approvals
 import com.pocketrocket.assistant.AssistantPrefs
@@ -49,7 +48,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import com.pocketrocket.sessions.ChatItem
 import com.pocketrocket.workspaces.GitHead
 import com.pocketrocket.ui.git.GitScreens
@@ -64,7 +62,6 @@ import com.pocketrocket.ui.claudeconfig.SessionStatusSheet
 fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = true) {
     val state by session.state.collectAsState()
     val list = rememberLazyListState()
-    val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val working = state.status == SessionStatus.Working || state.status == SessionStatus.Starting
     var controls by remember { mutableStateOf(false) }
@@ -72,6 +69,7 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
     var setup by remember { mutableStateOf(false) }
     var background by remember { mutableStateOf(false) }
     var openShell by remember { mutableStateOf<String?>(null) }
+    var openAgent by remember { mutableStateOf<String?>(null) }
     var picked by remember { mutableStateOf<Draft?>(null) }
     val rows = state.items.size + if (working) 1 else 0
 
@@ -111,7 +109,7 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
                         UserBubble(item.text, item.attachments, menu = menu)
                     }
                     is ChatItem.Assistant -> AssistantMessage(item.text)
-                    is ChatItem.Tool -> if (item.agent != null) AgentCard(item, item.agent) else ToolCallCard(
+                    is ChatItem.Tool -> if (item.agent != null) AgentCard(item, item.agent, onOpen = { openAgent = item.id }) else ToolCallCard(
                         item, onOpenOutput = { openShell = item.id }, onMoveToBackground = { session.moveToBackground(item.id) },
                     )
                     is ChatItem.Error -> ErrorRow(item.text)
@@ -163,6 +161,7 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
             StatusLine(
                 state, onOpenControls = { controls = true }, onShowBackground = { background = true },
                 onOpenBranches = { GitHead.repoRoot(state.folder)?.let { GitScreens.openBranches(context, it.path) } },
+                onSwitchMode = { session.setMode(state.mode.tapNext) },
             )
         }
     }
@@ -181,18 +180,16 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
         BackgroundSheet(
             state, onDismiss = { background = false },
             onOpenShell = { openShell = it.id },
-            // Items are the list's first rows while any exist, so an item's index is its row.
-            onShowAgent = { agent ->
-                background = false
-                val at = state.items.indexOfFirst { it.id == agent.id }
-                if (at >= 0) scope.launch { list.animateScrollToItem(at) }
-            },
+            onOpenAgent = { openAgent = it.id },
             onStop = session::stopTask,
         )
     }
     // Looked up on each change, so the screen follows the shell to its end.
     (state.items.firstOrNull { it.id == openShell } as? ChatItem.Tool)?.let { tool ->
         ShellOutputScreen(tool, onStop = session::stopTask, onDismiss = { openShell = null })
+    }
+    (state.items.firstOrNull { it.id == openAgent } as? ChatItem.Tool)?.takeIf { it.agent != null }?.let { tool ->
+        AgentScreen(tool, onStop = session::stopTask, onDismiss = { openAgent = null })
     }
     if (status) SessionStatusSheet(session, state, onDismiss = { status = false })
     if (setup) SessionSetupSheet(session, state, onDismiss = { setup = false })

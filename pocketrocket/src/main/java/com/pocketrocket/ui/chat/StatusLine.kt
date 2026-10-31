@@ -39,12 +39,12 @@ import kotlinx.coroutines.withContext
 /**
  * The terminal-style lines under the chat box: `folder │ branch │ model │ 160k/1M`, then the permission mode with
  * `│ 2 agents │ 1 shell` beside it while subagents or background shells run. Tapping the branch opens the repo's
- * branches; tapping a count opens the Background sheet; tapping anywhere else, or long-pressing, opens the controls,
- * where the mode is changed.
+ * branches; tapping a count opens the Background sheet; tapping the mode switches it (auto, manual, plan); tapping
+ * anywhere else, or long-pressing, opens the controls.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun StatusLine(state: SessionState, onOpenControls: () -> Unit, onShowBackground: () -> Unit, onOpenBranches: () -> Unit, modifier: Modifier = Modifier) {
+fun StatusLine(state: SessionState, onOpenControls: () -> Unit, onShowBackground: () -> Unit, onOpenBranches: () -> Unit, onSwitchMode: () -> Unit, modifier: Modifier = Modifier) {
     var branch by remember(state.folder) { mutableStateOf<String?>(null) }
     // Re-read after each turn: Claude may have switched branches.
     LaunchedEffect(state.folder, state.status == SessionStatus.Done) {
@@ -81,15 +81,18 @@ fun StatusLine(state: SessionState, onOpenControls: () -> Unit, onShowBackground
         Row(Modifier.fillMaxWidth().combinedClickable(onClick = onOpenControls, onLongClick = onOpenControls)) {
             Text(line, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        // The counts take their own taps; the mode opens the controls.
+        // The mode and the counts take their own taps; the rest of the row opens the controls.
         Row(Modifier.fillMaxWidth().combinedClickable(onClick = onOpenControls, onLongClick = onOpenControls)) {
-            Text(modeLine(state.mode), style = style, color = modeColor(state.mode), maxLines = 1, softWrap = false)
+            Text(
+                modeLine(state.mode), style = style, color = modeColor(state.mode), maxLines = 1, softWrap = false,
+                modifier = Modifier.combinedClickable(onClick = onSwitchMode, onLongClick = onOpenControls),
+            )
             if (counts.isNotEmpty()) {
                 Text(
                     buildAnnotatedString {
                         counts.forEach { (text, shell) ->
                             withStyle(SpanStyle(color = bar)) { append(" │ ") }
-                            withStyle(SpanStyle(color = if (shell) c.teal else c.lilac)) { append(text) }
+                            withStyle(SpanStyle(color = if (text.startsWith("0 ")) dim else if (shell) c.teal else c.lilac)) { append(text) }
                         }
                     },
                     style = style,
@@ -102,27 +105,31 @@ fun StatusLine(state: SessionState, onOpenControls: () -> Unit, onShowBackground
     }
 }
 
-/** "1 agent", "2 shells": what runs beside the conversation, each paired with whether it is a shell. */
-internal fun backgroundCounts(agents: Int, shells: Int): List<Pair<String, Boolean>> = listOfNotNull(
-    agents.takeIf { it > 0 }?.let { (if (it == 1) "1 agent" else "$it agents") to false },
-    shells.takeIf { it > 0 }?.let { (if (it == 1) "1 shell" else "$it shells") to true },
+/** "0 agents", "2 shells": what runs beside the conversation, always shown, each paired with whether it is a shell. */
+internal fun backgroundCounts(agents: Int, shells: Int): List<Pair<String, Boolean>> = listOf(
+    (if (agents == 1) "1 agent" else "$agents agents") to false,
+    (if (shells == 1) "1 shell" else "$shells shells") to true,
 )
 
-/** How the terminal shows each mode under its prompt. */
+/** How Claude Code shows each mode under its prompt, with ‖ and ▸▸ for its ⏸ and ⏵⏵. */
 fun modeLine(mode: PermissionMode): String = when (mode) {
-    PermissionMode.Manual -> "▸ manual"
-    PermissionMode.AcceptEdits -> "▸▸ accept edits"
+    PermissionMode.Manual -> "‖ manual mode on"
+    PermissionMode.AcceptEdits -> "▸▸ accept edits on"
     // Not ⏸: Android draws it as an emoji.
-    PermissionMode.Plan -> "‖ plan mode"
-    PermissionMode.Auto -> "▸▸ auto mode"
+    PermissionMode.Plan -> "‖ plan mode on"
+    PermissionMode.Auto -> "▸▸ auto mode on"
 }
 
+/** Claude Code's own colours for each mode (its `inactive`, `autoAccept`, `planMode` and `warning`), dark and light. */
 @Composable
-fun modeColor(mode: PermissionMode): Color = when (mode) {
-    PermissionMode.Manual -> PrTheme.colors.textMuted
-    PermissionMode.AcceptEdits -> PrTheme.colors.accent
-    PermissionMode.Plan -> PrTheme.colors.teal
-    PermissionMode.Auto -> PrTheme.colors.lilac
+fun modeColor(mode: PermissionMode): Color {
+    val dark = PrTheme.colors.isDark
+    return when (mode) {
+        PermissionMode.Manual -> if (dark) Color(153, 153, 153) else Color(102, 102, 102)
+        PermissionMode.AcceptEdits -> if (dark) Color(175, 135, 255) else Color(135, 0, 255)
+        PermissionMode.Plan -> if (dark) Color(72, 150, 140) else Color(0, 102, 102)
+        PermissionMode.Auto -> if (dark) Color(255, 193, 7) else Color(150, 108, 30)
+    }
 }
 
 fun folderName(folder: String): String {

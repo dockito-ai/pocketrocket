@@ -2,6 +2,7 @@ package com.pocketrocket.ui.sessions
 
 import com.pocketrocket.sessions.SessionState
 import com.pocketrocket.sessions.SessionStatus
+import com.pocketrocket.sessions.runningWork
 import com.termux.shared.termux.TermuxConstants
 
 /** A status in words, as the cards and chips show it. Its colour is `PrTheme.colors.status(...)` (ui/theme). */
@@ -16,9 +17,12 @@ val SessionStatus.label: String
         SessionStatus.Paused -> "Paused"
     }
 
-/** A card's status words: [label], or "1 shell running" when only background shells keep it working ([SessionState.shownStatus]). */
+/**
+ * A card's status words: [label], or "1 agent running", "2 shells running", "1 agent · 2 shells running" when only
+ * subagents or background shells keep it working ([SessionState.shownStatus]).
+ */
 val SessionState.statusLabel: String
-    get() = if (shownStatus != status) (if (runningShells == 1) "1 shell running" else "$runningShells shells running") else status.label
+    get() = if (shownStatus != status) runningWork(runningAgents, runningShells) + " running" else status.label
 
 /** Shows the Termux home as ~. */
 fun displayPath(path: String): String = path.replace(TermuxConstants.TERMUX_HOME_DIR_PATH, "~")

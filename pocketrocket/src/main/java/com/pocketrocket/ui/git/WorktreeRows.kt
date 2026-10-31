@@ -49,7 +49,7 @@ object WorktreeRows {
                     lastCommit = if (gone) null else repo.lastCommitIn(tree.path),
                     merged = tree.branch != null && tree.branch in merged,
                     sessions = inside.map { it.title },
-                    working = inside.any { it.status == SessionStatus.Working || it.status == SessionStatus.WaitingForPermission },
+                    working = inside.any { it.shownStatus == SessionStatus.Working || it.shownStatus == SessionStatus.WaitingForPermission },
                     here = tree.path.trimEnd('/') == repo.root.path.trimEnd('/'),
                 )
             }
