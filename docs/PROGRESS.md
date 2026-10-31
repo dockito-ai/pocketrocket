@@ -1,6 +1,7 @@
 # Progress
 
 ## 31 Oct 2026
+- README presented as a Dockito Labs project in a "we" voice (decision 91).
 - Full releases (decision 90): `release.yml` and `scripts/release.sh` publish with `--latest` in place of `--prerelease`; release skill and `docs/app-updates.md` updated. Takes effect from the next release.
 - Wrangler local dev (decisions 82 and 86, branch `feature/wrangler-local-dev`): installing Wrangler also downloads workerd 1.20261023.1 built without tcmalloc by `ports/workerd` (release `workerd-v1.20261023.1`), checks its SHA-256 and puts it behind a glibc wrapper; the check step now serves a request with `wrangler dev`. On the phone: `--only wrangler` passes in 75 s, and plain `wrangler dev` answers with outbound fetch, KV, D1, R2 and Durable Objects working. Unit tests can't run on the phone (termux-shared needs Google's NDK); the shell parts were checked by hand and CI runs the rest. Tile in the app not yet seen on the emulator.
 - Dropped the old releases repo (decision 83): `ReleaseSource` reads only `dockito-ai/pocketrocket`, `release.yml` and `scripts/release.sh` no longer publish to `pocketrocket-releases`, docs updated. The old repo and its `RELEASES_REPO_TOKEN` secret are left for Shankar to delete.
