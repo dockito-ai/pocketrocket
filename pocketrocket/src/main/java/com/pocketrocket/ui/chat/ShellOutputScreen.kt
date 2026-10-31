@@ -103,8 +103,8 @@ fun ShellOutputScreen(tool: ChatItem.Tool, onStop: (taskId: String) -> Unit, onD
                     val note = when {
                         lines == null -> "Waiting for output…"
                         shown.isNotEmpty() -> null
-                        running -> "No output yet. Some commands print only when they finish."
-                        else -> "It printed nothing."
+                        running -> "Nothing to show yet. This command hasn't printed anything."
+                        else -> "Nothing to show. This command printed nothing."
                     }
                     if (note != null) item { Text(note, style = PrType.codeSmall, color = c.textMuted) }
                     itemsIndexed(shown) { _, line -> Text(line.ifEmpty { " " }, style = PrType.codeSmall, color = lineColor(line)) }
