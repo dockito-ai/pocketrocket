@@ -25,6 +25,9 @@ import com.pocketrocket.fluttertool.FlutterRustState
 import com.pocketrocket.fluttertool.FlutterTool
 import com.pocketrocket.node.NodeJs
 import com.pocketrocket.node.NodeState
+import com.pocketrocket.pkgtools.PackageTool
+import com.pocketrocket.pkgtools.PackageTools
+import com.pocketrocket.pkgtools.PackageToolsState
 import com.pocketrocket.profiles.DockitoAccounts
 import com.pocketrocket.ui.Routes
 import com.pocketrocket.updates.UpdateComponent
@@ -40,7 +43,7 @@ import java.io.File
 /**
  * Every tool in Settings → Tools (decisions 64 and 87): what it declares and how its module's state reads as a
  * [ToolState]. Included (built in): Claude Code, Dockito, Git, Node.js and npm. Add-ons (optional): Android,
- * Android NDK, Flutter & Dart, Headless Chrome, Rust, Wrangler. The screen orders them by name.
+ * Android NDK, Bun, Flutter & Dart, Headless Chrome, Python, Rust, Wrangler. The screen orders them by name.
  */
 enum class Tool(val spec: ToolSpec, val route: String) {
     ClaudeCode(ToolSpec("Claude Code", ToolKind.BuiltIn, hasVersion = true, canUpdate = true), Routes.CLAUDE_CODE),
@@ -71,6 +74,8 @@ enum class Tool(val spec: ToolSpec, val route: String) {
         ),
         Routes.TOOL_RUST,
     ),
+    Python(PackageTool.Python.spec("Python"), Routes.TOOL_PYTHON),
+    Bun(PackageTool.Bun.spec("Bun"), Routes.TOOL_BUN),
     ;
 
     /** Its brand mark (decision 87), bundled as a VectorDrawable; sources in docs/third-party-icons.md. */
@@ -84,6 +89,8 @@ enum class Tool(val spec: ToolSpec, val route: String) {
         Wrangler -> ToolGlyph(R.drawable.ic_tool_cloudflareworkers, 0xFFF38020)
         Flutter -> ToolGlyph(R.drawable.ic_tool_flutter, 0xFF02569B)
         Rust -> ToolGlyph(R.drawable.ic_tool_rust, 0xFF000000)
+        Python -> ToolGlyph(R.drawable.ic_tool_python, 0xFF3776AB)
+        Bun -> ToolGlyph(R.drawable.ic_tool_bun, 0xFF000000)
     }
 }
 
@@ -98,7 +105,13 @@ val UpdateComponent.icon: ToolGlyph get() = when (this) {
     UpdateComponent.Dockito -> Tool.Dockito.icon
     UpdateComponent.Flutter -> Tool.Flutter.icon
     UpdateComponent.Rust -> Tool.Rust.icon
+    UpdateComponent.Python -> Tool.Python.icon
+    UpdateComponent.Bun -> Tool.Bun.icon
 }
+
+/** A package tool's tile (decision 92): an add-on with its versions, updated from Updates. */
+private fun PackageTool.spec(name: String) =
+    ToolSpec(name, ToolKind.Optional, hasVersion = true, canUpdate = true, downloadMb = downloadMb, installedMb = installedMb)
 
 /** How each module's state reads as a [ToolState]. */
 object ToolStates {
@@ -184,8 +197,30 @@ object ToolStates {
         )
     }
 
-    /** Rust (decision 87): installing and removing are its jobs; its version and update come from its Updates row. */
-    fun rust(s: FlutterRustState, row: UpdateRow?): ToolState {
+    /**
+     * A package tool (decision 92): installed when its main package is on the phone, read from dpkg; its versions and
+     * size from dpkg too, its update from its Updates row.
+     */
+    fun packageTool(t: PackageTool, s: PackageToolsState, row: UpdateRow?): ToolState {
+        val mine = s.isFor(t)
+        return ToolState(
+            installed = s.installed(t),
+            checked = s.checked,
+            job = if (mine) ToolModel.job(s.running, s.failed, s.removing) else ToolJob.None,
+            progress = if (mine) s.job?.progress else null,
+            versions = t.versions(s.packages),
+            latest = row?.latest,
+            updateAvailable = row?.available == true,
+            updating = row?.running == true,
+            sizeMb = t.sizeMb(s.packages),
+        )
+    }
+
+    /**
+     * Rust (decision 87): installing and removing are its jobs; its version and update come from its Updates row.
+     * Adding or removing the wasm target ([wasmBusy]) shows as Updating.
+     */
+    fun rust(s: FlutterRustState, row: UpdateRow?, wasmBusy: Boolean = false): ToolState {
         val mine = s.isFor(FlutterPart.Rust)
         return ToolState(
             installed = s.rustInstalled,
@@ -195,7 +230,7 @@ object ToolStates {
             versions = listOfNotNull(row?.installed?.let { "Rust" to it }),
             latest = row?.latest,
             updateAvailable = row?.available == true,
-            updating = row?.running == true,
+            updating = row?.running == true || wasmBusy,
         )
     }
 
@@ -220,6 +255,7 @@ fun rememberTools(): List<Pair<Tool, ToolState>> {
     val ndk by AndroidNdk.state.collectAsState()
     val wrangler by Wrangler.state.collectAsState()
     val flutter by FlutterRust.state.collectAsState()
+    val packages by PackageTools.state.collectAsState()
     LaunchedEffect(Unit) { refreshAll(context) }
     val dockitoSize by produceState<Int?>(null, dockito.installed) { value = withContext(Dispatchers.IO) { ToolStates.dockitoSizeMb(dockito.installed) } }
     fun row(c: UpdateComponent) = updates.rows.firstOrNull { it.component == c }
@@ -233,7 +269,9 @@ fun rememberTools(): List<Pair<Tool, ToolState>> {
         Tool.AndroidNdk to ToolStates.ndk(ndk, android.installed),
         Tool.Wrangler to ToolStates.wrangler(wrangler),
         Tool.Flutter to ToolStates.flutter(flutter, row(UpdateComponent.Flutter)),
-        Tool.Rust to ToolStates.rust(flutter, row(UpdateComponent.Rust)),
+        Tool.Rust to ToolStates.rust(flutter, row(UpdateComponent.Rust), packages.running && packages.isFor(PackageTool.RustWasm)),
+        Tool.Python to ToolStates.packageTool(PackageTool.Python, packages, row(UpdateComponent.Python)),
+        Tool.Bun to ToolStates.packageTool(PackageTool.Bun, packages, row(UpdateComponent.Bun)),
     )
 }
 
@@ -247,4 +285,5 @@ fun refreshAll(context: Context) {
     AndroidNdk.refresh()
     Wrangler.refresh()
     FlutterRust.refresh()
+    PackageTools.refresh()
 }

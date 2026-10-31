@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * What the Updates screen keeps current (decision 41), in the screen's order. Optional ones come from an optional
- * tool and show only while it's installed (Flutter and Rust, decisions 75 and 87).
+ * tool and show only while it's installed (Flutter and Rust, decisions 75 and 87; Python and Bun, decision 92).
  */
 enum class UpdateComponent(val label: String, val optional: Boolean = false) {
     PocketRocket("PocketRocket"),
@@ -17,6 +17,8 @@ enum class UpdateComponent(val label: String, val optional: Boolean = false) {
     Dockito("Dockito"),
     Flutter("Flutter", optional = true),
     Rust("Rust", optional = true),
+    Python("Python", optional = true),
+    Bun("Bun", optional = true),
 }
 
 /** Screen order, except PocketRocket goes last: installing it restarts the app. */

@@ -43,7 +43,7 @@ object Updates {
     private const val PREFS = "pocketrocket"
     private const val KEY_CHECKED_AT = "updates_checked_at"
 
-    val sources: List<UpdateSource> = listOf(AppSource, ClaudeSource, GitSource, DockitoSource, FlutterSource, RustSource)
+    val sources: List<UpdateSource> = listOf(AppSource, ClaudeSource, GitSource, DockitoSource, FlutterSource, RustSource, PythonSource, BunSource)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val control = MutableStateFlow(UpdatesState())

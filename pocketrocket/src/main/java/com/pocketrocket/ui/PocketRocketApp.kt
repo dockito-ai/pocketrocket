@@ -46,6 +46,8 @@ import com.pocketrocket.ui.tools.AndroidNdkToolPage
 import com.pocketrocket.ui.tools.FlutterToolPage
 import com.pocketrocket.ui.tools.GitToolPage
 import com.pocketrocket.ui.tools.RustToolPage
+import com.pocketrocket.ui.tools.PythonToolPage
+import com.pocketrocket.ui.tools.BunToolPage
 import com.pocketrocket.ui.tools.WranglerToolPage
 import com.pocketrocket.ui.tools.ChromiumToolPage
 import com.pocketrocket.ui.tools.DockitoToolPage
@@ -180,6 +182,8 @@ fun PocketRocketApp(startScreen: AppScreen, onOpenTerminal: () -> Unit, showSess
             r == Routes.TOOL_WRANGLER -> WranglerToolPage(onBack = ::pop)
             r == Routes.TOOL_FLUTTER -> FlutterToolPage(onBack = ::pop, onOpenRust = { push(Routes.TOOL_RUST) })
             r == Routes.TOOL_RUST -> RustToolPage(onBack = ::pop)
+            r == Routes.TOOL_PYTHON -> PythonToolPage(onBack = ::pop)
+            r == Routes.TOOL_BUN -> BunToolPage(onBack = ::pop)
             r == Routes.TOOL_GIT -> GitToolPage(onBack = ::pop)
             r == Routes.CLAUDE_CODE -> ClaudeCodeScreen(onBack = ::pop)
             r == Routes.UPDATES -> UpdatesScreen(onBack = ::pop, onClaudeCode = { push(Routes.CLAUDE_CODE) })

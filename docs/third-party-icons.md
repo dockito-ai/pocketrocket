@@ -19,9 +19,11 @@ endorsement or affiliation.
 | Wrangler | `ic_tool_cloudflareworkers.xml` | Simple Icons 16.36.0, `cloudflareworkers` | `#F38020` | CC0 1.0 (Simple Icons) |
 | Flutter & Dart | `ic_tool_flutter.xml` | Simple Icons 16.36.0, `flutter` | `#02569B` | CC0 1.0 (Simple Icons) |
 | Rust | `ic_tool_rust.xml` | Simple Icons 16.36.0, `rust` | `#000000` | CC BY-SA 4.0 (Rust Foundation, per Simple Icons) |
+| Python | `ic_tool_python.xml` | Simple Icons 16.36.0, `python` | `#3776AB` | CC0 1.0 (Simple Icons) |
+| Bun | `ic_tool_bun.xml` | Simple Icons 16.36.0, `bun` | `#000000` | CC0 1.0 (Simple Icons) |
 
 Simple Icons' collection is CC0; where Simple Icons records a licence for a single icon, that licence is listed above
-and applies to that file. Brand guidelines: Android, Cloudflare, Flutter, Google Chrome, Node.js and Rust publish
+and applies to that file. Brand guidelines: Android, Cloudflare, Flutter, Google Chrome, Node.js, Python and Rust publish
 theirs, linked from Simple Icons' data (`data/simple-icons.json`).
 
 To add one: download the SVG from `https://cdn.jsdelivr.net/npm/simple-icons@<version>/icons/<slug>.svg` into a

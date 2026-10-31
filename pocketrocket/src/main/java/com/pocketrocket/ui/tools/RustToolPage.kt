@@ -1,19 +1,22 @@
 package com.pocketrocket.ui.tools
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import com.pocketrocket.fluttertool.FlutterPart
 import com.pocketrocket.fluttertool.FlutterRust
 import com.pocketrocket.fluttertool.FlutterTool
+import com.pocketrocket.pkgtools.PackageTool
+import com.pocketrocket.pkgtools.PackageTools
 import com.pocketrocket.updates.UpdateComponent
 import com.pocketrocket.updates.Updates
 
 /**
  * Settings → Tools → Rust (decisions 75 and 87): Termux's rust package for cargo check and clippy, with its version,
  * Update through Updates, and Install or Uninstall on its own. It shares Flutter's job runner, so it waits while a
- * Flutter job runs.
+ * Flutter job runs. The wasm target is an option on it (decision 92), added and removed on its own.
  */
 @Composable
 fun RustToolPage(onBack: () -> Unit) {
@@ -21,9 +24,13 @@ fun RustToolPage(onBack: () -> Unit) {
     val s by FlutterRust.state.collectAsState()
     val updates by Updates.state.collectAsState()
     val mine = s.isFor(FlutterPart.Rust)
+    val packages by PackageTools.state.collectAsState()
+    val wasmBusy = packages.running && packages.isFor(PackageTool.RustWasm)
+    // dpkg is read again when a Rust job ends: uninstalling Rust takes the wasm target with it.
+    LaunchedEffect(s.running) { PackageTools.refresh() }
     ToolPage(
         spec = Tool.Rust.spec,
-        state = ToolStates.rust(s, updates.rows.firstOrNull { it.component == UpdateComponent.Rust }),
+        state = ToolStates.rust(s, updates.rows.firstOrNull { it.component == UpdateComponent.Rust }, wasmBusy),
         icon = Tool.Rust.icon,
         purpose = "Check Rust code for errors.",
         onBack = onBack,
@@ -35,8 +42,12 @@ fun RustToolPage(onBack: () -> Unit) {
             onRetry = { FlutterRust.retry(context) },
             onUninstall = { FlutterRust.removeRust(context) },
             confirmTitle = "Uninstall Rust?",
-            confirmBody = "The rust packages this tool installed and ~/.cargo are removed. Flutter, your crates and their target folders stay.",
-            blocked = if (s.running && !mine) ({ BusyButton("Flutter is busy…") }) else null,
+            confirmBody = "The rust packages this tool installed, the wasm target and ~/.cargo are removed. Flutter, your crates and their target folders stay.",
+            blocked = when {
+                s.running && !mine -> ({ BusyButton("Flutter is busy…") })
+                packages.running -> ({ BusyButton("Waiting for another install…") })
+                else -> null
+            },
         ),
         update = toolUpdate(context, updates, UpdateComponent.Rust),
         storageRows = listOf("Packages per project" to "~/.cargo, target/"),
@@ -56,5 +67,6 @@ fun RustToolPage(onBack: () -> Unit) {
                     "checks use this stable. No builds for release on the phone.",
             )
         }
+        if (s.rustInstalled) WasmTargetCard(packages, rustBusy = s.running)
     }
 }

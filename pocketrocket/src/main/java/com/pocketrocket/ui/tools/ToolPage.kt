@@ -194,6 +194,6 @@ private fun VersionSection(spec: ToolSpec, state: ToolState, update: ToolUpdate?
 }
 
 @Composable
-private fun Note(text: String) {
+internal fun Note(text: String) {
     Text(text, style = mockText(11.sp).copy(lineHeight = 16.sp), color = PrTheme.colors.textMuted)
 }
