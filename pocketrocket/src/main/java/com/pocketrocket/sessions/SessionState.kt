@@ -63,6 +63,8 @@ data class SessionState(
     val rewind: PendingRewind? = null,
     /** Items appended so far; keeps item ids unique when a rewind drops some. */
     val seq: Int = 0,
+    /** Claude Code's guess at the next message, offered above the chat box until something else is said. */
+    val suggestion: String? = null,
     /** The saved last line, shown until a restored session's history is loaded. */
     val preview: String? = null,
 ) {

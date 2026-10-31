@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -144,6 +146,15 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
             AnimatedVisibility(state.queued.isNotEmpty()) { QueuedMessages(state.queued, onSendNow = session::sendNow) }
             // An Edit stays open to Undo for a few seconds, until the CLI is told.
             AnimatedVisibility(state.rewind != null) { UndoBar(onUndo = session::undoEdit) }
+            // Claude Code's guess at the next message: tap sends it, long-press puts it in the box to edit.
+            val suggestion = state.suggestion?.takeIf { !working && state.permission == null && state.rewind == null && state.queued.isEmpty() }
+            AnimatedVisibility(suggestion != null) {
+                SuggestionChip(
+                    suggestion.orEmpty(),
+                    onSend = { session.send(suggestion.orEmpty()) },
+                    onEdit = { picked = Draft(suggestion.orEmpty(), (picked?.key ?: 0) + 1); session.dropSuggestion() },
+                )
+            }
             Composer(
                 state.id, working = working, onStop = session::interrupt,
                 onSend = session::send,
@@ -185,6 +196,26 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
     }
     if (status) SessionStatusSheet(session, state, onDismiss = { status = false })
     if (setup) SessionSetupSheet(session, state, onDismiss = { setup = false })
+}
+
+/** One suggested reply, as a pill at the left above the chat box: "↳ go ahead". */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SuggestionChip(text: String, onSend: () -> Unit, onEdit: () -> Unit, modifier: Modifier = Modifier) {
+    val c = PrTheme.colors
+    val shape = RoundedCornerShape(999.dp)
+    Row(modifier.fillMaxWidth()) {
+        Text(
+            "↳  $text",
+            style = PrType.body,
+            color = c.text,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.clip(shape).background(c.accentSurface).border(1.dp, c.accentBorder, shape)
+                .combinedClickable(onClick = onSend, onLongClick = onEdit, onClickLabel = "Send", onLongClickLabel = "Edit first")
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+        )
+    }
 }
 
 /** Shown while an Edit can still be taken back, before the CLI is told (Session.edit). */

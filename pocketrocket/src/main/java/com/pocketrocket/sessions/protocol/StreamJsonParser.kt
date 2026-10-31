@@ -20,6 +20,7 @@ object StreamJsonParser {
             "control_request" -> listOfNotNull(controlRequest(json))
             "control_response" -> listOfNotNull(controlResponse(json))
             "control_cancel_request" -> listOf(StreamEvent.PermissionCancelled(json.optString("request_id")))
+            "prompt_suggestion" -> listOfNotNull(json.optStringOrNull("suggestion")?.trim()?.takeIf { it.isNotEmpty() }?.let { StreamEvent.PromptSuggestion(it) })
             else -> emptyList()
         }
     }
