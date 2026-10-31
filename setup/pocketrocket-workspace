@@ -1,0 +1,72 @@
+#!/data/data/app.pocket/files/usr/bin/bash
+# pocketrocket-workspace: add or clone PocketRocket workspaces from a shell (decision 73).
+# Installed as $PREFIX/bin/pocketrocket-workspace by the app at every start.
+#
+#   pocketrocket-workspace add <path> [--name N] [--github ID] [--claude ID] [--dockito ID]
+#   pocketrocket-workspace clone <url> [folder] [--branch B] [--name N] [--github ID] [--claude ID] [--dockito ID]
+#   pocketrocket-workspace list [--json]
+#
+# This script only asks; the app does the work with the same code as its New workspace and Clone
+# screens, so the Workspaces list updates at once. The request goes through a file in
+# ~/.pocketrocket/requests/ (private to the app): <id>.req is the request, the app answers in <id>.out
+# and puts the exit code in <id>.exit. Accounts not given are those of the workspace this session or
+# folder is in (POCKETROCKET_SESSION_FOLDER, else $PWD), else the defaults.
+
+dir="$HOME/.pocketrocket/requests"
+me="pocketrocket-workspace"
+
+case "${1:-}" in
+  ""|-h|--help|help)
+    sed -n '5,7p' "$0" | sed 's/^#   /  /'
+    [ -n "${1:-}" ] && exit 0 || exit 2
+    ;;
+esac
+
+mkdir -p "$dir" || { echo "$me: can't write to $dir" >&2; exit 1; }
+id="$(date +%s)-$$-$RANDOM"
+req="$dir/$id.req"; out="$dir/$id.out"; code_file="$dir/$id.exit"
+
+# NUL-separated fields, so any argument (spaces, quotes) arrives as given.
+if ! { printf '%s\0' "pocketrocket-workspace/1" "cwd=$PWD" "session=${POCKETROCKET_SESSION_FOLDER:-}" "claude=${CLAUDECODE:-}" "--"
+       printf '%s\0' "$@"; } >"$dir/.$id.tmp" || ! mv "$dir/.$id.tmp" "$req"; then
+  rm -f "$dir/.$id.tmp"
+  echo "$me: couldn't write the request to $dir" >&2
+  exit 1
+fi
+
+# The app creates <id>.out as soon as it takes the request.
+tries=0
+while [ ! -e "$out" ]; do
+  if [ "$tries" -ge 100 ]; then
+    rm -f "$req"
+    [ -e "$out" ] || { echo "$me: PocketRocket didn't answer. Open the app and try again." >&2; exit 3; }
+    break
+  fi
+  sleep 0.1
+  tries=$((tries + 1))
+done
+
+# Follow the answer until the exit code is there. Lines starting "error: " go to stderr.
+shown=0
+show() {
+  local total
+  total=$(wc -l <"$out" 2>/dev/null) || total=0
+  [ "$total" -gt "$shown" ] || return 0
+  sed -n "$((shown + 1)),${total}p" "$out" | while IFS= read -r line; do
+    case "$line" in
+      "error: "*) printf '%s: %s\n' "$me" "${line#error: }" >&2 ;;
+      *) printf '%s\n' "$line" ;;
+    esac
+  done
+  shown=$total
+}
+while :; do
+  finished=0
+  [ -e "$code_file" ] && finished=1
+  show
+  [ "$finished" = 1 ] && break
+  sleep 0.2
+done
+code="$(cat "$code_file" 2>/dev/null)"
+rm -f "$out" "$code_file"
+case "$code" in ''|*[!0-9]*) exit 1 ;; *) exit "$code" ;; esac

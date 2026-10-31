@@ -14,6 +14,7 @@ The shell side of PocketRocket's first run (BRD R2, R10; decisions 3 and 5). Our
   7. Runs `claude --version` through the launcher.
   8. Installs Dockito's CLI (decision 40) as `--only dockito` does, from the release the app read from Dockito's Homebrew formula (`POCKETROCKET_DOCKITO_*`). Without that release (offline) an installed Dockito is kept; otherwise the step fails and Retry tries again.
 - `claude`: the launcher. Runs `~/.pocketrocket/claude/current/claude` with `LD_PRELOAD` unset (Termux's bionic preload crashes a glibc binary), `DISABLE_AUTOUPDATER=1`, `USE_BUILTIN_RIPGREP=0`, and the DNS preload through `BUN_OPTIONS` when it is on. It never updates anything.
+- `pocketrocket-workspace`: add, clone and list workspaces from a shell (decision 73). Not installed by this script: the app copies it to `$PREFIX/bin` from its assets at every start, and answers it through files in `~/.pocketrocket/requests/` (`docs/workspaces.md`).
 - `NOTICE`: the MIT license of the code we ported.
 
 ## Updating Claude Code alone (R9)
