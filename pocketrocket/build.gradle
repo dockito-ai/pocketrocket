@@ -1,0 +1,71 @@
+plugins {
+    id "com.android.library"
+    id "org.jetbrains.kotlin.android"
+    id "org.jetbrains.kotlin.plugin.compose"
+}
+
+// The setup script ships as assets under setup/. The real script lives in the repo's setup/ folder;
+// pass -Ppocketrocket.setupStub to package the fake one in stub/ instead (UI testing, forced errors).
+def setupScriptDir = (project.hasProperty("pocketrocket.setupStub") || !rootProject.file("setup/pocketrocket-setup.sh").exists()) ?
+    file("stub") : rootProject.file("setup")
+
+def copySetupAssets = tasks.register("copySetupAssets", Sync) {
+    from(setupScriptDir) { exclude "*.md" }
+    into layout.buildDirectory.dir("generated/setupAssets/setup")
+}
+
+android {
+    namespace "com.pocketrocket"
+    compileSdk project.properties.compileSdkVersion.toInteger()
+
+    defaultConfig {
+        minSdk project.properties.minSdkVersion.toInteger()
+        consumerProguardFiles "consumer-rules.pro"
+    }
+
+    buildFeatures {
+        compose true
+    }
+
+    sourceSets {
+        main.assets.srcDirs += layout.buildDirectory.dir("generated/setupAssets")
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+kotlin {
+    jvmToolchain(17)
+}
+
+tasks.named("preBuild") { dependsOn copySetupAssets }
+
+dependencies {
+    implementation project(":termux-shared")
+
+    implementation platform("androidx.compose:compose-bom:2026.06.00")
+    implementation "androidx.compose.ui:ui"
+    implementation "androidx.compose.foundation:foundation"
+    implementation "androidx.compose.material3:material3"
+    implementation "androidx.compose.material:material-icons-core:1.7.8"
+    implementation "androidx.compose.ui:ui-tooling-preview"
+    debugImplementation "androidx.compose.ui:ui-tooling"
+
+    implementation "androidx.activity:activity-compose:1.11.0"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4"
+    implementation "androidx.lifecycle:lifecycle-runtime-compose:2.9.4"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2"
+    implementation "androidx.browser:browser:1.8.0"
+    // FileProvider for chat attachments (camera target, opening an attachment in another app).
+    implementation "androidx.core:core:1.13.1"
+
+    // Reads and writes the backup's tar. 1.21 is the last version with no dependencies of its own.
+    implementation "org.apache.commons:commons-compress:1.21"
+
+    testImplementation "junit:junit:4.13.2"
+    // The real org.json: android.jar's copy is stubs in local unit tests.
+    testImplementation "org.json:json:20231013"
+}

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Workspaces</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #0F1218; color: #E8EAF0; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; position: relative; overflow: hidden">
+  <div style="padding: 28px 20px 8px; display: flex; align-items: center; justify-content: space-between">
+    <div style="font-size: 26px; font-weight: 700; letter-spacing: -0.5px">Workspaces</div>
+    <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #9AA3B2">~/projects</span>
+  </div>
+  <div style="display: flex; gap: 8px; padding: 8px 20px 16px">
+    <a href="Clone.dc.html" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; height: 44px; border-radius: 12px; background: #FF8A3D; color: #1A1206; font-size: 14px; font-weight: 600">Clone repo</a>
+    <a href="NewWorkspace.dc.html" style="flex: 1; display: flex; align-items: center; justify-content: center; height: 44px; border-radius: 12px; border: 1px solid #2A303C; font-size: 14px">New workspace</a>
+    <button style="flex: 0.7; height: 44px; border-radius: 12px; border: 1px solid #2A303C; background: none; color: #E8EAF0; font: inherit; font-size: 14px">Folder</button>
+  </div>
+
+  <div style="flex: 1; overflow: auto; padding: 0 20px 100px; display: flex; flex-direction: column; gap: 6px">
+    <div style="display: flex; align-items: center; gap: 8px; padding: 10px 4px; font-size: 13px; color: #9AA3B2">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg><span style="font-family: 'JetBrains Mono', monospace">work/</span>
+    </div>
+    <a href="Workspace.dc.html" style="margin-left: 16px; display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; background: #181C24; border: 1.5px solid #F5B83D">
+      <div style="display: flex; align-items: center; justify-content: space-between"><span style="font-size: 16px; font-weight: 600">pocketrocket</span><span style="font-size: 12px; color: #F5B83D">1 needs you</span></div>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px; font-family: 'JetBrains Mono', monospace; font-size: 12px">
+        <span style="padding: 4px 8px; border-radius: 6px; background: #20252F">app <span style="color: #5BD69A">main</span> <span style="color: #F5B83D">●3</span></span>
+        <span style="padding: 4px 8px; border-radius: 6px; background: #20252F">api <span style="color: #5BD69A">feat/auth</span> <span style="color: #F5B83D">●5</span> ↑2</span>
+        <span style="padding: 4px 8px; border-radius: 6px; background: #20252F">shared <span style="color: #5BD69A">main</span></span>
+      </div>
+      <div style="font-size: 12px; color: #9AA3B2">3 repos · 3 sessions</div>
+    </a>
+    <a href="Workspace.dc.html" style="margin-left: 16px; display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 16px; background: #181C24; border: 1px solid #2A303C">
+      <div style="display: flex; align-items: center; justify-content: space-between"><span style="font-size: 16px; font-weight: 600">client-site</span><span style="font-size: 12px; color: #9AA3B2">idle</span></div>
+      <div style="display: flex; gap: 6px; font-family: 'JetBrains Mono', monospace; font-size: 12px"><span style="padding: 4px 8px; border-radius: 6px; background: #20252F">web <span style="color: #5BD69A">main</span></span></div>
+    </a>
+
+    <div style="display: flex; align-items: center; gap: 8px; padding: 14px 4px 10px; font-size: 13px; color: #9AA3B2">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg><span style="font-family: 'JetBrains Mono', monospace">personal/</span>
+    </div>
+    <a href="Workspace.dc.html" style="margin-left: 16px; display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 16px; background: #181C24; border: 1px solid #2A303C">
+      <div style="display: flex; align-items: center; justify-content: space-between"><span style="font-size: 16px; font-weight: 600">notes</span><span style="font-size: 12px; color: #7AB4FF">1 working</span></div>
+      <div style="display: flex; gap: 6px; font-family: 'JetBrains Mono', monospace; font-size: 12px"><span style="padding: 4px 8px; border-radius: 6px; background: #20252F">notes <span style="color: #5BD69A">main</span> ↑1</span></div>
+    </a>
+    <div style="display: flex; align-items: center; gap: 8px; padding: 14px 4px 10px; font-size: 13px; color: #9AA3B2">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg><span style="font-family: 'JetBrains Mono', monospace">experiments/</span><span>· 4</span>
+    </div>
+    <div style="font-size: 12px; color: #9AA3B2; padding: 8px 4px; line-height: 1.4">Long-press a workspace or folder to rename or move it.</div>
+  </div>
+
+  <nav style="position: absolute; left: 0; right: 0; bottom: 0; height: 76px; background: #141821; border-top: 1px solid #2A303C; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center; text-align: center; font-size: 12px">
+    <a href="Main.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; color: #9AA3B2"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>Sessions</a>
+    <a href="Workspaces.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; color: #FF8A3D"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>Workspaces</a>
+    <a href="Settings.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; color: #9AA3B2"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><circle cx="12" cy="12" r="8"></circle></svg>Settings</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Updates</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root { --bg:#0F1218; --card:#161A22; --edge:#232833; --line:#2A303C; --rule:#1E232D; --text:#E8EAF0; --muted:#9AA3B2; --dim:#4A5262; --orange:#FF8A3D; --green:#5BD69A; --blue:#6AA8FF; --red:#FF8F8F; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #07090D; color: var(--text); font-family: Inter, system-ui, sans-serif; }
+  a { color: inherit; text-decoration: none; }
+  .page { max-width: 1680px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .lead { color: var(--muted); font-size: 14px; margin: 0 0 28px; line-height: 1.5; max-width: 760px; }
+  h2 { font-size: 15px; margin: 40px 0 14px; color: var(--orange); }
+  .row { display: flex; flex-wrap: wrap; gap: 20px; }
+  .shot { width: 390px; max-width: 100%; }
+  .cap { font-size: 12px; color: var(--muted); margin: 8px 4px 0; line-height: 1.4; }
+
+  /* Phone frame: same as Tools.dc.html (full screen, no bottom nav) */
+  .phone { width: 100%; height: 844px; background: var(--bg); border: 1px solid var(--line); border-radius: 22px; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+  .bar { padding: 18px 12px 6px; display: flex; align-items: center; gap: 8px; }
+  .back { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+  .bar b { font-size: 17px; font-weight: 600; flex: 1; }
+  .bar .act { font-size: 14px; font-weight: 600; color: var(--orange); padding: 10px 12px; }
+  .bar .act.off { color: var(--muted); font-weight: 500; }
+  .body { flex: 1; overflow: hidden; padding: 8px 24px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .intro { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .label { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: 0.5px; }
+
+  .tile { display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--edge); }
+  .tile.hot { border-color: #3A2E22; }
+  .tline { display: flex; align-items: center; gap: 12px; }
+  .icon { width: 36px; height: 36px; flex: none; border-radius: 10px; background: #232833; color: var(--text); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; }
+  .icon.orange { background: rgba(255,138,61,0.14); color: var(--orange); }
+  .icon.blue { background: rgba(106,168,255,0.14); color: var(--blue); }
+  .stack { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .stack .n { font-size: 14px; font-weight: 600; }
+  .stack .s { font-size: 12px; color: var(--muted); }
+  .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+
+  .pill { font-size: 11px; font-weight: 600; padding: 4px 9px; border-radius: 999px; white-space: nowrap; }
+  .pill.green { color: var(--green); background: rgba(91,214,154,0.14); }
+  .pill.blue { color: var(--blue); background: rgba(106,168,255,0.14); }
+  .sbtn { height: 34px; padding: 0 14px; border-radius: 10px; border: 0; font: inherit; font-size: 13px; font-weight: 600; background: var(--orange); color: #1A1206; white-space: nowrap; }
+  .sbtn.busy { background: #2A303C; color: var(--muted); }
+
+  .btn { height: 48px; border-radius: 12px; border: 0; font: inherit; font-size: 15px; font-weight: 600; width: 100%; }
+  .btn.primary { background: var(--orange); color: #1A1206; }
+  .btn.busy { background: #2A303C; color: var(--muted); }
+  .bottom { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
+  .foot { font-size: 11px; color: var(--muted); line-height: 1.45; }
+  .checked { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+
+  .steps { display: flex; flex-direction: column; gap: 10px; padding: 12px 0 2px; border-top: 1px solid var(--rule); }
+  .step { display: flex; align-items: flex-start; gap: 12px; font-size: 13px; }
+  .dot { width: 20px; height: 20px; flex: none; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+  .dot.done { background: rgba(91,214,154,0.16); color: var(--green); }
+  .dot.now { border: 2px solid var(--blue); border-right-color: transparent; }
+  .dot.wait { border: 1.5px solid var(--dim); }
+  .step .stack { gap: 6px; }
+  .step .n { font-size: 13px; font-weight: 500; }
+  .step.wait .n { color: var(--muted); font-weight: 400; }
+  .step .s { font-size: 12px; color: var(--muted); }
+  .track { height: 6px; background: #2A303C; border-radius: 3px; }
+  .track > div { height: 6px; border-radius: 3px; background: var(--blue); }
+  .log { border-radius: 10px; border: 1px solid var(--edge); background: #0B0E13; }
+  .log .h { display: flex; justify-content: space-between; padding: 10px 12px; font-size: 12px; color: var(--muted); }
+
+  /* Settings strip */
+  .srow { display: flex; justify-content: space-between; padding: 13px 2px; border-bottom: 1px solid var(--rule); font-size: 14px; }
+  .srow:last-child { border-bottom: 0; }
+  .srow span:last-child { color: var(--muted); }
+
+  .notes { max-width: 860px; font-size: 13px; line-height: 1.6; color: #D5D9E2; }
+  .notes table { border-collapse: collapse; width: 100%; margin: 6px 0 16px; }
+  .notes td, .notes th { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--rule); }
+  .notes th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  .notes code { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #C9D1DE; }
+  .notes ul { padding-left: 18px; margin: 6px 0; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Updates</h1>
+  <p class="lead">Settings → Updates (decision 41). One page for everything PocketRocket keeps current: PocketRocket itself, Claude Code, Git and Dockito. Full screen with no bottom nav, the same as Tools. Each row shows the installed version and either "Up to date" or "Update to X". A running update shows its steps and live progress the same way a tool page does. Sample data is made up.</p>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"></path></symbol>
+    <symbol id="rocket" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c3 2.5 4.5 6 4.5 10v4h-9v-4C7.5 8 9 4.5 12 2z"></path><path d="M7.5 13 5 16v3h2.5M16.5 13 19 16v3h-2.5M10 20h4"></path><circle cx="12" cy="9" r="1.5"></circle></symbol>
+    <symbol id="branch" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2.5"></circle><circle cx="6" cy="18" r="2.5"></circle><circle cx="18" cy="9" r="2.5"></circle><path d="M6 8.5v7M18 11.5c0 3-4 3-9.5 4.5"></path></symbol>
+    <symbol id="doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h8l4 4v14H6z"></path><path d="M14 3v4h4M9 12h6M9 16h6"></path></symbol>
+  </svg>
+
+  <!-- ===================== SETTINGS ROW ===================== -->
+  <h2>1. The row in Settings</h2>
+  <div class="row">
+    <div class="shot">
+      <div class="phone" style="height: auto; padding: 20px 24px 16px">
+        <div class="label" style="padding-bottom: 6px">APP</div>
+        <div class="srow"><span>Tools</span><span>1 installed ›</span></div>
+        <div class="srow"><span>Theme</span><span>Dark ›</span></div>
+        <a class="srow" href="#all-current"><span>Updates</span><span>Up to date ›</span></a>
+      </div>
+      <div class="cap">Everything current. Replaces the old Claude Code and PocketRocket rows.</div>
+    </div>
+    <div class="shot">
+      <div class="phone" style="height: auto; padding: 20px 24px 16px">
+        <div class="label" style="padding-bottom: 6px">APP</div>
+        <div class="srow"><span>Tools</span><span>1 installed ›</span></div>
+        <div class="srow"><span>Theme</span><span>Dark ›</span></div>
+        <a class="srow" href="#two-out"><span>Updates</span><span style="color: var(--orange)">2 updates ›</span></a>
+      </div>
+      <div class="cap">Something is out of date: the count, in orange ("1 update ›", "2 updates ›"). While one runs: "Updating… ›" in blue.</div>
+    </div>
+  </div>
+
+  <!-- ===================== PAGE ===================== -->
+  <h2>2–4. Updates page</h2>
+  <div class="row">
+
+    <!-- 2. All up to date -->
+    <div class="shot" id="all-current">
+      <div class="phone">
+        <div class="bar"><a class="back" href="Settings.dc.html" aria-label="Back"><svg width="22" height="22"><use href="#back"/></svg></a><b>Updates</b><span class="act">Check now</span></div>
+        <div class="body">
+          <div class="checked"><span>Checked 2 min ago</span><span>Everything is up to date</span></div>
+
+          <div class="tile">
+            <div class="tline">
+              <span class="icon orange"><svg width="18" height="18"><use href="#rocket"/></svg></span>
+              <span class="stack"><span class="n">PocketRocket</span><span class="s mono">1.0.0</span></span>
+              <span class="pill green">Up to date</span>
+            </div>
+          </div>
+          <div class="tile">
+            <div class="tline">
+              <span class="icon orange">C</span>
+              <span class="stack"><span class="n">Claude Code</span><span class="s mono">2.1.312</span></span>
+              <span class="pill green">Up to date</span>
+            </div>
+          </div>
+          <div class="tile">
+            <div class="tline">
+              <span class="icon"><svg width="18" height="18"><use href="#branch"/></svg></span>
+              <span class="stack"><span class="n">Git</span><span class="s mono">2.51.0</span></span>
+              <span class="pill green">Up to date</span>
+            </div>
+          </div>
+          <div class="tile">
+            <div class="tline">
+              <span class="icon"><svg width="18" height="18"><use href="#doc"/></svg></span>
+              <span class="stack"><span class="n">Dockito</span><span class="s mono">0.0.1-beta.29</span></span>
+              <span class="pill green">Up to date</span>
+            </div>
+          </div>
+
+          <div class="foot">PocketRocket checks when the app opens. Check now looks again for all four.</div>
+        </div>
+      </div>
+      <div class="cap">2. All up to date. No buttons on the rows. "Check now" in the top bar reads "Checking…" while it runs.</div>
+    </div>
+
+    <!-- 3. Two updates -->
+    <div class="shot" id="two-out">
+      <div class="phone">
+        <div class="bar"><a class="back" href="Settings.dc.html" aria-label="Back"><svg width="22" height="22"><use href="#back"/></svg></a><b>Updates</b><span class="act">Check now</span></div>
+        <div class="body">
+          <div class="checked"><span>Checked 2 min ago</span><span style="color: var(--orange)">2 updates</span></div>
+
+          <div class="tile">
+            <div class="tline">
+              <span class="icon orange"><svg width="18" height="18"><use href="#rocket"/></svg></span>
+              <span class="stack"><span class="n">PocketRocket</span><span class="s mono">1.0.0</span></span>
+              <span class="pill green">Up to date</span>
+            </div>
+          </div>
+          <div class="tile hot">
+            <div class="tline">
+              <span class="icon orange">C</span>
+              <span class="stack"><span class="n">Claude Code</span><span class="s"><span class="mono">2.1.312</span> · <span style="color: var(--orange)">Update to 2.1.315</span></span></span>
+              <button class="sbtn">Update</button>
+            </div>
+          </div>
+          <div class="tile">
+            <div class="tline">
+              <span class="icon"><svg width="18" height="18"><use href="#branch"/></svg></span>
+              <span class="stack"><span class="n">Git</span><span class="s mono">2.51.0</span></span>
+              <span class="pill green">Up to date</span>
+            </div>
+          </div>
+          <div class="tile hot">
+            <div class="tline">
+              <span class="icon"><svg width="18" height="18"><use href="#doc"/></svg></span>
+              <span class="stack"><span class="n">Dockito</span><span class="s"><span class="mono">0.0.1-beta.27</span> · <span style="color: var(--orange)">Update to 0.0.1-beta.29</span></span></span>
+              <button class="sbtn">Update</button>
+            </div>
+          </div>
+
+          <div class="bottom">
+            <div class="foot">Running sessions keep the version they started with until they restart.</div>
+            <button class="btn primary">Update all (2)</button>
+          </div>
+        </div>
+      </div>
+      <div class="cap">3. Two updates. Each out-of-date row has its own Update. "Update all" shows only when more than one row needs updating.</div>
+    </div>
+
+    <!-- 4. One row mid-update -->
+    <div class="shot">
+      <div class="phone">
+        <div class="bar"><a class="back" href="Settings.dc.html" aria-label="Back"><svg width="22" height="22"><use href="#back"/></svg></a><b>Updates</b><span class="act off">Check now</span></div>
+        <div class="body">
+          <div class="checked"><span>Checked 3 min ago</span><span style="color: var(--blue)">Updating 1 of 2</span></div>
+
+          <div class="tile">
+            <div class="tline">
+              <span class="icon orange"><svg width="18" height="18"><use href="#rocket"/></svg></span>
+              <span class="stack"><span class="n">PocketRocket</span><span class="s mono">1.0.0</span></span>
+              <span class="pill green">Up to date</span>
+            </div>
+          </div>
+          <div class="tile" style="border-color: #24364F">
+            <div class="tline">
+              <span class="icon blue">C</span>
+              <span class="stack"><span class="n">Claude Code</span><span class="s" style="color: var(--blue)">Updating to 2.1.315 · 58%</span></span>
+              <span class="pill blue">Updating</span>
+            </div>
+            <div class="steps">
+              <div class="step"><span class="dot now"></span><span class="stack"><span class="n">Downloading 2.1.315</span><span class="s">71 of 122 MB</span><span class="track"><div style="width: 58%"></div></span></span></div>
+              <div class="step wait"><span class="dot wait"></span><span class="stack"><span class="n">Checking it against Anthropic's manifest</span></span></div>
+              <div class="step wait"><span class="dot wait"></span><span class="stack"><span class="n">Test run</span></span></div>
+              <div class="step wait"><span class="dot wait"></span><span class="stack"><span class="n">Switching to 2.1.315</span></span></div>
+            </div>
+            <div class="log"><div class="h"><span>Log</span><span>Show ›</span></div></div>
+          </div>
+          <div class="tile hot">
+            <div class="tline">
+              <span class="icon"><svg width="18" height="18"><use href="#branch"/></svg></span>
+              <span class="stack"><span class="n">Git</span><span class="s"><span class="mono">2.51.0</span> · <span style="color: var(--orange)">Update to 2.51.1</span></span></span>
+              <span class="pill" style="color: var(--muted); background: #232833">Next</span>
+            </div>
+          </div>
+          <div class="tile">
+            <div class="tline">
+              <span class="icon"><svg width="18" height="18"><use href="#doc"/></svg></span>
+              <span class="stack"><span class="n">Dockito</span><span class="s mono">0.0.1-beta.29</span></span>
+              <span class="pill green">Up to date</span>
+            </div>
+          </div>
+
+          <div class="bottom">
+            <div class="foot">You can leave this page. Updates keep going.</div>
+            <button class="btn busy" disabled>Updating…</button>
+          </div>
+        </div>
+      </div>
+      <div class="cap">4. Mid-update, after "Update all" with Claude Code and Git out of date. The running row opens to show its steps with live progress, as on a tool page; the queued row says "Next". Updates run one at a time. When one fails, its row shows the failed step, the open log and Retry, as on a tool page.</div>
+    </div>
+
+  </div>
+
+  <!-- ===================== NOTES ===================== -->
+  <h2>Notes for the build</h2>
+  <div class="notes">
+    <table>
+      <tr><th>Row</th><th>Installed</th><th>Latest</th><th>Update</th></tr>
+      <tr><td>PocketRocket</td><td>App version name</td><td>Latest GitHub release (<code>AppUpdater.check</code>)</td><td>The existing in-app updater, <code>AppUpdater.update</code>: download the APK, check its SHA-256, hand it to Android's installer. Android asks to confirm. The app restarts, so in "Update all" PocketRocket always goes last. If sessions are running, the confirm sheet says how many (<code>AppUpdater.activeSessions</code>).</td></tr>
+      <tr><td>Claude Code</td><td><code>ClaudeVersions.installed</code></td><td>The existing check, <code>ClaudeUpdater.check</code></td><td><code>ClaudeUpdater.update</code>, which runs <code>pocketrocket-setup.sh --only claude</code>: download, check against Anthropic's manifest, test run, switch.</td></tr>
+      <tr><td>Git</td><td><code>dpkg-query</code> version of <code>git</code></td><td><code>apt-get update</code>, then the candidate version from <code>apt-cache policy git</code></td><td>Through apt: a new <code>--only git</code> option in the setup script that upgrades just git with the same progress lines as <code>apt_install_progress</code> (download, prefix rewrite, install).</td></tr>
+      <tr><td>Dockito</td><td><code>DockitoCli.installed</code></td><td>Homebrew tap formula, <code>DockitoFormula.fetch</code></td><td>The same as <code>Dockito.install</code>: <code>--only dockito</code> downloads the release, checks it against the formula's SHA-256, patches it for glibc, test run, switch.</td></tr>
+    </table>
+    <ul>
+      <li>"Checked 2 min ago" is the time of the last check that covered all four. Check now rechecks all four in parallel and greys out while it runs.</li>
+      <li>The Settings row counts the rows that are out of date. It is quiet (grey) when nothing is.</li>
+      <li>Settings › Dockito keeps accounts only. The Claude Code page loses its Update and Check again buttons.</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

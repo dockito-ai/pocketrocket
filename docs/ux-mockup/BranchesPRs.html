@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Branches and pull requests</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root { --bg:#0F1218; --bar:#141821; --card:#181C24; --line:#2A303C; --text:#E8EAF0; --muted:#9AA3B2; --dim:#4A5262; --orange:#FF8A3D; --green:#5BD69A; --blue:#6AA8FF; --amber:#F5B83D; --red:#FF8F8F; --purple:#B79BFF; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #07090D; color: var(--text); font-family: Inter, system-ui, sans-serif; }
+  .page { max-width: 1280px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .lead { color: var(--muted); font-size: 14px; margin: 0 0 28px; line-height: 1.5; max-width: 760px; }
+  h2 { font-size: 15px; margin: 40px 0 4px; color: var(--orange); }
+  .note { color: var(--muted); font-size: 13px; margin: 0 0 14px; line-height: 1.5; max-width: 760px; }
+  .row { display: flex; flex-wrap: wrap; gap: 20px; }
+  .shot { width: 390px; max-width: 100%; }
+  .cap { font-size: 12px; color: var(--muted); margin: 8px 4px 0; line-height: 1.4; }
+  .phone { width: 100%; height: 700px; background: var(--bg); border: 1px solid var(--line); border-radius: 22px; overflow: hidden; display: flex; flex-direction: column; position: relative; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .muted { color: var(--muted); }
+  .head { padding: 16px 12px 4px; display: flex; align-items: center; gap: 8px; }
+  .head .back { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 22px; color: #C9CFDA; }
+  .head b { font-size: 19px; font-weight: 700; display: block; } .head span { font-size: 12px; color: var(--muted); }
+  .bcard { margin: 6px 16px 10px; padding: 12px 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+  .bcard .r { display: flex; align-items: center; gap: 10px; }
+  .bname { flex: 1; font-family: 'JetBrains Mono', monospace; font-size: 14px; }
+  .sb { height: 34px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--line); background: none; color: var(--text); font: inherit; font-size: 13px; font-weight: 600; }
+  .sb.o { border: 0; background: var(--orange); color: #1A1206; }
+  .prline { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding-top: 10px; border-top: 1px solid #20252F; }
+  .tabs { display: flex; gap: 4px; margin: 0 16px; padding: 4px; border-radius: 12px; background: var(--card); }
+  .tabs div { flex: 1; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 9px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+  .tabs div.on { background: var(--line); color: var(--text); }
+  .body { flex: 1; overflow: hidden; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .chips { display: flex; gap: 6px; }
+  .chips span { font-size: 12px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); color: #C9CFDA; }
+  .chips span.on { background: #2A2016; border-color: #5A3A1E; color: var(--orange); }
+  .pr { padding: 12px 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+  .pr .t { font-size: 14px; font-weight: 500; line-height: 1.35; }
+  .pr .m { font-size: 12px; color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .pill { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 6px; background: #20252F; }
+  .ok { color: var(--green); } .bad { color: var(--red); } .run { color: var(--amber); } .draft { color: var(--muted); }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; background: #1A1F29; border-radius: 22px 22px 0 0; border-top: 1px solid var(--line); padding: 10px 16px 18px; box-shadow: 0 -20px 40px rgba(0,0,0,.5); }
+  .grab { width: 36px; height: 4px; border-radius: 2px; background: #3A4150; margin: 0 auto 12px; }
+  .scrim { position: absolute; inset: 0; background: rgba(5,7,10,.55); }
+  .search { height: 42px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--dim); font-size: 14px; display: flex; align-items: center; padding: 0 14px; }
+  .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 14px 2px 6px; }
+  .br { display: flex; align-items: center; gap: 10px; padding: 10px 6px; border-bottom: 1px solid #20252F; }
+  .br .n { flex: 1; min-width: 0; } .br .n div:first-child { font-family: 'JetBrains Mono', monospace; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .br .n div:last-child { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .cur { color: var(--green); }
+  .acts { display: flex; gap: 8px; margin-top: 12px; }
+  .acts button { flex: 1; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: none; color: var(--text); font: inherit; font-size: 13.5px; font-weight: 600; }
+  .acts button.o { background: var(--orange); color: #1A1206; border: 0; }
+  .dialog { position: absolute; left: 22px; right: 22px; top: 190px; background: #1E2430; border-radius: 22px; padding: 20px; box-shadow: 0 20px 50px rgba(0,0,0,.6); }
+  .dialog b { font-size: 17px; display: block; margin-bottom: 10px; }
+  .dialog p { font-size: 13.5px; color: #C9CFDA; line-height: 1.5; margin: 0 0 10px; }
+  .opt { display: block; padding: 12px; border-radius: 12px; border: 1px solid var(--line); margin-top: 8px; font-size: 13.5px; }
+  .opt small { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
+  .opt.rec { border-color: #5A3A1E; background: #241B13; }
+  .warn { padding: 10px 12px; border-radius: 12px; background: #2A2312; border: 1px solid #5A4A1E; color: #F5D58A; font-size: 12.5px; line-height: 1.45; }
+  .check { display: flex; align-items: center; gap: 10px; padding: 9px 2px; font-size: 13px; border-bottom: 1px solid #20252F; }
+  .check span:nth-child(2) { flex: 1; }
+  .desc { font-size: 13px; line-height: 1.55; color: #C9CFDA; }
+  .foot { padding: 10px 16px 18px; border-top: 1px solid var(--line); display: flex; gap: 8px; background: var(--bg); }
+  .foot button { flex: 1; height: 46px; border-radius: 14px; border: 1px solid var(--line); background: none; color: var(--text); font: inherit; font-size: 14px; font-weight: 600; }
+  .foot button.o { background: var(--orange); color: #1A1206; border: 0; }
+  .input { border-radius: 12px; border: 1px solid var(--line); background: var(--bg); padding: 11px 13px; font-size: 14px; }
+  .input.area { min-height: 120px; font-size: 13px; line-height: 1.5; color: #C9CFDA; }
+  .fl { font-size: 12px; color: var(--muted); margin: 12px 2px 6px; }
+  .tog { display: flex; align-items: center; justify-content: space-between; font-size: 14px; margin-top: 14px; }
+  .sw { width: 42px; height: 24px; border-radius: 12px; background: #2A303C; position: relative; } .sw::after { content: ''; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 9px; background: #9AA3B2; }
+  .repo { padding: 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+  .repo .r { display: flex; justify-content: space-between; align-items: center; }
+  .sec { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .4px; margin-top: 4px; }
+  .status { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; padding: 8px 14px 12px; color: var(--muted); border-top: 1px solid var(--line); background: var(--bar); }
+  .status .g { color: var(--green); text-decoration: underline dotted; }
+  .rec-tag { display: inline-block; font-size: 11px; font-weight: 600; color: #1A1206; background: var(--orange); border-radius: 6px; padding: 2px 6px; margin-left: 6px; vertical-align: 1px; }
+  .file { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--card); border: 1px solid var(--line); font-size: 12.5px; }
+  .file .p { flex: 1; font-family: 'JetBrains Mono', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+<div class="page">
+<h1>Branches and pull requests</h1>
+<p class="lead">Both live in the repo's Git screen, the one you reach from Workspace → repo card (and from the branch in a session's status line). One place per repo, so there is nothing new to find: the branch card at the top opens the branches, and a new <b>PRs</b> tab sits next to Changes and Commits. The Commits tab becomes a Graph. The workspace's GitHub account is used for everything. No creating PRs here.</p>
+
+<h2>1 · Where you get in</h2>
+<p class="note">The workspace's repo cards gain one line when a repo has open PRs. Tapping the card opens the Git screen as today. In a session, tapping the branch in the status line opens the same branch sheet.</p>
+<div class="row">
+  <div class="shot"><div class="phone">
+    <div class="head"><span class="back">‹</span><div><b>pocketrocket</b><span class="mono">~/projects/work/pocketrocket</span></div></div>
+    <div class="body">
+      <div class="sec">REPOS</div>
+      <div class="repo"><div class="r"><b style="font-size:15px">app</b><span class="mono cur" style="font-size:12px">feat/attachments</span></div>
+        <div style="font-size:12px;color:#C9CFDA;display:flex;gap:12px"><span>● 3 changed</span><span>↑2 to push</span></div>
+        <div style="font-size:12px;display:flex;gap:10px"><span style="color:var(--purple)">⇄ 3 open PRs</span><span class="muted">· #42 yours, checks passing</span></div></div>
+      <div class="repo"><div class="r"><b style="font-size:15px">api</b><span class="mono cur" style="font-size:12px">main</span></div>
+        <div style="font-size:12px;color:#C9CFDA;display:flex;gap:12px"><span>clean</span><span>up to date</span></div>
+        <div style="font-size:12px;display:flex;gap:10px"><span style="color:var(--amber)">⇄ 1 PR waiting for your review</span></div></div>
+      <div class="repo"><div class="r"><b style="font-size:15px">shared</b><span class="mono cur" style="font-size:12px">main</span></div>
+        <div style="font-size:12px;color:#C9CFDA;display:flex;gap:12px"><span>clean</span><span>↓1 to pull</span></div></div>
+    </div>
+  </div><div class="cap">Workspace: a PR line on repos that have any. Review requests show in amber.</div></div>
+
+  <div class="shot"><div class="phone">
+    <div class="head"><span class="back">‹</span><div><b>Fix login</b><span>app · Opus 5.5</span></div></div>
+    <div class="body" style="justify-content:flex-end"><div class="desc">Done. The retry is in <span class="mono">src/auth/retry.ts</span> and the tests pass.</div></div>
+    <div class="sheet" style="position:relative;border-radius:0;box-shadow:none;padding:8px 12px 6px;background:var(--bar)">
+      <div class="search" style="border-radius:22px">Message Claude…</div></div>
+    <div class="status">app │ <span class="g">feat/attachments</span> │ Opus 5.5 │ 82k/1M<br><span style="color:var(--orange)">Accept edits</span></div>
+  </div><div class="cap">Session: the branch in the status line is tappable and opens the branch sheet for that folder.</div></div>
+</div>
+
+<h2>2 · Git screen: branch card and PRs tab</h2>
+<p class="note">The branch card already shows <span class="mono">main ▾</span> in the approved mockup; the ▾ now opens the branches. Under it, the PR for this branch if there is one. No PR creation in the app: Claude or GitHub does that.</p>
+<div class="row">
+  <div class="shot"><div class="phone">
+    <div class="head"><span class="back">‹</span><div><b>app</b><span>pocketrocket / app</span></div></div>
+    <div class="bcard">
+      <div class="r"><span class="cur">⑂</span><span class="bname">feat/attachments ▾</span><span style="font-size:12px;color:#C9CFDA">↑2 ↓0</span><button class="sb">Pull</button><button class="sb o">Push</button></div>
+      <div class="prline"><span style="color:var(--purple)">⇄</span><span style="flex:1"><b>#42</b> Attachments in the chat</span><span class="ok">✓ checks</span><span class="muted">›</span></div>
+    </div>
+    <div class="tabs"><div class="on">Changes · 3</div><div>Graph</div><div>PRs · 3</div><div>Files</div></div>
+    <div class="body">
+      <div class="file"><span class="pill run">M</span><span class="p">src/chat/Composer.kt</span><span class="ok mono">+40</span><span class="bad mono">−6</span></div>
+      <div class="file"><span class="pill ok">A</span><span class="p">src/chat/Attachments.kt</span><span class="ok mono">+212</span></div>
+      <div class="file"><span class="pill run">M</span><span class="p">docs/BRD.md</span><span class="ok mono">+3</span><span class="bad mono">−1</span></div>
+    </div>
+  </div><div class="cap">Branch has a PR: one line on the card, tap opens it. No PR: no line.</div></div>
+
+  <div class="shot"><div class="phone">
+    <div class="head"><span class="back">‹</span><div><b>app</b><span>pocketrocket / app</span></div></div>
+    <div class="bcard">
+      <div class="r"><span class="cur">⑂</span><span class="bname">fix/retry ▾</span><span style="font-size:12px;color:#C9CFDA">↑0 ↓0</span><button class="sb">Pull</button><button class="sb o">Push</button></div>
+    </div>
+    <div class="tabs"><div>Changes</div><div>Graph</div><div class="on">PRs · 3</div><div>Files</div></div>
+    <div class="body">
+      <div class="chips"><span class="on">Open</span><span>Mine</span><span>To review · 1</span><span>Closed</span></div>
+      <div class="pr"><div class="t">Attachments in the chat</div><div class="m"><span class="mono">#42</span><span>feat/attachments</span><span>· you · 2 h</span></div><div class="m"><span class="pill ok">✓ 4/4 checks</span><span class="pill" style="color:var(--blue)">1 approval</span></div></div>
+      <div class="pr" style="border-color:#5A4A1E"><div class="t">Bump Kotlin to 2.1</div><div class="m"><span class="mono">#40</span><span>chore/kotlin</span><span>· dependabot · 1 d</span></div><div class="m"><span class="pill run">● 2 running</span><span class="pill" style="color:var(--amber)">review requested</span></div></div>
+      <div class="pr"><div class="t">Health screen rows</div><div class="m"><span class="mono">#37</span><span>feat/health</span><span>· you · 3 d</span></div><div class="m"><span class="pill draft">Draft</span><span class="pill bad">✗ 1 failing</span></div></div>
+    </div>
+  </div><div class="cap">PRs tab: filters, then one card per PR with checks and review state.</div></div>
+</div>
+
+<h2>3 · Branches</h2>
+<p class="note">A sheet from the branch card or the status line. Local branches first, newest commit first; remote-only branches below. Tap to switch; long-press for Rename, Delete (only when merged), Compare with current. At the bottom: New branch, and New session on a branch, which opens it in a git worktree so two sessions can work on two branches at once.</p>
+<div class="row">
+  <div class="shot"><div class="phone">
+    <div class="head"><span class="back">‹</span><div><b>app</b><span>pocketrocket / app</span></div></div>
+    <div class="bcard"><div class="r"><span class="cur">⑂</span><span class="bname">feat/attachments ▾</span></div></div>
+    <div class="scrim"></div>
+    <div class="sheet" style="top:90px">
+      <div class="grab"></div>
+      <div class="search">Find a branch</div>
+      <div class="lbl">On this phone</div>
+      <div class="br"><span class="cur">✓</span><div class="n"><div class="cur">feat/attachments</div><div>↑2 · 20 min ago · #42 open</div></div></div>
+      <div class="br"><span style="width:12px"></span><div class="n"><div>main</div><div>default · up to date · 1 d ago</div></div></div>
+      <div class="br"><span style="width:12px"></span><div class="n"><div>fix/retry</div><div>↓3 behind main · 2 d ago · <span style="color:var(--blue)">used by “API tests” (worktree)</span></div></div></div>
+      <div class="br"><span style="width:12px"></span><div class="n"><div>feat/health</div><div>#37 draft · 3 d ago</div></div></div>
+      <div class="lbl">On GitHub only</div>
+      <div class="br"><span style="width:12px"></span><div class="n"><div>origin/chore/kotlin</div><div>dependabot · #40 open</div></div><span class="muted" style="font-size:12px">Check out</span></div>
+      <div class="acts"><button>New branch</button><button class="o">New session on a branch</button></div>
+    </div>
+  </div><div class="cap">Branch sheet. A branch already checked out in a session's worktree says so and opens that session instead.</div></div>
+
+  <div class="shot"><div class="phone">
+    <div class="head"><span class="back">‹</span><div><b>app</b><span>pocketrocket / app</span></div></div>
+    <div class="scrim"></div>
+    <div class="dialog">
+      <b>Switch to main?</b>
+      <p>You have 3 changed files on <span class="mono">feat/attachments</span>.</p>
+      <div class="warn">“Fix login” is working in this folder right now. Switching changes the files under it. Stop it first, or start a new session on a branch instead.</div>
+      <div class="opt rec">Keep them on this branch<small>Stashed now, put back when you switch back here</small></div>
+      <div class="opt">Bring them to main<small>Only if they don't clash</small></div>
+      <div style="display:flex;justify-content:flex-end;gap:18px;margin-top:16px;font-size:14px;font-weight:600"><span class="muted">Cancel</span><span style="color:var(--orange)">Switch</span></div>
+    </div>
+  </div><div class="cap">Switching with uncommitted changes, and the warning when a session is busy in the same folder.</div></div>
+</div>
+
+<h2>4 · A pull request</h2>
+<p class="note">Read the description, checks and reviews; Files uses the existing diff viewer. At the bottom: Check out (switch this folder to the PR's branch), Review with Claude (a new session on the PR in a worktree, asked to review it), and Merge with the repo's allowed methods. Open on GitHub sits in the ⋮ menu with Close and Mark ready.</p>
+<div class="row">
+  <div class="shot"><div class="phone">
+    <div class="head"><span class="back">‹</span><div style="flex:1"><b style="font-size:16px">Bump Kotlin to 2.1</b><span class="mono">#40 · chore/kotlin → main</span></div><span class="back">⋮</span></div>
+    <div class="tabs" style="margin-top:6px"><div class="on">Overview</div><div>Files · 4</div><div>Commits · 2</div></div>
+    <div class="body">
+      <div class="m" style="display:flex;gap:8px;font-size:12px"><span class="pill ok">Open</span><span class="muted">dependabot · 1 d ago · +18 −14</span></div>
+      <div class="desc">Bumps Kotlin from 2.0.21 to 2.1.0. Release notes: compiler speed-ups, K2 by default, new warnings for…</div>
+      <div class="lbl">Checks</div>
+      <div class="check"><span class="ok">✓</span><span>build / assembleDebug</span><span class="muted">3m 12s</span></div>
+      <div class="check"><span class="ok">✓</span><span>unit tests</span><span class="muted">1m 40s</span></div>
+      <div class="check"><span class="run">●</span><span>instrumented / API 36</span><span class="muted">running</span></div>
+      <div class="lbl">Reviews</div>
+      <div class="check"><span class="run">○</span><span>You were asked to review</span></div>
+      <div class="check"><span class="muted">💬</span><span>2 comments</span><span class="muted">›</span></div>
+    </div>
+    <div class="foot"><button>Check out</button><button>Review with Claude</button><button class="o">Merge ▾</button></div>
+  </div><div class="cap">PR overview. Merge waits for a confirm: Squash / Merge commit / Rebase, delete the branch after.</div></div>
+
+</div>
+
+<h2 id="graph">5 · Graph</h2>
+<p class="note">The Commits tab becomes Graph: the commit list with lanes on the left, like GitHub Desktop or <span class="mono">git log --graph</span>. Branch names sit on their commits: yours in green, GitHub's (<span class="mono">origin/…</span>) in blue, PR numbers in purple. “This branch” or “All branches”. Tap a commit for its files and diffs (as today); long-press for Check out, New branch here, Open PR, Copy SHA.</p>
+<div class="row">
+  <div class="shot"><div class="phone">
+    <div class="head"><span class="back">‹</span><div><b>app</b><span>pocketrocket / app</span></div></div>
+    <div class="bcard"><div class="r"><span class="cur">⑂</span><span class="bname">feat/attachments ▾</span><span style="font-size:12px;color:#C9CFDA">↑2 ↓0</span><button class="sb">Pull</button><button class="sb o">Push</button></div></div>
+    <div class="tabs"><div>Changes · 3</div><div class="on">Graph</div><div>PRs · 3</div><div>Files</div></div>
+    <div class="body" style="padding-top:8px;gap:0">
+      <div class="chips" style="margin-bottom:8px"><span>This branch</span><span class="on">All branches</span></div>
+      <svg width="100%" height="440" viewBox="0 0 358 440" style="font-family:Inter,sans-serif">
+        <g stroke-width="2" fill="none">
+          <path d="M34 20 V 120 C34 140 14 140 14 160" stroke="#5BD69A"/>
+          <path d="M14 160 V 440" stroke="#FF8A3D"/>
+          <path d="M54 260 C54 290 14 290 14 320" stroke="#6AA8FF"/>
+          <path d="M14 210 C14 230 54 230 54 260" stroke="#6AA8FF"/>
+        </g>
+        <g font-size="12.5" fill="#E8EAF0">
+          <circle cx="34" cy="20" r="5" fill="#5BD69A"/>
+          <text x="70" y="17">Add tray to composer</text>
+          <rect x="70" y="24" width="106" height="15" rx="4" fill="#173326"/><text x="75" y="35" font-size="10" fill="#5BD69A" font-family="JetBrains Mono">feat/attachments</text>
+          <rect x="180" y="24" width="28" height="15" rx="4" fill="#2A2340"/><text x="185" y="35" font-size="10" fill="#B79BFF" font-family="JetBrains Mono">#42</text>
+          <text x="216" y="35" font-size="11" fill="#9AA3B2">Claude · 20 m</text>
+
+          <circle cx="34" cy="70" r="5" fill="#5BD69A"/>
+          <text x="70" y="67">Share to session</text>
+          <rect x="70" y="74" width="150" height="15" rx="4" fill="#16243A"/><text x="75" y="85" font-size="10" fill="#6AA8FF" font-family="JetBrains Mono">origin/feat/attachments</text>
+
+          <circle cx="34" cy="120" r="5" fill="#5BD69A"/>
+          <text x="70" y="117">+ sheet with Photos, Files</text><text x="70" y="134" font-size="11" fill="#9AA3B2">Claude · 3 h</text>
+
+          <circle cx="14" cy="160" r="5" fill="#FF8A3D"/>
+          <text x="70" y="160">Sessions: rename from Home</text>
+          <rect x="70" y="167" width="36" height="15" rx="4" fill="#3A2614"/><text x="75" y="178" font-size="10" fill="#FF8A3D" font-family="JetBrains Mono">main</text>
+          <rect x="110" y="167" width="76" height="15" rx="4" fill="#16243A"/><text x="115" y="178" font-size="10" fill="#6AA8FF" font-family="JetBrains Mono">origin/main</text>
+          <text x="194" y="178" font-size="11" fill="#9AA3B2">Shankar · 1 d</text>
+
+          <circle cx="14" cy="210" r="5" fill="#FF8A3D"/>
+          <text x="70" y="207">New session: optional Name</text><text x="70" y="224" font-size="11" fill="#9AA3B2">Claude · 1 d</text>
+
+          <circle cx="54" cy="260" r="5" fill="#6AA8FF"/>
+          <text x="70" y="257">Bump Kotlin to 2.1</text>
+          <rect x="70" y="264" width="120" height="15" rx="4" fill="#16243A"/><text x="75" y="275" font-size="10" fill="#6AA8FF" font-family="JetBrains Mono">origin/chore/kotlin</text>
+          <rect x="194" y="264" width="28" height="15" rx="4" fill="#2A2340"/><text x="199" y="275" font-size="10" fill="#B79BFF" font-family="JetBrains Mono">#40</text>
+
+          <circle cx="14" cy="320" r="5" fill="#FF8A3D"/>
+          <text x="70" y="317">Git viewer: panel, diffs, browse</text><text x="70" y="334" font-size="11" fill="#9AA3B2">Claude · 2 d</text>
+          <circle cx="14" cy="370" r="5" fill="#FF8A3D"/>
+          <text x="70" y="367">Claude controls: status line</text><text x="70" y="384" font-size="11" fill="#9AA3B2">Claude · 3 d</text>
+          <circle cx="14" cy="420" r="5" fill="#FF8A3D"/>
+          <text x="70" y="417">Setup: download Claude Code</text><text x="70" y="434" font-size="11" fill="#9AA3B2">Shankar · 4 d</text>
+        </g>
+      </svg>
+    </div>
+  </div><div class="cap">Graph, all branches. Each branch keeps its lane and colour; names sit on the commits they point at.</div></div>
+
+  <div class="shot"><div class="phone">
+    <div class="head"><span class="back">‹</span><div><b>app</b><span>pocketrocket / app</span></div></div>
+    <div class="tabs" style="margin-top:6px"><div>Changes · 3</div><div class="on">Graph</div><div>PRs · 3</div><div>Files</div></div>
+    <div class="scrim"></div>
+    <div class="sheet">
+      <div class="grab"></div>
+      <div style="font-size:15px;font-weight:600">Bump Kotlin to 2.1</div>
+      <div class="mono muted" style="font-size:12px;margin:4px 0 10px">7d0b14 · origin/chore/kotlin · #40</div>
+      <div class="br" style="font-size:14px">See files and diffs</div>
+      <div class="br" style="font-size:14px">Check out <span class="mono" style="margin-left:4px">chore/kotlin</span></div>
+      <div class="br" style="font-size:14px">New branch here</div>
+      <div class="br" style="font-size:14px">Open PR #40</div>
+      <div class="br" style="font-size:14px;border:0">Copy SHA</div>
+    </div>
+  </div><div class="cap">Long-press a commit. On a branch tip, Check out switches to that branch; elsewhere it offers a new branch there.</div></div>
+</div>
+
+<h2>Not in this round</h2>
+<p class="note">Creating PRs in the app (Claude or GitHub does it). Writing review comments line by line, approving, resolving conversations, and editing labels or reviewers. They're easy to add later through <span class="mono">gh</span>; on a phone, reading, merging and asking Claude to review cover most of it.</p>
+</div>
+</body>
+</html>

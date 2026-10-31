@@ -10,6 +10,8 @@ import android.system.Os;
 import android.util.Pair;
 import android.view.WindowManager;
 
+import com.pocketrocket.relocate.AmWrapper;
+import com.pocketrocket.relocate.PrefixRelocation;
 import com.termux.R;
 import com.termux.shared.file.FileUtils;
 import com.termux.shared.termux.crash.TermuxCrashUtils;
@@ -26,6 +28,7 @@ import com.termux.shared.termux.shell.command.environment.TermuxShellEnvironment
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -63,6 +66,11 @@ final class TermuxInstaller {
 
     /** Performs bootstrap setup if necessary. */
     static void setupBootstrapIfNeeded(final Activity activity, final Runnable whenDone) {
+        setupBootstrapIfNeeded(activity, whenDone, true);
+    }
+
+    /** PocketRocket: same as above, optionally without the progress dialog (the caller shows its own progress). */
+    static void setupBootstrapIfNeeded(final Activity activity, final Runnable whenDone, final boolean showProgressDialog) {
         String bootstrapErrorMessage;
         Error filesDirectoryAccessibleError;
 
@@ -107,6 +115,8 @@ final class TermuxInstaller {
             if (TermuxFileUtils.isTermuxPrefixDirectoryEmpty()) {
                 Logger.logInfo(LOG_TAG, "The termux prefix directory \"" + TERMUX_PREFIX_DIR_PATH + "\" exists but is empty or only contains specific unimportant files.");
             } else {
+                PrefixRelocation.installAptHook(TERMUX_PREFIX_DIR);
+                AmWrapper.install();
                 whenDone.run();
                 return;
             }
@@ -114,7 +124,7 @@ final class TermuxInstaller {
             Logger.logInfo(LOG_TAG, "The termux prefix directory \"" + TERMUX_PREFIX_DIR_PATH + "\" does not exist but another file exists at its destination.");
         }
 
-        final ProgressDialog progress = ProgressDialog.show(activity, null, activity.getString(R.string.bootstrap_installer_body), true, false);
+        final ProgressDialog progress = showProgressDialog ? ProgressDialog.show(activity, null, activity.getString(R.string.bootstrap_installer_body), true, false) : null;
         new Thread() {
             @Override
             public void run() {
@@ -167,7 +177,7 @@ final class TermuxInstaller {
                                     String[] parts = line.split("←");
                                     if (parts.length != 2)
                                         throw new RuntimeException("Malformed symlink line: " + line);
-                                    String oldPath = parts[0];
+                                    String oldPath = PrefixRelocation.rewrite(parts[0]);
                                     String newPath = TERMUX_STAGING_PREFIX_DIR_PATH + "/" + parts[1];
                                     symlinks.add(Pair.create(oldPath, newPath));
 
@@ -189,10 +199,15 @@ final class TermuxInstaller {
                                 }
 
                                 if (!isDirectory) {
+                                    // PocketRocket: swap Termux's data dir for our own id (decision 36).
+                                    ByteArrayOutputStream entryBytes = new ByteArrayOutputStream();
+                                    int readBytes;
+                                    while ((readBytes = zipInput.read(buffer)) != -1)
+                                        entryBytes.write(buffer, 0, readBytes);
+                                    byte[] content = entryBytes.toByteArray();
+                                    PrefixRelocation.rewrite(content, content.length);
                                     try (FileOutputStream outStream = new FileOutputStream(targetFile)) {
-                                        int readBytes;
-                                        while ((readBytes = zipInput.read(buffer)) != -1)
-                                            outStream.write(buffer, 0, readBytes);
+                                        outStream.write(content);
                                     }
                                     if (zipEntryName.startsWith("bin/") || zipEntryName.startsWith("libexec") ||
                                         zipEntryName.startsWith("lib/apt/apt-helper") || zipEntryName.startsWith("lib/apt/methods")) {
@@ -209,6 +224,7 @@ final class TermuxInstaller {
                     for (Pair<String, String> symlink : symlinks) {
                         Os.symlink(symlink.first, symlink.second);
                     }
+                    PrefixRelocation.installAptHook(TERMUX_STAGING_PREFIX_DIR);
 
                     Logger.logInfo(LOG_TAG, "Moving termux prefix staging to prefix directory.");
 
@@ -217,6 +233,7 @@ final class TermuxInstaller {
                     }
 
                     Logger.logInfo(LOG_TAG, "Bootstrap packages installed successfully.");
+                    AmWrapper.install();
 
                     // Recreate env file since termux prefix was wiped earlier
                     TermuxShellEnvironment.writeEnvironmentToFile(activity);
@@ -229,7 +246,7 @@ final class TermuxInstaller {
                 } finally {
                     activity.runOnUiThread(() -> {
                         try {
-                            progress.dismiss();
+                            if (progress != null) progress.dismiss();
                         } catch (RuntimeException e) {
                             // Activity already dismissed - ignore.
                         }

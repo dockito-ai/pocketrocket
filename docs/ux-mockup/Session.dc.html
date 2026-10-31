@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Session</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #0F1218; color: #E8EAF0; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <div style="padding: 18px 12px 8px; display: flex; align-items: center; gap: 8px">
+    <a href="Workspace.dc.html" aria-label="Back to workspace" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></a>
+    <div style="flex: 1; min-width: 0">
+      <div style="font-size: 16px; font-weight: 600">pocketrocket</div>
+      <div style="font-size: 12px; color: #9AA3B2">3 sessions · 1 needs you</div>
+    </div>
+    <a href="Git.dc.html" aria-label="Git changes" style="height: 36px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid #2A303C; border-radius: 10px; font-size: 12px; color: #C9CFDA"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="6" cy="6" r="2.5"></circle><circle cx="6" cy="18" r="2.5"></circle><circle cx="18" cy="9" r="2.5"></circle><path d="M6 8.5v7M18 11.5c0 3-4 3-9.5 4.5"></path></svg>3 changed</a>
+    <button aria-label="Open in terminal" style="width: 44px; height: 44px; background: none; border: 0; color: #C9CFDA; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 17l6-5-6-5M12 19h8"></path></svg></button>
+  </div>
+
+  <div style="display: flex; gap: 8px; padding: 0 12px 10px; border-bottom: 1px solid #2A303C; overflow: hidden">
+    <span style="display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 10px; background: #20252F; border: 1.5px solid #F5B83D; font-size: 13px; font-weight: 600; white-space: nowrap"><span style="width: 7px; height: 7px; border-radius: 4px; background: #F5B83D"></span>Fix login</span>
+    <span style="display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 10px; border: 1px solid #2A303C; font-size: 13px; color: #C9CFDA; white-space: nowrap"><span style="width: 7px; height: 7px; border-radius: 4px; background: #7AB4FF"></span>API tests</span>
+    <span style="display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 10px; border: 1px solid #2A303C; font-size: 13px; color: #C9CFDA; white-space: nowrap"><span style="width: 7px; height: 7px; border-radius: 4px; background: #5BD69A"></span>Types</span>
+    <a href="NewSession.dc.html" aria-label="New session in this workspace" style="display: flex; align-items: center; padding: 8px 10px; border-radius: 10px; border: 1px dashed #3A4150; color: #9AA3B2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></a>
+  </div>
+
+  <div style="flex: 1; overflow: auto; padding: 14px 14px 8px; display: flex; flex-direction: column; gap: 10px">
+    <div style="align-self: flex-end; max-width: 82%; display: flex; flex-direction: column; align-items: flex-end; gap: 4px">
+      <div style="background: #263048; padding: 10px 14px; border-radius: 16px 16px 4px 16px; font-size: 14px; line-height: 1.45">Login fails on the second try with a stale token. Find why and fix it, then run the auth tests.</div>
+      <span style="font-size: 11px; color: #9AA3B2">Long-press: Rewind to here · Copy</span>
+    </div>
+    <div style="font-size: 14px; line-height: 1.5; color: #DCE0E8">The refresh path reuses the old token after a 401. I'll check the auth module and fix the retry.</div>
+
+    <div style="display: flex; align-items: center; gap: 10px; background: #181C24; border: 1px solid #2A303C; border-radius: 12px; padding: 10px 12px; font-size: 13px">
+      <span style="font-family: 'JetBrains Mono', monospace; color: #9AA3B2">Read</span><span style="font-family: 'JetBrains Mono', monospace; flex: 1">src/auth/session.ts</span><span style="color: #5BD69A">✓</span>
+    </div>
+
+    <div style="background: #181C24; border: 1px solid #2A303C; border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 13px">
+        <span style="font-size: 11px; font-weight: 600; color: #C4A8FF; background: rgba(196,168,255,0.12); padding: 3px 7px; border-radius: 6px">Agent</span>
+        <span style="flex: 1; font-weight: 500">Trace token refresh callers</span><span style="color: #5BD69A; font-size: 12px">done · 6 steps</span>
+      </div>
+      <div style="font-size: 12px; color: #9AA3B2; font-family: 'JetBrains Mono', monospace; padding-left: 10px; border-left: 2px solid #2A303C; display: flex; flex-direction: column; gap: 4px">
+        <span>Grep "refreshToken" · 9 matches</span><span>Read src/api/client.ts</span><span>+4 more</span>
+      </div>
+    </div>
+
+    <a href="Diff.dc.html" style="display: flex; align-items: center; gap: 10px; background: #181C24; border: 1px solid #2A303C; border-radius: 12px; padding: 10px 12px; font-size: 13px">
+      <span style="font-family: 'JetBrains Mono', monospace; color: #9AA3B2">Edit</span><span style="font-family: 'JetBrains Mono', monospace; flex: 1">src/auth/session.ts</span><span style="color: #5BD69A; font-family: 'JetBrains Mono', monospace">+12</span><span style="color: #FF6B6B; font-family: 'JetBrains Mono', monospace">−3</span><span style="color: #9AA3B2">›</span>
+    </a>
+
+    <div style="background: #2A2416; border: 1.5px solid #F5B83D; border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+      <div style="font-size: 14px; font-weight: 600">Claude wants to run a command</div>
+      <div style="background: #0F1218; border-radius: 8px; padding: 10px 12px; font-family: 'JetBrains Mono', monospace; font-size: 13px">npm test -- auth</div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+        <button style="height: 44px; border-radius: 12px; border: 1px solid #5A5030; background: none; color: #E8EAF0; font: inherit; font-size: 14px">Deny</button>
+        <button style="height: 44px; border-radius: 12px; border: 0; background: #F5B83D; color: #1A1206; font: inherit; font-size: 14px; font-weight: 600">Allow</button>
+      </div>
+      <button style="height: 40px; border-radius: 12px; border: 1px solid #5A5030; background: none; color: #F5D48A; font: inherit; font-size: 13px">Always allow npm test in this workspace</button>
+    </div>
+  </div>
+
+  <div style="padding: 8px 12px 10px; border-top: 1px solid #2A303C; background: #141821; display: flex; flex-direction: column; gap: 8px">
+    <div style="display: flex; align-items: flex-end; gap: 8px">
+      <button aria-label="Slash commands" style="width: 44px; height: 44px; border-radius: 22px; border: 1px solid #2A303C; background: none; color: #C9CFDA; font: inherit; font-size: 18px; font-family: 'JetBrains Mono', monospace">/</button>
+      <label style="flex: 1; display: flex"><span style="position: absolute; left: -9999px">Message</span><input placeholder="Message Claude" style="flex: 1; height: 44px; box-sizing: border-box; border-radius: 22px; border: 1px solid #2A303C; background: #0F1218; color: #E8EAF0; padding: 0 16px; font: inherit; font-size: 14px"></label>
+      <button aria-label="Dictate" style="width: 44px; height: 44px; border-radius: 22px; border: 0; background: #FF8A3D; color: #1A1206; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></button>
+    </div>
+    <a href="Controls.dc.html" style="display: flex; flex-direction: column; gap: 3px; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; padding: 0 4px">
+      <span style="color: #9AA3B2">app <span style="color: #4A5262">│</span> <span style="color: #5BD69A">main</span> <span style="color: #4A5262">│</span> Opus 5.5 <span style="color: #4A5262">│</span> 160k/1M</span>
+      <span style="color: #FF8A3D">▸▸ accept edits <span style="color: #9AA3B2">(tap to change)</span></span>
+    </a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Want ask questions about the project?
-    url: https://github.com/termux/termux-app/discussions
-    about: Join GitHub Discussions
+  - name: Security vulnerability
+    url: https://github.com/ShankarKakumani/pocketrocket/security/advisories/new
+    about: Please report security problems privately, not as an issue.

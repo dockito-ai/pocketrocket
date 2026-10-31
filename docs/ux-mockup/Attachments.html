@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Attachments: options</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root { --bg:#0F1218; --bar:#141821; --card:#181C24; --line:#2A303C; --text:#E8EAF0; --muted:#9AA3B2; --dim:#4A5262; --orange:#FF8A3D; --green:#5BD69A; --blue:#6AA8FF; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #07090D; color: var(--text); font-family: Inter, system-ui, sans-serif; }
+  a { color: inherit; text-decoration: none; }
+  .page { max-width: 1280px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .lead { color: var(--muted); font-size: 14px; margin: 0 0 28px; line-height: 1.5; }
+  h2 { font-size: 15px; margin: 40px 0 4px; color: var(--orange); }
+  .note { color: var(--muted); font-size: 13px; margin: 0 0 14px; line-height: 1.5; max-width: 720px; }
+  .row { display: flex; flex-wrap: wrap; gap: 20px; }
+  .shot { width: 390px; max-width: 100%; }
+  .cap { font-size: 12px; color: var(--muted); margin: 8px 4px 0; line-height: 1.4; }
+  .phone { width: 100%; height: 560px; background: var(--bg); border: 1px solid var(--line); border-radius: 22px; overflow: hidden; display: flex; flex-direction: column; position: relative; }
+  .top { padding: 14px 12px 8px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #1B2029; }
+  .top b { font-size: 15px; font-weight: 600; } .top span { font-size: 12px; color: var(--muted); }
+  .chat { flex: 1; padding: 14px 14px 10px; display: flex; flex-direction: column; gap: 10px; justify-content: flex-end; overflow: hidden; }
+  .claude { font-size: 14px; line-height: 1.5; color: #D5D9E2; }
+  .me { align-self: flex-end; max-width: 82%; background: #232A38; border-radius: 16px 16px 4px 16px; padding: 10px 12px; font-size: 14px; line-height: 1.45; display: flex; flex-direction: column; gap: 8px; }
+  .composer { padding: 8px 12px 10px; border-top: 1px solid var(--line); background: var(--bar); display: flex; flex-direction: column; gap: 8px; }
+  .line { display: flex; align-items: flex-end; gap: 8px; }
+  .round { width: 44px; height: 44px; flex: none; border-radius: 22px; border: 1px solid var(--line); background: none; color: #C9CFDA; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 18px; }
+  .mic { border: 0; background: var(--orange); color: #1A1206; }
+  .field { flex: 1; min-height: 44px; border-radius: 22px; border: 1px solid var(--line); background: var(--bg); color: var(--dim); padding: 0 6px 0 16px; font-size: 14px; display: flex; align-items: center; gap: 4px; }
+  .field .t { flex: 1; } .field .t.typed { color: var(--text); }
+  .inner { width: 34px; height: 34px; border-radius: 17px; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+  .status { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; padding: 0 4px; display: flex; flex-direction: column; gap: 3px; color: var(--muted); }
+  .status .sep { color: var(--dim); } .status .br { color: var(--green); } .status .mode { color: var(--orange); }
+  .tray { display: flex; gap: 8px; overflow: hidden; padding: 2px 2px 0; }
+  .thumb { position: relative; width: 56px; height: 56px; flex: none; border-radius: 12px; background: linear-gradient(135deg,#3B4A6B,#6B4A3B); border: 1px solid var(--line); }
+  .thumb.b { background: linear-gradient(135deg,#2E5B4E,#1F2F4A); }
+  .x { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 10px; background: #2A303C; border: 1.5px solid var(--bar); color: var(--text); font-size: 11px; display: flex; align-items: center; justify-content: center; }
+  .file { position: relative; height: 56px; flex: none; border-radius: 12px; background: var(--card); border: 1px solid var(--line); padding: 0 12px; display: flex; align-items: center; gap: 8px; max-width: 170px; }
+  .file .n { font-family: 'JetBrains Mono', monospace; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file .s { font-size: 11px; color: var(--muted); }
+  .ext { width: 30px; height: 34px; flex: none; border-radius: 6px; background: #2A303C; font-size: 9px; font-weight: 700; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 4px; color: #C9CFDA; }
+  .ext.pdf { background: #5A2A2A; color: #FFB4B4; } .ext.log { background: #2A3A5A; color: #B4CCFF; }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; background: #1A1F29; border-radius: 22px 22px 0 0; border-top: 1px solid var(--line); padding: 10px 16px 18px; box-shadow: 0 -20px 40px rgba(0,0,0,.5); }
+  .grab { width: 36px; height: 4px; border-radius: 2px; background: #3A4150; margin: 0 auto 14px; }
+  .scrim { position: absolute; inset: 0; background: rgba(5,7,10,.55); }
+  .grid4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+  .act { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 12px; color: #C9CFDA; padding: 6px 0; }
+  .act i { width: 52px; height: 52px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; color: var(--text); font-style: normal; }
+  .recent { display: flex; gap: 6px; margin-top: 14px; }
+  .recent .thumb { width: 64px; height: 64px; border-radius: 10px; }
+  .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 16px 0 8px; }
+  .pop { position: absolute; left: 12px; bottom: 112px; width: 210px; background: #1A1F29; border: 1px solid var(--line); border-radius: 14px; padding: 6px; box-shadow: 0 12px 30px rgba(0,0,0,.5); }
+  .pop div { height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 10px; font-size: 14px; border-radius: 10px; }
+  .pop div:first-child { background: #232A38; }
+  .img { width: 100%; height: 150px; border-radius: 10px; background: linear-gradient(135deg,#3B4A6B,#6B4A3B); }
+  .imgs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; } .imgs .img { height: 96px; }
+  .chip { display: flex; align-items: center; gap: 8px; background: #1A1F29; border-radius: 10px; padding: 8px 10px; }
+  .sess { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--line); background: var(--card); border-radius: 14px; margin-bottom: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 5px; flex: none; }
+  .sess .m { flex: 1; min-width: 0; } .sess .m b { font-size: 14px; font-weight: 600; display: block; } .sess .m span { font-size: 12px; color: var(--muted); }
+  .pick { font-size: 12px; color: var(--muted); }
+  .btn { height: 48px; border-radius: 14px; border: 0; background: var(--orange); color: #1A1206; font: inherit; font-weight: 600; font-size: 15px; width: 100%; margin-top: 6px; }
+  .rec { display: inline-block; font-size: 11px; font-weight: 600; color: #1A1206; background: var(--orange); border-radius: 6px; padding: 2px 6px; margin-left: 6px; vertical-align: 1px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Attachments in the session chat</h1>
+  <p class="lead">Draft for Shankar. Three ways to fit attach into the composer without making it more crowded, then what an attached message looks like and the share-to flow. The composer today is: <span style="font-family:'JetBrains Mono',monospace">/</span> · Message field · Mic, with the status line under it.</p>
+
+  <!-- ===================== OPTION A ===================== -->
+  <h2>Option A: "+" replaces "/" <span class="rec">my pick</span></h2>
+  <p class="note">The left button becomes "+". It opens one sheet with Photos, Files, Camera and Commands. Typing "/" in the field still opens the command picker, so nothing is lost. The composer keeps exactly three things in a row.</p>
+  <div class="row">
+    <div class="shot">
+      <div class="phone">
+        <div class="top"><b>pocketrocket</b><span>· 3 sessions</span></div>
+        <div class="chat">
+          <div class="claude">Done. Tests pass. Want me to open a PR?</div>
+        </div>
+        <div class="composer">
+          <div class="line">
+            <div class="round"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></div>
+            <div class="field"><span class="t">Message Claude</span></div>
+            <div class="round mic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div>
+          </div>
+          <div class="status"><span>app <span class="sep">│</span> <span class="br">main</span> <span class="sep">│</span> Opus 5.5 <span class="sep">│</span> 160k/1M</span><span class="mode">▸▸ accept edits</span></div>
+        </div>
+      </div>
+      <div class="cap">A1. Idle. Same layout as today, "/" swapped for "+".</div>
+    </div>
+
+    <div class="shot">
+      <div class="phone">
+        <div class="top"><b>pocketrocket</b><span>· 3 sessions</span></div>
+        <div class="chat"><div class="claude">Done. Tests pass. Want me to open a PR?</div></div>
+        <div class="composer">
+          <div class="line"><div class="round">+</div><div class="field"><span class="t">Message Claude</span></div><div class="round mic">●</div></div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <div class="grid4">
+            <div class="act"><i><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg></i>Photos</div>
+            <div class="act"><i><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></i>Files</div>
+            <div class="act"><i><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></i>Camera</div>
+            <div class="act"><i style="font-family:'JetBrains Mono',monospace;font-size:20px">/</i>Commands</div>
+          </div>
+          <div class="lbl">Recent screenshots</div>
+          <div class="recent"><div class="thumb"></div><div class="thumb b"></div><div class="thumb"></div><div class="thumb b"></div><div class="thumb"></div></div>
+        </div>
+      </div>
+      <div class="cap">A2. Tap "+". One tap on a recent screenshot attaches it, since screenshots are the most common thing to send. Photos and Files open Android's own pickers.</div>
+    </div>
+  </div>
+
+  <!-- ===================== OPTION B ===================== -->
+  <h2>Option B: paperclip inside the field</h2>
+  <p class="note">Like WhatsApp. The paperclip sits inside the message pill, "/" stays. Nothing new outside the field, but the field gets a bit narrower and the clip is a smaller target.</p>
+  <div class="row">
+    <div class="shot">
+      <div class="phone">
+        <div class="top"><b>pocketrocket</b><span>· 3 sessions</span></div>
+        <div class="chat"><div class="claude">Done. Tests pass. Want me to open a PR?</div></div>
+        <div class="composer">
+          <div class="line">
+            <div class="round">/</div>
+            <div class="field"><span class="t">Message Claude</span><span class="inner"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11l-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"/></svg></span></div>
+            <div class="round mic">●</div>
+          </div>
+          <div class="status"><span>app <span class="sep">│</span> <span class="br">main</span> <span class="sep">│</span> Opus 5.5 <span class="sep">│</span> 160k/1M</span><span class="mode">▸▸ accept edits</span></div>
+        </div>
+      </div>
+      <div class="cap">B1. Idle.</div>
+    </div>
+    <div class="shot">
+      <div class="phone">
+        <div class="top"><b>pocketrocket</b><span>· 3 sessions</span></div>
+        <div class="chat"><div class="claude">Done. Tests pass. Want me to open a PR?</div></div>
+        <div class="pop"><div>🖼&nbsp; Photos</div><div>📄&nbsp; Files</div><div>📷&nbsp; Camera</div></div>
+        <div class="composer">
+          <div class="line"><div class="round">/</div><div class="field"><span class="t">Message Claude</span><span class="inner" style="background:#232A38;color:var(--text)">⌇</span></div><div class="round mic">●</div></div>
+          <div class="status"><span>app <span class="sep">│</span> <span class="br">main</span> <span class="sep">│</span> Opus 5.5 <span class="sep">│</span> 160k/1M</span><span class="mode">▸▸ accept edits</span></div>
+        </div>
+      </div>
+      <div class="cap">B2. Tap the clip: a small menu above the field.</div>
+    </div>
+  </div>
+
+  <!-- ===================== OPTION C ===================== -->
+  <h2>Option C: long-press "/"</h2>
+  <p class="note">No visible change at all: tap "/" for commands, long-press it for attach. Cleanest, but nobody finds a long-press, including you in three weeks. Listed so you can rule it out.</p>
+
+  <!-- ===================== ATTACHED STATE ===================== -->
+  <h2>With attachments (any option)</h2>
+  <p class="note">A tray appears above the field only while something is attached, so the empty composer never grows. Images show as thumbnails, other files as a chip with name and size. ✕ removes one. Mic turns into Send once there is text or an attachment.</p>
+  <div class="row">
+    <div class="shot">
+      <div class="phone">
+        <div class="top"><b>pocketrocket</b><span>· 3 sessions</span></div>
+        <div class="chat"><div class="claude">Done. Tests pass. Want me to open a PR?</div></div>
+        <div class="composer">
+          <div class="tray">
+            <div class="thumb"><span class="x">✕</span></div>
+            <div class="thumb b"><span class="x">✕</span></div>
+            <div class="file"><span class="ext log">LOG</span><span><div class="n">build.log</div><div class="s">84 KB</div></span><span class="x">✕</span></div>
+          </div>
+          <div class="line">
+            <div class="round">+</div>
+            <div class="field"><span class="t typed">The login button is cut off, see these</span></div>
+            <div class="round mic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+          </div>
+          <div class="status"><span>app <span class="sep">│</span> <span class="br">main</span> <span class="sep">│</span> Opus 5.5 <span class="sep">│</span> 160k/1M</span><span class="mode">▸▸ accept edits</span></div>
+        </div>
+      </div>
+      <div class="cap">Two screenshots and a log ready to send.</div>
+    </div>
+
+    <div class="shot">
+      <div class="phone">
+        <div class="top"><b>pocketrocket</b><span>· 3 sessions</span></div>
+        <div class="chat">
+          <div class="me">
+            <div class="imgs"><div class="img"></div><div class="img" style="background:linear-gradient(135deg,#2E5B4E,#1F2F4A)"></div></div>
+            <div class="chip"><span class="ext log">LOG</span><span><div class="n" style="font-family:'JetBrains Mono',monospace;font-size:12px">build.log</div><div style="font-size:11px;color:var(--muted)">84 KB</div></span></div>
+            <span>The login button is cut off, see these</span>
+          </div>
+          <div class="claude">I can see it: the button sits under the keyboard inset on the second screenshot. The log shows…</div>
+        </div>
+        <div class="composer">
+          <div class="line"><div class="round">+</div><div class="field"><span class="t">Message Claude</span></div><div class="round mic">●</div></div>
+          <div class="status"><span>app <span class="sep">│</span> <span class="br">main</span> <span class="sep">│</span> Opus 5.5 <span class="sep">│</span> 160k/1M</span><span class="mode">▸▸ accept edits</span></div>
+        </div>
+      </div>
+      <div class="cap">Sent. Tap an image to view it full screen; tap a file to open it.</div>
+    </div>
+  </div>
+
+  <!-- ===================== SHARE TO ===================== -->
+  <h2>Share to PocketRocket from another app</h2>
+  <p class="note">From Gallery, Files, Chrome or WhatsApp: Share → PocketRocket. A sheet asks which session; the one that needs you or was used last is first. "New session" asks for the project.</p>
+  <div class="row">
+    <div class="shot">
+      <div class="phone" style="background:#0B0D12">
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:13px">(Gallery, behind)</div>
+        <div class="scrim"></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+            <div class="thumb" style="width:44px;height:44px;border-radius:10px"></div>
+            <div><div style="font-size:15px;font-weight:600">Send 1 screenshot to…</div><div class="pick">Screenshot_20261029_1412.png</div></div>
+          </div>
+          <div class="sess"><span class="dot" style="background:#F5B83D"></span><div class="m"><b>pocketrocket · fix clone list</b><span>Needs you · 2 min ago</span></div><span style="color:var(--orange)">◉</span></div>
+          <div class="sess"><span class="dot" style="background:var(--blue)"></span><div class="m"><b>pocketrocket · attachments</b><span>Working</span></div><span style="color:var(--dim)">○</span></div>
+          <div class="sess"><span class="dot" style="background:#5A6272"></span><div class="m"><b>notes-site · hero copy</b><span>Paused · yesterday</span></div><span style="color:var(--dim)">○</span></div>
+          <div class="sess" style="background:none;border-style:dashed"><span style="width:10px;color:var(--muted)">+</span><div class="m"><b>New session</b><span>Pick a project</span></div></div>
+          <button class="btn">Attach and open chat</button>
+        </div>
+      </div>
+      <div class="cap">Opens the chat with the screenshot already in the tray, so you add a line before sending.</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

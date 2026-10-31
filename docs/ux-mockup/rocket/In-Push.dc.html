@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Push or Auto mode: confirm</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #07090E; color: #E8EAF0; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; justify-content: flex-end; padding: 16px; overflow: hidden">
+  <div style="display: flex; flex-direction: column; gap: 18px; padding: 24px 22px 22px; border-radius: 34px; background: #F2F4F8; color: #12151C">
+    <div style="font-size: 14px; color: #4A5160">Push pocketrocket</div>
+    <div style="font-size: 18px; font-weight: 600">pocketrocket wants to run</div>
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 27px; line-height: 1.2; font-weight: 500; letter-spacing: -0.6px; color: #B23A0C">git push origin feat/auth</div>
+    <div style="display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: #3A404C"><span>3 commits on feat/auth</span><span>Using this workspace's GitHub account</span></div>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+      <button style="height: 60px; border-radius: 30px; border: 0; background: #E2E5EA; color: #12151C; font: inherit; font-size: 16px; font-weight: 600">Deny</button>
+      <button style="height: 60px; border-radius: 30px; border: 0; background: #12151C; color: #F2F4F8; font: inherit; font-size: 16px; font-weight: 600">Allow</button>
+    </div>
+    <div style="font-size: 13px; color: #4A5160; text-align: center">Say "yes" to confirm. Fingerprint on a locked phone.</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

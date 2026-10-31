@@ -3,6 +3,7 @@ package com.termux.app;
 import android.app.Application;
 import android.content.Context;
 
+import com.pocketrocket.PocketRocket;
 import com.termux.BuildConfig;
 import com.termux.shared.errors.Error;
 import com.termux.shared.logger.Logger;
@@ -33,6 +34,13 @@ public class TermuxApplication extends Application {
         setLogConfig(context);
 
         Logger.logDebug("Starting Application");
+
+        // PocketRocket's setup screen installs the bootstrap through TermuxInstaller, with its own progress UI
+        PocketRocket.setBootstrapInstaller((activity, whenDone) -> TermuxInstaller.setupBootstrapIfNeeded(activity, whenDone, false));
+        // PocketRocket makes ~/storage itself once storage access is given (no termux-setup-storage)
+        PocketRocket.setStorageLinker(TermuxInstaller::setupStorageSymlinks);
+        // PocketRocket's chat sessions come back from disk, paused, so the Home grid shows them
+        PocketRocket.init(context);
 
         // Set TermuxBootstrap.TERMUX_APP_PACKAGE_MANAGER and TermuxBootstrap.TERMUX_APP_PACKAGE_VARIANT
         TermuxBootstrap.setTermuxPackageManagerAndVariant(BuildConfig.TERMUX_PACKAGE_VARIANT);

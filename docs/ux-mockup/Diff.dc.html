@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Diff</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #0F1218; color: #E8EAF0; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <div style="padding: 18px 12px 8px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #2A303C">
+    <a href="Git.dc.html" aria-label="Back" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></a>
+    <div style="flex: 1; min-width: 0"><div style="font-family: 'JetBrains Mono', monospace; font-size: 14px">session.ts</div><div style="font-size: 12px; color: #9AA3B2; font-family: 'JetBrains Mono', monospace">app/src/auth · <span style="color: #5BD69A">+12</span> <span style="color: #FF8F8F">−3</span></div></div>
+    <span style="font-size: 12px; color: #9AA3B2; padding-right: 8px">1 of 3 ›</span>
+  </div>
+  <div style="flex: 1; overflow: auto; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.7">
+    <div style="padding: 6px 12px; color: #7AB4FF; background: #141B28">@@ -38,9 +38,18 @@ export async function refresh()</div>
+    <sc-for list="{{lines}}" as="l" hint-placeholder-count="12">
+      <div style="{{l.style}}"><span style="display: inline-block; width: 28px; color: #4A5262; text-align: right; margin-right: 10px">{{l.n}}</span><span style="white-space: pre">{{l.text}}</span></div>
+    </sc-for>
+  </div>
+  <div style="padding: 12px 18px 22px; border-top: 1px solid #2A303C; display: flex; gap: 8px">
+    <a href="Session.dc.html" style="flex: 1; display: flex; align-items: center; justify-content: center; height: 48px; border-radius: 14px; background: #20252F; font-size: 14px; font-weight: 600">Comment to Claude</a>
+    <button style="flex: 1; height: 48px; border-radius: 14px; border: 1px solid #5A2A30; background: none; color: #FF8F8F; font: inherit; font-size: 14px">Discard file</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const row = (kind, n, text) => ({ n, text: (kind === '+' ? '+ ' : kind === '-' ? '− ' : '  ') + text,
+      style: 'padding: 0 12px; ' + (kind === '+' ? 'background: rgba(91,214,154,0.10); color: #B8F0D2' : kind === '-' ? 'background: rgba(255,107,107,0.10); color: #FFC2C2' : 'color: #C9CFDA') });
+    return { lines: [
+      row(' ', 38, 'const res = await api.post(url, {'),
+      row(' ', 39, '  token: store.refreshToken,'),
+      row(' ', 40, '});'),
+      row('-', 41, 'if (res.status === 401) {'),
+      row('-', 42, '  return store.token;'),
+      row('-', 43, '}'),
+      row('+', 41, 'if (res.status === 401) {'),
+      row('+', 42, '  store.clear();'),
+      row('+', 43, '  return retry(() => login(), {'),
+      row('+', 44, '    attempts: 2,'),
+      row('+', 45, '    backoffMs: 300,'),
+      row('+', 46, '  });'),
+      row('+', 47, '}'),
+      row(' ', 48, 'store.token = res.body.token;'),
+      row(' ', 49, 'return store.token;')
+    ]};
+  }
+}
+</script>
+</body>
+</html>

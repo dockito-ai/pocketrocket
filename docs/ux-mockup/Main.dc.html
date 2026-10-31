@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Home</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #0F1218; color: #E8EAF0; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; position: relative; overflow: hidden">
+  <div style="padding: 28px 24px 14px; display: flex; align-items: center; justify-content: space-between">
+    <div style="font-size: 22px; font-weight: 700; letter-spacing: -0.3px">Sessions</div>
+    <div style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: #9AA3B2; background: #181C24; border: 1px solid #2A303C; border-radius: 999px; padding: 5px 10px">
+      <span style="width: 7px; height: 7px; border-radius: 4px; background: #F5B83D"></span>1 needs you
+      <span style="width: 7px; height: 7px; border-radius: 4px; background: #7AB4FF; margin-left: 6px"></span>2 working
+    </div>
+  </div>
+
+  <div role="tablist" aria-label="Projects" style="display: flex; gap: 8px; padding: 0 24px 14px; overflow-x: auto; border-bottom: 1px solid #1E232D">
+    <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+      <button role="tab" aria-selected="{{t.selected}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}<span style="{{t.countStyle}}">{{t.count}}</span></button>
+    </sc-for>
+  </div>
+
+  <div style="flex: 1; overflow: auto; padding: 18px 24px 130px; display: flex; flex-direction: column; gap: 22px">
+    <sc-for list="{{groups}}" as="g" hint-placeholder-count="2">
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+          <button onClick="{{g.toggle}}" aria-expanded="{{g.open}}" style="display: flex; align-items: center; gap: 8px; min-height: 44px; background: none; border: 0; padding: 0; color: #C9CFDA; font: inherit; font-size: 13px; cursor: pointer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="{{g.chevStyle}}"><path d="M9 6l6 6-6 6"></path></svg>
+            <span style="font-family: 'JetBrains Mono', monospace">{{g.path}}</span>
+            <span style="font-size: 11px; color: #9AA3B2; background: #181C24; border: 1px solid #2A303C; border-radius: 999px; padding: 1px 7px">{{g.count}}</span>
+          </button>
+          <a href="Workspace.dc.html" style="font-size: 12px; color: #9AA3B2; padding: 12px 0">Open ›</a>
+        </div>
+        <sc-if value="{{g.open}}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column; gap: 10px">
+            <sc-for list="{{g.cards}}" as="c" hint-placeholder-count="2">
+              <a href="Session.dc.html" style="{{c.cardStyle}}">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px">
+                  <div style="font-size: 14px; font-weight: 600">{{c.title}}</div>
+                  <span style="{{c.chipStyle}}"><span style="{{c.dotStyle}}"></span>{{c.status}}</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #9AA3B2">
+                  <span style="font-family: 'JetBrains Mono', monospace">{{c.where}}</span><span>·</span><span>{{c.profile}}</span>
+                </div>
+                <div style="font-size: 12px; color: #B4BBC8; line-height: 1.45; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical">{{c.last}}</div>
+              </a>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </sc-for>
+  </div>
+
+  <a href="NewSession.dc.html" style="position: absolute; right: 24px; bottom: 96px; display: flex; align-items: center; gap: 8px; background: #FF8A3D; color: #1A1206; font-weight: 600; font-size: 14px; padding: 14px 18px; border-radius: 16px">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>New session
+  </a>
+
+  <nav style="position: absolute; left: 0; right: 0; bottom: 0; height: 76px; background: #141821; border-top: 1px solid #2A303C; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center; text-align: center; font-size: 11px">
+    <a href="Main.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; color: #FF8A3D"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>Sessions</a>
+    <a href="Workspaces.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; color: #9AA3B2"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>Workspaces</a>
+    <a href="Settings.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; color: #9AA3B2"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><circle cx="12" cy="12" r="8"></circle></svg>Settings</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'all', closed: {} };
+  }
+  renderVals() {
+    const tone = {
+      'Needs you': ['#F5B83D', 'rgba(245,184,61,0.14)', '#5A4520'],
+      'Working': ['#7AB4FF', 'rgba(122,180,255,0.12)', '#232833'],
+      'Done': ['#5BD69A', 'rgba(91,214,154,0.12)', '#232833'],
+      'Error': ['#FF6B6B', 'rgba(255,107,107,0.12)', '#5A2A30'],
+      'Paused': ['#9AA3B2', 'rgba(154,163,178,0.12)', '#232833']
+    };
+    const card = (status, title, where, last, profile) => {
+      const t = tone[status];
+      return {
+        status, title, where, last, profile,
+        cardStyle: 'display: flex; flex-direction: column; gap: 6px; box-sizing: border-box; padding: 14px 16px; border-radius: 14px; background: #161A22; border: 1px solid ' + t[2],
+        chipStyle: 'display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; font-size: 10.5px; font-weight: 600; padding: 3px 8px; border-radius: 999px; color: ' + t[0] + '; background: ' + t[1],
+        dotStyle: 'width: 6px; height: 6px; border-radius: 3px; background: ' + t[0]
+      };
+    };
+    const all = [
+      { id: 'pocketrocket', label: 'pocketrocket', path: 'work/pocketrocket', cards: [
+        card('Needs you', 'Fix login bug', 'app · main', 'Allow Bash? npm test -- auth', 'personal'),
+        card('Working', 'API tests', 'api · feat/auth', 'Agent: running the auth test suite (3 of 7)', 'personal'),
+        card('Done', 'Shared types', 'shared · main', 'Added Session and Profile types, both packages build.', 'work')
+      ]},
+      { id: 'notes', label: 'notes', path: 'personal/notes', cards: [
+        card('Working', 'Tidy notes', 'notes · main', 'Read 14 files, merging duplicates', 'personal'),
+        card('Paused', 'Blog draft', 'notes · drafts', 'Resume to continue where you left off', 'personal')
+      ]}
+    ];
+    const tab = this.state.tab;
+    const closed = this.state.closed;
+    const total = all.reduce((n, g) => n + g.cards.length, 0);
+    const tabList = [{ id: 'all', label: 'All', count: total }].concat(all.map((g) => ({ id: g.id, label: g.label, count: g.cards.length })));
+    const tabs = tabList.map((t) => {
+      const sel = t.id === tab;
+      return {
+        label: t.label, count: t.count, selected: sel ? 'true' : 'false',
+        pick: () => this.setState({ tab: t.id }),
+        style: 'display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; min-height: 36px; padding: 0 14px; border-radius: 999px; font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; ' + (sel ? 'background: #E8EAF0; color: #0F1218; border: 1px solid #E8EAF0' : 'background: transparent; color: #C9CFDA; border: 1px solid #2A303C'),
+        countStyle: 'font-size: 11px; ' + (sel ? 'color: #4A5160' : 'color: #9AA3B2')
+      };
+    });
+    const groups = all
+      .filter((g) => tab === 'all' || g.id === tab)
+      .map((g) => {
+        const open = !closed[g.id];
+        return {
+          path: g.path, cards: g.cards, count: g.cards.length, open,
+          chevStyle: 'transition: transform 0.15s; transform: rotate(' + (open ? '90deg' : '0deg') + ')',
+          toggle: () => this.setState({ closed: Object.assign({}, closed, { [g.id]: open }) })
+        };
+      });
+    return { tabs, groups };
+  }
+}
+</script>
+</body>
+</html>

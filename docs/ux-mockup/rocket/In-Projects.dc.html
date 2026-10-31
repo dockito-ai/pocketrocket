@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>What it can do per project</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #0F1218; color: #E8EAF0; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; gap: 16px; padding: 18px 20px">
+  <div style="display: flex; align-items: center; gap: 8px"><a href="In-Assistant.dc.html" aria-label="Back" style="font-size: 24px; width: 32px">‹</a><span style="font-size: 18px; font-weight: 600">Projects</span></div>
+  <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #C9CFDA">Rocket knows your workspaces, their sessions and branches. Turn one off and Rocket can only tell you its status.</p>
+  <div style="display: flex; flex-direction: column">
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 2px; border-bottom: 1px solid #1E232D"><span style="font-family: 'JetBrains Mono', monospace; font-size: 14px">work/api-server</span><button aria-label="Rocket can act in api-server" aria-pressed="true" style="width: 48px; height: 28px; border-radius: 14px; border: 0; background: #FF8A3D; display: flex; justify-content: flex-end; padding: 3px"><span style="width: 22px; height: 22px; border-radius: 50%; background: #1A0D04"></span></button></div>
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 2px; border-bottom: 1px solid #1E232D"><span style="font-family: 'JetBrains Mono', monospace; font-size: 14px">work/pocketrocket</span><button aria-label="Rocket can act in pocketrocket" aria-pressed="true" style="width: 48px; height: 28px; border-radius: 14px; border: 0; background: #FF8A3D; display: flex; justify-content: flex-end; padding: 3px"><span style="width: 22px; height: 22px; border-radius: 50%; background: #1A0D04"></span></button></div>
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 2px"><span style="font-family: 'JetBrains Mono', monospace; font-size: 14px">personal/notes</span><button aria-label="Rocket can act in notes" aria-pressed="false" style="width: 48px; height: 28px; border-radius: 14px; border: 0; background: #2A303C; display: flex; padding: 3px"><span style="width: 22px; height: 22px; border-radius: 50%; background: #E8EAF0"></span></button></div>
+  </div>
+  <div style="display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 14px; background: #161A22; border: 1px solid #232833; font-size: 13px; line-height: 1.4">
+    <div style="font-size: 11px; font-weight: 600; color: #AEB6C4; letter-spacing: 0.5px">IN THESE PROJECTS</div>
+    <div style="display: flex; justify-content: space-between; gap: 12px"><span>Status, tokens, show changes</span><span style="color: #5BD69A; flex: none">Just does it</span></div>
+    <div style="display: flex; justify-content: space-between; gap: 12px"><span>Start agents, send messages, compact</span><span style="color: #5BD69A; flex: none">Just does it</span></div>
+    <div style="display: flex; justify-content: space-between; gap: 12px"><span>Allow, push, Auto mode</span><span style="color: #F5B83D; flex: none">Asks you first</span></div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

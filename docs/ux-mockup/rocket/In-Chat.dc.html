@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chat records what Rocket did</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #0F1218; color: #E8EAF0; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <div style="padding: 18px 12px 10px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #2A303C">
+    <button aria-label="Back" style="width: 44px; height: 44px; border: 0; background: none; color: #E8EAF0; font-size: 22px">‹</button>
+    <div style="flex: 1; min-width: 0"><div style="font-size: 16px; font-weight: 600">pocketrocket</div><div style="font-size: 12px; color: #AEB6C4">Fix login bug</div></div>
+    <button aria-label="Git changes" style="height: 36px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid #2A303C; border-radius: 10px; background: none; color: #C9CFDA; font: inherit; font-size: 12px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="6" cy="6" r="2.5"></circle><circle cx="6" cy="18" r="2.5"></circle><circle cx="18" cy="9" r="2.5"></circle><path d="M6 8.5v7M18 11.5c0 3-4 3-9.5 4.5"></path></svg>4 changed</button>
+    <button aria-label="Open in terminal" style="width: 44px; height: 44px; border: 0; background: none; color: #C9CFDA; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 17l6-5-6-5M12 19h8"></path></svg></button>
+  </div>
+  <div style="flex: 1; padding: 14px; display: flex; flex-direction: column; gap: 10px; overflow: hidden">
+    <div style="align-self: flex-end; max-width: 82%; background: #263048; padding: 10px 14px; border-radius: 16px 16px 4px 16px; font-size: 14px; line-height: 1.45">Login fails on the second try. Find why and fix it.</div>
+    <div style="font-size: 14px; line-height: 1.5; color: #DCE0E8">The refresh path reuses the old token. Fixing it, then running the auth tests.</div>
+    <div style="display: flex; justify-content: space-between; background: #181C24; border: 1px solid #2A303C; border-radius: 12px; padding: 10px 12px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px"><span>Edit src/auth/session.ts</span><span style="color: #5BD69A">+12 −3</span></div>
+    <div style="align-self: center; font-size: 12px; color: #FF9A57">Allowed by voice over earbuds · 09:14</div>
+    <div style="display: flex; justify-content: space-between; background: #181C24; border: 1px solid #2A303C; border-radius: 12px; padding: 10px 12px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px"><span>Bash npm test -- auth</span><span style="color: #FF8A8A">2 failed</span></div>
+    <div style="align-self: flex-end; max-width: 82%; background: #263048; padding: 10px 14px; border-radius: 16px 16px 4px 16px; font-size: 14px; line-height: 1.45">Fix the failing tests, then open a PR.</div>
+    <div style="align-self: flex-end; font-size: 12px; color: #FF9A57">Sent through Rocket · 09:21</div>
+    <div style="font-size: 14px; line-height: 1.5; color: #DCE0E8">Both failures are expired tokens. Fixing them now.</div>
+  </div>
+  <div style="padding: 8px 12px 14px; border-top: 1px solid #2A303C; background: #141821; display: flex; flex-direction: column; gap: 8px">
+    <div style="display: flex; align-items: center; gap: 8px">
+      <button aria-label="Slash commands" style="width: 44px; height: 44px; border-radius: 22px; border: 1px solid #2A303C; background: none; color: #C9CFDA; font-family: 'JetBrains Mono', monospace; font-size: 18px">/</button>
+      <label style="flex: 1; display: flex"><span style="position: absolute; left: -9999px">Message</span><input placeholder="Message Claude" style="flex: 1; min-width: 0; height: 44px; box-sizing: border-box; border-radius: 22px; border: 1px solid #2A303C; background: #0F1218; color: #E8EAF0; padding: 0 16px; font: inherit; font-size: 14px"></label>
+      <button aria-label="Dictate into this chat" style="width: 44px; height: 44px; border-radius: 22px; border: 0; background: #FF8A3D; color: #1A1206; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></button>
+    </div>
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: #AEB6C4; padding: 0 4px">app │ feat/auth │ Opus 5.5 │ 160k/1M</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

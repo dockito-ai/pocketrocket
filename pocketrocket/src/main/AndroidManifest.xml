@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Our activities opt in to predictive back (enableOnBackInvokedCallback); Termux's own keep onBackPressed. -->
+
+    <!-- Dictation in the chat box (R13): Android's speech recognition, asked for at the first mic tap. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Hey Rocket: a foreground service with the mic open (WakeWordService), and the notification that opens the popup
+         when Android won't let a background app do it itself. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
+    <!-- The fingerprint popup for Rocket's sensitive actions (decision 57). -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+
+    <!-- App update from Settings (decision 26): hands a downloaded, SHA-256-checked release APK to Android's
+         installer. Android still asks for "Install unknown apps" and a confirm tap. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!-- Recent screenshots in the chat's "+" sheet (R16), asked for only when the user taps "Show my recent
+         screenshots". On Android 14+ the user may allow only some photos. Older versions use READ_EXTERNAL_STORAGE,
+         which the app already declares. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+
+    <!-- Lets the sign-in sheet find the browser's Custom Tabs service (Android 11+ package visibility). -->
+    <queries>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+        <!-- Lets dictation find the speech recognition service (Android 11+ package visibility). -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <!-- Lets Rocket find the phone's text-to-speech engines. -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
+    <application>
+        <!-- PocketRocket's own screens. The launcher entry; TermuxActivity is opened from here for sessions. -->
+        <activity
+            android:name="com.pocketrocket.MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.PocketRocket"
+            android:windowSoftInputMode="adjustResize"
+            android:enableOnBackInvokedCallback="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Session chat: all sessions in a pager, opened from the Home grid. -->
+        <activity
+            android:name="com.pocketrocket.ui.chat.SessionActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode"
+            android:theme="@style/Theme.PocketRocket"
+            android:windowSoftInputMode="adjustResize"
+            android:enableOnBackInvokedCallback="true" />
+
+        <!-- Git viewer for one repo folder: panel, diffs, commits, read-only browsing (GitScreens.open). -->
+        <activity
+            android:name="com.pocketrocket.ui.git.GitActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode"
+            android:theme="@style/Theme.PocketRocket"
+            android:windowSoftInputMode="adjustResize"
+            android:enableOnBackInvokedCallback="true" />
+
+        <!-- Share to PocketRocket (R16): files or text from any app go to a session's chat box. Labelled apart from
+             Termux's own share target (FileShareReceiverActivity, saves to ~/downloads), which stays. -->
+        <activity
+            android:name="com.pocketrocket.ui.share.ShareActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode"
+            android:exported="true"
+            android:label="Send to session"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity="${applicationId}.share"
+            android:theme="@style/Theme.PocketRocket.Share">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
+
+        <!-- Rocket's popup, over other apps and the lock screen. ACTION_ASSIST makes it choosable as the phone's assistant app,
+             which is what the power button uses where the phone allows it. Deliberately not a VoiceInteractionService: that
+             also makes its recogniser the phone's default speech recognition, and a sideloaded one gains no hotword from it.
+             VOICE_COMMAND and VOICE_SEARCH_HANDS_FREE are what Android sends for a long-press on a headset button; no media
+             session is involved, so play and pause stay with the music app. -->
+        <activity
+            android:name="com.pocketrocket.assistant.AssistantActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:label="Rocket"
+            android:launchMode="singleTask"
+            android:taskAffinity="${applicationId}.assistant"
+            android:theme="@style/Theme.PocketRocket.Popup">
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VOICE_COMMAND" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.speech.action.VOICE_SEARCH_HANDS_FREE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Approving something Rocket asks about (mockup A-Approve). Deliberately not over the lock screen. -->
+        <activity
+            android:name="com.pocketrocket.assistant.ApprovalActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:label="Rocket"
+            android:launchMode="singleTask"
+            android:taskAffinity="${applicationId}.approval"
+            android:theme="@style/Theme.PocketRocket" />
+
+        <!-- Hey Rocket (decision 54). Only while the mic is wanted; WakeWord decides. -->
+        <service
+            android:name="com.pocketrocket.assistant.WakeWordService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <!-- Hands chat attachments to the camera (to write a photo) and to other apps (to open one). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.pocketrocket.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/pocketrocket_files" />
+        </provider>
+
+        <!-- PackageInstaller's status for an app update: opens Android's confirm screen, reports failures. -->
+        <receiver
+            android:name="com.pocketrocket.appupdate.ApkInstaller$InstallStatusReceiver"
+            android:exported="false" />
+
+        <!-- Clones in the background (decision 42): keeps git alive while a repo clones, with its progress as the
+             notification. specialUse like TermuxService (no time cap); FOREGROUND_SERVICE_SPECIAL_USE is in app's manifest. -->
+        <service
+            android:name="com.pocketrocket.keepalive.CloneService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps a git clone the user started running while they leave the app" />
+        </service>
+
+        <!-- Backup and restore in the background (decision 53), the same way. -->
+        <service
+            android:name="com.pocketrocket.keepalive.BackupService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps a backup or restore the user started running while they leave the app" />
+        </service>
+
+        <!-- Allow and Deny on a session's "Needs you" notification. -->
+        <receiver
+            android:name="com.pocketrocket.notifications.NotificationActionReceiver"
+            android:exported="false" />
+    </application>
+
+</manifest>

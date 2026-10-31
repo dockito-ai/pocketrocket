@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PocketRocket · session notification</title>
+<style>
+  :root { --bg:#1b1d22; --card:#2a2c31; --text:#e8eaf0; --muted:#9aa3b2; --btn:#8fd0c0;
+          --amber:#F5B83D; --red:#FF6B6B; --blue:#7AB4FF; --green:#5BD69A; --flame:#FF8A3D; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 system-ui, Roboto, sans-serif; padding:20px 14px 60px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  h2 { font-size:15px; color:var(--muted); font-weight:500; margin:28px 4px 10px; }
+  p.note { color:var(--muted); margin:6px 4px 0; font-size:13px; }
+  .n { background:var(--card); border-radius:26px; padding:16px 18px 14px; max-width:420px; }
+  .head { display:flex; align-items:center; gap:10px; color:var(--muted); font-size:13.5px; }
+  .icon { width:30px; height:30px; border-radius:50%; display:grid; place-items:center; font-size:15px; color:#1a1206; }
+  .clock { margin-left:2px; }
+  .chev { margin-left:auto; width:28px; height:28px; border-radius:50%; background:#3a3c42; display:grid; place-items:center; font-size:12px; }
+  .body { padding-left:40px; margin-top:8px; }
+  .title { font-weight:600; font-size:16.5px; }
+  .strip { margin-top:3px; color:var(--muted); }
+  .strip span { margin-right:16px; white-space:nowrap; }
+  .strip b { margin-right:12px; }
+  .line b { color:var(--text); }
+  .line { margin-top:5px; color:var(--muted); }
+  .line b { margin-right:8px; }
+  .more { color:var(--muted); font-size:13px; margin-top:6px; }
+  .actions { display:flex; gap:26px; padding-left:40px; margin-top:14px; font-weight:500; }
+  .actions a { color:var(--btn); text-decoration:none; }
+  .d { font-size:12px; margin-right:4px; }
+  .amber{color:var(--amber)} .red{color:var(--red)} .blue{color:var(--blue)} .green{color:var(--green)}
+</style>
+</head>
+<body>
+<h1>Session notification</h1>
+<p class="note">The ongoing PocketRocket notification while chat sessions run. Same colours as the tab dots: amber needs you, red error, blue working, green done.</p>
+
+<h2>1 · One needs you, others busy (collapsed)</h2>
+<div class="n">
+  <div class="head"><div class="icon" style="background:var(--amber)">🚀</div>PocketRocket · <span class="clock">12:41</span><div class="chev">⌄</div></div>
+  <div class="body">
+    <div class="title">pocketrocket needs you</div>
+    <div class="strip"><b class="amber">1W</b><b class="red">1E</b><b class="blue">2IP</b><b class="green">1D</b></div>
+  </div>
+  <div class="actions"><a>Open pocketrocket</a><a>Stop all</a></div>
+</div>
+<p class="note">W waiting on you · E error · IP in progress · D done. Rocket and buttons tint amber. The clock counts up from when sessions started working.</p>
+
+<h2>2 · Same, expanded</h2>
+<div class="n">
+  <div class="head"><div class="icon" style="background:var(--amber)">🚀</div>PocketRocket · <span class="clock">12:41</span><div class="chev">⌃</div></div>
+  <div class="body">
+    <div class="title">pocketrocket needs you</div>
+    <div class="line"><span class="d amber">●</span><b>pocketrocket</b>needs you</div>
+    <div class="line"><span class="d red">●</span><b>dockito-api</b>error</div>
+    <div class="line"><span class="d blue">●</span><b>blog</b>working</div>
+    <div class="line"><span class="d blue">●</span><b>home</b>working</div>
+    <div class="line"><span class="d green">●</span><b>scripts</b>done</div>
+  </div>
+  <div class="actions"><a>Open pocketrocket</a><a>Stop all</a></div>
+</div>
+
+<h2>3 · An error, nothing waiting</h2>
+<div class="n">
+  <div class="head"><div class="icon" style="background:var(--red)">🚀</div>PocketRocket · <span class="clock">3:07</span><div class="chev">⌄</div></div>
+  <div class="body">
+    <div class="title">dockito-api hit an error</div>
+    <div class="strip"><b class="red">1E</b><b class="blue">1IP</b></div>
+  </div>
+  <div class="actions"><a>Open dockito-api</a><a>Stop all</a></div>
+</div>
+
+<h2>4 · Just working, with a terminal open</h2>
+<div class="n">
+  <div class="head"><div class="icon" style="background:var(--flame)">🚀</div>PocketRocket · <span class="clock">0:52</span><div class="chev">⌄</div></div>
+  <div class="body">
+    <div class="title">3 sessions working</div>
+    <div class="strip"><b class="blue">3IP</b><b class="green">2D</b><span>· 1 terminal</span></div>
+  </div>
+  <div class="actions"><a>Stop all</a></div>
+</div>
+<p class="note">Orange (the app colour) when nothing needs a look. “Acquire wakelock” only shows when a terminal is open: chat sessions get the app’s own lock, taken and dropped automatically.</p>
+
+<h2>Later, if you want it</h2>
+<p class="note">• What each session is doing right now (“Running tests…”) on its line. It changes often, so updates would need throttling.<br>
+• Tinting the whole notification background by state. Some phone brands ignore this.</p>
+</body>
+</html>

@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spike page</title>
+  <style>
+    body { font: 18px system-ui, sans-serif; margin: 0; padding: 24px; background: #f4f1ea; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 800px) { .grid { grid-template-columns: repeat(3, 1fr); } body { background: #dfe9f5; } }
+    .card { background: #fff; border-radius: 8px; padding: 16px; }
+    button { font-size: 20px; padding: 12px 20px; }
+  </style>
+</head>
+<body>
+  <h1 id="title">Web testing spike</h1>
+  <div class="grid">
+    <div class="card">One</div><div class="card">Two</div><div class="card">Three</div>
+  </div>
+  <p><button id="go">Press me</button> <span id="result">not clicked</span></p>
+  <script>
+    let n = 0;
+    document.getElementById('go').addEventListener('click', () => {
+      document.getElementById('result').textContent = 'clicked ' + (++n);
+    });
+    console.error('deliberate spike error: widget failed to load');
+  </script>
+</body>
+</html>

@@ -1,0 +1,1046 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rocket prototype</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --flame: #FF8A3D; --flame-deep: #F0561E; --amber: #F5B83D; --blue: #7AB4FF; --green: #5BD69A; --red: #FF6B6B;
+  --text: #F2F4F8; --soft: #C3CAD6; --muted: #8C95A5; --line: rgba(255,255,255,.09); --glass: rgba(17,20,27,.84);
+  --sans: Inter, system-ui, -apple-system, Roboto, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; margin: 0; }
+body { background: #090B10; color: var(--text); font-family: var(--sans); font-size: 15px; line-height: 1.45; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--flame); outline-offset: 2px; }
+svg { display: block; }
+[hidden] { display: none !important; }
+
+.stage { min-height: 100%; display: flex; align-items: center; justify-content: center; gap: 72px; padding: 24px; }
+.phone-wrap { flex: none; }
+.phone { position: relative; width: 390px; height: 820px; transform-origin: top left; }
+.frame { position: absolute; inset: 0; border-radius: 54px; background: #000; padding: 9px; box-shadow: 0 0 0 1.5px #2b2f38, 0 40px 90px rgba(0,0,0,.65); }
+.side { position: absolute; right: -5px; top: 190px; width: 5px; height: 76px; border-radius: 0 4px 4px 0; background: #343943; transition: background .15s; }
+.side:hover { background: var(--flame); }
+.side-label { position: absolute; right: -96px; top: 214px; font-size: 12px; color: var(--muted); width: 84px; pointer-events: none; }
+.screen { position: relative; width: 100%; height: 100%; border-radius: 45px; overflow: clip; isolation: isolate;
+  background: radial-gradient(120% 60% at 85% 100%, rgba(240,86,30,.5), transparent 62%), radial-gradient(90% 55% at 5% 0%, #1B3F73, transparent 70%), #081226; }
+.bar { position: absolute; z-index: 30; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 16px 28px 0; font-size: 13px; font-weight: 500; }
+.bar-right { display: flex; align-items: center; gap: 8px; }
+.mic-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); opacity: 0; transition: opacity .2s; }
+.mic-dot.on { opacity: 1; }
+.camera { position: absolute; z-index: 31; top: 14px; left: 50%; width: 15px; height: 15px; margin-left: -7px; border-radius: 50%; background: #000; }
+
+/* lock */
+.lock { position: absolute; inset: 0; padding: 74px 16px 26px; display: flex; flex-direction: column; }
+.big-clock { font-weight: 300; font-size: 92px; line-height: .98; letter-spacing: -.03em; padding-left: 12px; font-variant-numeric: tabular-nums; }
+.date { padding: 12px 14px 22px; font-size: 15px; font-weight: 500; color: var(--soft); }
+.notes { display: grid; gap: 8px; }
+.note { background: var(--glass); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-radius: 22px; padding: 13px 14px; }
+.note-row { display: flex; align-items: center; gap: 11px; }
+.mark { flex: none; width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; background: #0B1E3A; color: var(--flame); }
+.mark svg { width: 21px; height: 21px; }
+.note-body { flex: 1; min-width: 0; }
+.note-title { font-size: 14px; font-weight: 600; }
+.note-text { font-size: 13px; color: var(--soft); }
+.round-mic { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(150deg, var(--flame), var(--flame-deep)); color: #1A0D04; box-shadow: 0 6px 18px rgba(240,86,30,.45); transition: transform .12s; }
+.round-mic:hover { transform: scale(1.06); }
+.round-mic svg { width: 21px; height: 21px; }
+.note.ask { background: rgba(58,44,14,.88); }
+.note.ask .note-title { color: var(--amber); }
+.hint { margin-top: auto; text-align: center; font-size: 12.5px; color: var(--soft); opacity: .85; }
+
+/* home */
+.home { position: absolute; inset: 0; padding: 92px 24px 30px; display: flex; flex-direction: column; }
+.glance { font-size: 24px; font-weight: 500; }
+.glance small { display: block; font-size: 14px; color: var(--soft); font-weight: 400; margin-top: 3px; }
+.dock { margin-top: auto; display: flex; justify-content: space-between; }
+.app { width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,.13); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); display: grid; place-items: center; color: var(--text); }
+.app svg { width: 25px; height: 25px; }
+.bubble { position: absolute; right: 22px; bottom: 116px; width: 60px; height: 60px; }
+.bubble .round-mic { width: 60px; height: 60px; }
+.bubble .round-mic svg { width: 26px; height: 26px; }
+
+/* heads-up */
+.banner { position: absolute; z-index: 25; top: 44px; left: 12px; right: 12px; transform: translateY(-260%); transition: transform .32s cubic-bezier(.2,.9,.3,1); }
+.banner.show { transform: none; }
+.banner .note { width: 100%; text-align: left; background: rgba(46,20,20,.96); }
+.banner .note-title { color: var(--red); }
+
+/* assistant */
+.scrim { position: absolute; z-index: 10; inset: 0; background: rgba(4,6,10,.55); opacity: 0; pointer-events: none; transition: opacity .25s; }
+.scrim.show { opacity: 1; pointer-events: auto; }
+.sheet { position: absolute; z-index: 20; left: 8px; right: 8px; bottom: 8px; max-height: 84%; display: flex; flex-direction: column; background: var(--glass); backdrop-filter: blur(34px) saturate(140%); -webkit-backdrop-filter: blur(34px) saturate(140%); border: 1px solid var(--line); border-radius: 38px; transform: translateY(112%); transition: transform .36s cubic-bezier(.2,.9,.25,1); }
+.sheet.show { transform: none; }
+.sheet-top { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 4px; flex: none; }
+.who { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+.who svg { width: 18px; height: 18px; color: var(--flame); }
+.close { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--soft); background: rgba(255,255,255,.08); }
+.close svg { width: 15px; height: 15px; }
+.talk { padding: 8px 22px 6px; overflow-y: auto; min-height: 0; display: grid; gap: 8px; }
+.you { font-size: 15px; color: var(--muted); min-height: 21px; }
+.reply { font-size: 22px; line-height: 1.26; font-weight: 500; letter-spacing: -.012em; text-wrap: pretty; }
+.reply code, .ask-cmd { font-family: var(--mono); }
+.reply code { font-size: 18px; color: var(--flame); }
+
+.card { background: rgba(255,255,255,.06); border-radius: 20px; overflow: hidden; margin-top: 6px; }
+.s-row { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; padding: 11px 14px; }
+.s-row + .s-row { border-top: 1px solid var(--line); }
+.s-icon { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.needs .s-icon { background: var(--amber); box-shadow: 0 0 0 4px rgba(245,184,61,.2); }
+.working .s-icon { background: var(--blue); animation: breathe 1.5s ease-in-out infinite; }
+.done .s-icon { background: var(--green); }
+.error .s-icon { background: var(--red); box-shadow: 0 0 0 4px rgba(255,107,107,.2); }
+@keyframes breathe { 50% { opacity: .3; } }
+.s-name { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.s-state { font-size: 13px; color: var(--muted); }
+.needs .s-state { color: var(--amber); font-weight: 600; }
+.working .s-state { color: var(--blue); }
+.done .s-state { color: var(--green); }
+.error .s-state { color: var(--red); font-weight: 600; }
+.ask-box { padding: 14px; display: grid; gap: 10px; }
+.ask-label { font-size: 13px; color: var(--soft); }
+.ask-cmd { font-size: 14px; background: rgba(0,0,0,.42); border-radius: 12px; padding: 10px 12px; overflow-wrap: anywhere; }
+.ask-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn { border-radius: 14px; padding: 12px; font-size: 14.5px; font-weight: 600; text-align: center; background: rgba(255,255,255,.1); }
+.btn:hover { background: rgba(255,255,255,.16); }
+.btn.go { background: var(--flame); color: #1A0D04; }
+.btn.go:hover { background: #FF9A57; }
+
+.chips:empty { display: none; }
+.chips { display: flex; gap: 7px; overflow-x: auto; padding: 10px 18px 2px; flex: none; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; font-size: 13px; font-weight: 500; border: 1px solid var(--line); background: rgba(255,255,255,.05); border-radius: 999px; padding: 7px 13px; }
+.chip:hover { background: rgba(255,255,255,.12); }
+
+.mic-zone { position: relative; flex: none; display: grid; justify-items: center; gap: 8px; padding: 14px 0 18px; }
+.orb { position: absolute; top: 2px; width: 92px; height: 92px; border-radius: 50%; background: radial-gradient(circle, rgba(255,138,61,.6), rgba(240,86,30,0) 68%); opacity: .45; transition: opacity .25s, transform .25s; pointer-events: none; }
+.mic-btn { position: relative; width: 66px; height: 66px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(150deg, var(--flame), var(--flame-deep)); color: #1A0D04; box-shadow: 0 8px 26px rgba(240,86,30,.4); transition: transform .12s; }
+.mic-btn:hover { transform: scale(1.04); }
+.mic-btn svg { width: 29px; height: 29px; }
+.mic-state { position: relative; font-size: 13px; color: var(--soft); min-height: 19px; }
+.listening .orb { opacity: 1; animation: listen 1.1s ease-in-out infinite; }
+.speaking .orb { opacity: .85; animation: listen .7s ease-in-out infinite; }
+.thinking .orb { opacity: .7; animation: think 1.3s linear infinite; }
+.listening .mic-btn { background: #fff; color: var(--flame-deep); }
+@keyframes listen { 50% { transform: scale(1.5); } }
+@keyframes think { 50% { transform: scale(1.18); opacity: .35; } }
+
+.print { position: absolute; z-index: 28; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 0 28px 58px; gap: 18px; background: rgba(4,6,10,.8); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); text-align: center; }
+.print h3 { margin: 0; font-size: 19px; font-weight: 500; }
+.print code { font-family: var(--mono); color: var(--flame); font-size: 15px; display: block; margin-top: 6px; }
+.sensor { width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; color: var(--flame); border: 2px solid rgba(255,138,61,.8); animation: pulse 1.5s ease-out infinite; }
+.sensor svg { width: 44px; height: 44px; }
+.print small { color: var(--soft); font-size: 13px; }
+.print .cancel { color: var(--muted); font-size: 13px; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,138,61,.5); } 100% { box-shadow: 0 0 0 24px rgba(255,138,61,0); } }
+
+/* inside the app: same look as docs/ux-mockup */
+.appv { position: absolute; inset: 0; background: #0F1218; display: flex; flex-direction: column; padding-top: 42px; z-index: 5; font-size: 14px; }
+.a-head { padding: 12px 20px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: none; }
+.a-title { font-size: 22px; font-weight: 700; letter-spacing: -.3px; }
+.a-pill { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #9AA3B2; background: #181C24; border: 1px solid #2A303C; border-radius: 999px; padding: 5px 10px; }
+.pdot { width: 7px; height: 7px; border-radius: 50%; }
+.a-body { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 20px 24px; display: flex; flex-direction: column; gap: 18px; scrollbar-width: none; }
+.a-body::-webkit-scrollbar { display: none; }
+.a-body.fabbed { padding-bottom: 150px; }
+.group { display: grid; gap: 8px; }
+.g-path { font-family: var(--mono); font-size: 12.5px; color: #C9CFDA; }
+.s-card { display: grid; gap: 5px; width: 100%; text-align: left; padding: 13px 15px; border-radius: 14px; background: #161A22; border: 1px solid #232833; }
+.s-card:hover { background: #1B2029; }
+.s-card.needs { border-color: #5A4520; }
+.s-card.error { border-color: #5A2A30; }
+.c-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.c-title { font-size: 14px; font-weight: 600; }
+.st-chip { display: inline-flex; align-items: center; gap: 5px; flex: none; font-size: 10.5px; font-weight: 600; padding: 3px 8px; border-radius: 999px; }
+.st-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.st-chip.needs { color: #F5B83D; background: rgba(245,184,61,.14); }
+.st-chip.working { color: #7AB4FF; background: rgba(122,180,255,.12); }
+.st-chip.done { color: #5BD69A; background: rgba(91,214,154,.12); }
+.st-chip.error { color: #FF6B6B; background: rgba(255,107,107,.12); }
+.c-where { font-size: 11px; color: #9AA3B2; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.c-where span:first-child { font-family: var(--mono); }
+.via { font-size: 10.5px; font-weight: 600; color: var(--flame); background: rgba(255,138,61,.13); border-radius: 5px; padding: 1px 6px; display: inline-flex; gap: 4px; align-items: center; }
+.via svg { width: 11px; height: 11px; }
+.c-last { font-size: 12px; color: #B4BBC8; }
+.fabs { position: absolute; right: 18px; bottom: 90px; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; z-index: 2; pointer-events: none; }
+.fabs > * { pointer-events: auto; }
+.rocket-fab { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: #1B2029; border: 1.5px solid var(--flame); color: var(--flame); box-shadow: 0 0 22px rgba(255,138,61,.28); }
+.rocket-fab:hover { background: #252B36; }
+.rocket-fab svg { width: 26px; height: 26px; }
+.new-fab { display: flex; align-items: center; gap: 8px; background: #FF8A3D; color: #1A1206; font-weight: 600; font-size: 14px; padding: 15px 18px; border-radius: 16px; }
+.nav { flex: none; height: 76px; background: #141821; border-top: 1px solid #2A303C; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; align-items: center; font-size: 11px; color: #9AA3B2; padding-bottom: 6px; }
+.nav button { display: grid; justify-items: center; gap: 4px; }
+.nav button.on { color: #FF8A3D; }
+.nav svg { width: 20px; height: 20px; }
+
+.t-head { display: flex; align-items: center; gap: 6px; padding: 6px 12px 8px; flex: none; }
+.t-back { width: 38px; height: 38px; display: grid; place-items: center; flex: none; }
+.t-back svg { width: 22px; height: 22px; }
+.t-name { flex: 1; min-width: 0; }
+.t-name b { display: block; font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-name span { font-size: 12px; color: #9AA3B2; }
+.t-rocket { width: 40px; height: 40px; flex: none; border-radius: 50%; display: grid; place-items: center; color: var(--flame); border: 1.5px solid var(--flame); box-shadow: 0 0 14px rgba(255,138,61,.22); }
+.t-rocket svg { width: 21px; height: 21px; }
+.t-tabs { display: flex; gap: 7px; padding: 0 12px 10px; border-bottom: 1px solid #2A303C; overflow-x: auto; flex: none; scrollbar-width: none; }
+.t-tab { display: flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 10px; border: 1px solid #2A303C; font-size: 12.5px; color: #C9CFDA; white-space: nowrap; flex: none; }
+.t-tab.on { background: #20252F; color: #E8EAF0; font-weight: 600; }
+.t-tab.needs { border-color: #F5B83D; }
+.chat { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 9px; scrollbar-width: none; }
+.chat::-webkit-scrollbar { display: none; }
+.m-user { align-self: flex-end; max-width: 84%; background: #263048; padding: 9px 13px; border-radius: 16px 16px 4px 16px; font-size: 13.5px; }
+.m-tag { align-self: flex-end; margin-top: -4px; }
+.m-claude { font-size: 13.5px; color: #DCE0E8; }
+.m-tool { display: flex; gap: 9px; align-items: center; background: #181C24; border: 1px solid #2A303C; border-radius: 12px; padding: 9px 11px; font-family: var(--mono); font-size: 12px; }
+.m-tool em { color: #9AA3B2; font-style: normal; }
+.m-tool span:last-child { margin-left: auto; color: #5BD69A; }
+.m-verdict { align-self: center; display: inline-flex; gap: 5px; align-items: center; font-size: 11.5px; color: #9AA3B2; }
+.m-verdict svg { width: 12px; height: 12px; color: var(--flame); }
+.m-error { background: rgba(255,107,107,.1); border: 1px solid #5A2A30; border-radius: 12px; padding: 10px 12px; font-size: 13px; color: #FFB3B3; }
+.perm { background: #2A2416; border: 1.5px solid #F5B83D; border-radius: 16px; padding: 13px; display: grid; gap: 9px; }
+.perm b { font-size: 13.5px; font-weight: 600; }
+.perm code { background: #0F1218; border-radius: 8px; padding: 9px 11px; font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+.perm-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.perm-btns button { height: 42px; border-radius: 12px; border: 1px solid #5A5030; font-size: 14px; }
+.perm-btns .ok { border: 0; background: #F5B83D; color: #1A1206; font-weight: 600; }
+.perm .always { height: 38px; border-radius: 12px; border: 1px solid #5A5030; color: #F5D48A; font-size: 12.5px; }
+.composer-row { flex: none; padding: 8px 12px 16px; border-top: 1px solid #2A303C; background: #141821; display: grid; gap: 7px; }
+.c-row { display: flex; align-items: center; gap: 8px; }
+.c-slash { width: 42px; height: 42px; flex: none; border-radius: 50%; border: 1px solid #2A303C; color: #C9CFDA; font-family: var(--mono); font-size: 17px; }
+.c-input { flex: 1; min-width: 0; height: 42px; border-radius: 21px; border: 1px solid #2A303C; background: #0F1218; color: #9AA3B2; padding: 0 15px; display: flex; align-items: center; font-size: 13.5px; }
+.c-dict { width: 42px; height: 42px; flex: none; border-radius: 50%; background: #FF8A3D; color: #1A1206; display: grid; place-items: center; }
+.c-dict svg { width: 20px; height: 20px; }
+.c-line { font-family: var(--mono); font-size: 11px; color: #9AA3B2; padding: 0 4px; }
+
+.sec { display: grid; gap: 8px; }
+.sec-t { font-size: 11px; font-weight: 600; color: #9AA3B2; letter-spacing: .5px; }
+.set-card { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 13px; border-radius: 14px; background: #161A22; border: 1px solid #232833; }
+.set-card:hover { background: #1B2029; }
+.set-card.hot { border-color: var(--flame); background: #1E1A16; }
+.tile2 { width: 36px; height: 36px; flex: none; border-radius: 10px; display: grid; place-items: center; font-size: 15px; font-weight: 700; background: #232833; }
+.tile2.flame { background: rgba(255,138,61,.14); color: #FF8A3D; }
+.tile2 svg { width: 20px; height: 20px; }
+.set-text { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.set-text b { font-size: 14px; font-weight: 600; }
+.set-text span { font-size: 12px; color: #9AA3B2; }
+.chev { color: #9AA3B2; font-size: 12px; }
+.rows { display: grid; }
+.set-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 12px 2px; border-bottom: 1px solid #1E232D; min-height: 48px; }
+.set-row:last-child { border-bottom: 0; }
+.set-row .r-text { min-width: 0; display: grid; gap: 1px; font-size: 14px; }
+.set-row small { font-size: 12px; color: #9AA3B2; }
+.set-row .val { color: #9AA3B2; font-size: 13px; flex: none; text-align: right; }
+.switch { position: relative; flex: none; width: 42px; height: 25px; border-radius: 999px; background: #2A303C; transition: background .15s; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 19px; height: 19px; border-radius: 50%; background: #E8EAF0; transition: transform .15s; }
+.switch.on { background: var(--flame); }
+.switch.on::after { transform: translateX(17px); background: #1A1206; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 3px; border-radius: 11px; background: #161A22; border: 1px solid #232833; }
+.seg button { padding: 7px 4px; border-radius: 8px; font-size: 12.5px; color: #C9CFDA; }
+.seg button.on { background: #E8EAF0; color: #0F1218; font-weight: 600; }
+.try { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 14px; border-radius: 16px; background: linear-gradient(120deg, rgba(255,138,61,.2), rgba(240,86,30,.06)); border: 1px solid rgba(255,138,61,.45); }
+.try .round-mic { width: 46px; height: 46px; pointer-events: none; }
+.log-row { display: grid; grid-template-columns: 44px 1fr; gap: 10px; padding: 12px 2px; border-bottom: 1px solid #1E232D; }
+.log-row:last-child { border-bottom: 0; }
+.log-time { font-family: var(--mono); font-size: 12px; color: #9AA3B2; padding-top: 1px; }
+.log-text { font-size: 13.5px; }
+.log-text code { font-family: var(--mono); font-size: 12.5px; color: var(--flame); }
+.log-text small { display: block; font-size: 12px; color: #9AA3B2; margin-top: 1px; }
+.pr-app { color: var(--flame); background: rgba(11,30,58,.9); border: 1.5px solid var(--flame); }
+.who small { color: var(--muted); font-size: 12.5px; font-weight: 400; }
+.g-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; border-radius: 12px; background: #15181F; border: 1px solid #2A2F39; }
+.g-tabs button { padding: 8px; border-radius: 9px; font-size: 13px; font-weight: 500; color: var(--soft); }
+.g-tabs button.on { background: var(--text); color: #0F1218; font-weight: 600; }
+
+/* visual answers */
+.v-card { background: rgba(255,255,255,.06); border-radius: 18px; margin-top: 6px; overflow: hidden; }
+.v-head { display: flex; justify-content: space-between; gap: 8px; padding: 10px 13px; font-family: var(--mono); font-size: 12px; color: var(--soft); border-bottom: 1px solid var(--line); }
+.v-head b { font-weight: 500; }
+.add { color: var(--green); } .del { color: var(--red); }
+.diff { font-family: var(--mono); font-size: 11.5px; line-height: 1.55; padding: 7px 0; background: rgba(0,0,0,.28); overflow-x: auto; }
+.diff div { padding: 0 13px; white-space: pre; }
+.diff .a { background: rgba(91,214,154,.11); color: #A7EBC8; }
+.diff .d { background: rgba(255,107,107,.11); color: #FFB3B3; }
+.fail-row { display: grid; gap: 2px; padding: 10px 13px; border-bottom: 1px solid var(--line); }
+.fail-row b { font-size: 13px; font-weight: 600; }
+.fail-row code { font-family: var(--mono); font-size: 11.5px; color: #FFB3B3; overflow-wrap: anywhere; }
+.shot-frame { margin: 12px auto; width: 150px; border-radius: 12px; background: #F6F7F9; color: #1A1E26; padding: 10px; display: grid; gap: 7px; font-size: 9px; }
+.shot-frame b { font-size: 12px; }
+.shot-line { display: flex; justify-content: space-between; border-bottom: 1px solid #E2E5EA; padding-bottom: 4px; }
+.shot-btn { background: #1A1E26; color: #fff; border-radius: 6px; padding: 6px; text-align: center; font-weight: 600; }
+.v-note { padding: 0 13px 10px; text-align: center; font-size: 11.5px; color: var(--muted); }
+.v-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 9px; }
+.v-actions button { border-radius: 11px; padding: 9px; font-size: 13px; font-weight: 600; background: rgba(255,255,255,.1); }
+.v-actions .go { background: var(--flame); color: #1A0D04; }
+/* account picker */
+.pick-scrim { position: absolute; inset: 0; z-index: 8; background: rgba(4,6,10,.65); display: flex; align-items: flex-end; }
+.pick-sheet { width: 100%; background: #181C24; border-radius: 22px 22px 0 0; border-top: 1px solid #2A303C; padding: 18px 16px 24px; display: grid; gap: 6px; }
+.pick-sheet h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.pick-sheet > p { margin: 0 0 8px; font-size: 12.5px; color: #9AA3B2; }
+.acct { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; padding: 11px; border-radius: 13px; border: 1px solid #2A303C; }
+.acct.on { border-color: var(--flame); background: rgba(255,138,61,.09); }
+.acct .radio { width: 18px; height: 18px; flex: none; border-radius: 50%; border: 1.5px solid #4A5160; }
+.acct.on .radio { border: 5px solid var(--flame); }
+.off-note { color: #9AA3B2; font-size: 13.5px; }
+.master b { font-size: 15px !important; }
+.is-off { background: #15181F; }
+
+/* rocket tab */
+.r-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.r-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 20px 10px; display: flex; flex-direction: column; gap: 14px; scrollbar-width: none; }
+.r-scroll::-webkit-scrollbar { display: none; }
+.r-big { font-size: 30px; line-height: 1.15; font-weight: 600; letter-spacing: -.7px; }
+.r-you { align-self: flex-end; max-width: 84%; background: #263048; padding: 9px 13px; border-radius: 16px 16px 4px 16px; font-size: 13.5px; }
+.r-say { font-size: 16px; line-height: 1.38; }
+.r-say code { font-family: var(--mono); font-size: 14px; color: var(--flame); }
+.r-item.old .ask-btns, .r-item.old .v-actions { display: none; }
+.r-item { display: grid; gap: 8px; }
+.r-need { background: #2A2416; border: 1.5px solid #F5B83D; border-radius: 16px; padding: 13px; display: grid; gap: 10px; }
+.r-need b { font-size: 14px; font-weight: 600; }
+.r-chips { display: flex; gap: 7px; overflow-x: auto; padding: 8px 20px 0; flex: none; scrollbar-width: none; }
+.r-chips:empty { display: none; }
+.r-chips::-webkit-scrollbar { display: none; }
+.r-bar { flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 20px 12px; }
+.r-input { flex: 1; min-width: 0; height: 54px; border-radius: 27px; border: 1px solid #2A303C; background: #161A22; color: #E8EAF0; padding: 0 18px; font: inherit; font-size: 15px; }
+.r-input::placeholder { color: #AEB6C4; }
+.r-mic { flex: none; width: 54px; height: 54px; border-radius: 50%; background: #FF8A3D; color: #1A0D04; display: grid; place-items: center; }
+.r-mic svg { width: 24px; height: 24px; }
+.r-bar.listening .r-input { border-color: #FF8A3D; background: #1E1A16; }
+.r-bar.listening .r-mic { background: #F2F4F8; color: #C7420F; animation: pulse 1.3s ease-out infinite; }
+.r-bar.thinking .r-input::placeholder, .r-bar.speaking .r-input::placeholder { color: #FF9A57; }
+
+/* quick controls */
+.tune { width: 44px; height: 44px; border-radius: 12px; border: 1px solid #2A303C; display: grid; place-items: center; color: #C9CFDA; flex: none; }
+.tune:hover { background: #181C24; }
+.tune svg { width: 20px; height: 20px; }
+.quick-sheet { width: 100%; background: #181C24; border-radius: 24px 24px 0 0; padding: 10px 16px 18px; display: grid; gap: 9px; max-height: 92%; overflow-y: auto; scrollbar-width: none; }
+.grip { justify-self: center; width: 36px; height: 4px; border-radius: 2px; background: #3A4150; margin-bottom: 4px; }
+.q-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.q-tile { display: grid; gap: 3px; align-content: start; text-align: left; min-height: 74px; padding: 10px 12px; border-radius: 14px; border: 1px solid #2A303C; background: #10131A; }
+.q-tile b { font-size: 14.5px; font-weight: 600; }
+.q-tile span { font-size: 12px; line-height: 1.32; color: #C9CFDA; }
+.q-tile.on { border: 1.5px solid #FF8A3D; background: #33261E; }
+.q-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; min-height: 56px; text-align: left; padding: 8px 14px; border-radius: 14px; border: 1px solid #2A303C; background: #10131A; }
+.q-row b { display: block; font-size: 14.5px; font-weight: 600; }
+.q-row small { font-size: 12px; color: #C9CFDA; }
+.q-head { display: flex; justify-content: space-between; align-items: baseline; padding-top: 4px; }
+.q-head span:last-child { font-family: var(--mono); font-size: 12px; color: #AEB6C4; }
+.q-meter { height: 8px; border-radius: 4px; background: #2A303C; overflow: hidden; }
+.q-meter i { display: block; width: 8%; height: 100%; background: #7AB4FF; }
+.q-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.q-btn { height: 44px; border-radius: 12px; border: 1px solid #2A303C; font-size: 14px; text-align: center; }
+.q-btn:hover { background: #20252F; }
+.q-wide { grid-column: 1 / -1; }
+
+/* guide */
+.guide { width: 340px; flex: none; display: grid; gap: 22px; }
+.guide h1 { margin: 0 0 6px; font-size: 26px; font-weight: 600; letter-spacing: -.02em; }
+.guide > div > p { margin: 0; color: var(--muted); font-size: 14px; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.step { display: flex; gap: 12px; }
+.tick { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid #3A404C; color: var(--muted); display: grid; place-items: center; font-size: 12px; font-weight: 600; }
+.step.done .tick { background: var(--green); border-color: var(--green); color: #07150E; }
+.step b { display: block; font-size: 14.5px; font-weight: 600; }
+.step span { font-size: 13.5px; color: var(--soft); }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; }
+.tool { font-size: 13px; font-weight: 500; border-radius: 10px; padding: 8px 12px; background: #171A21; border: 1px solid #2A2F39; }
+.tool:hover { background: #20242D; }
+.tool[aria-pressed="true"] { color: var(--flame); border-color: var(--flame); }
+.tool.main { background: var(--flame); border-color: var(--flame); color: #1A0D04; font-weight: 600; }
+.alert { font-size: 13px; color: var(--amber); }
+
+@media (max-width: 860px) { .stage { flex-direction: column; gap: 32px; } .guide { width: min(390px, 100%); } .side-label { display: none; } }
+@media (prefers-reduced-motion: reduce) { .orb, .working .s-icon, .sensor { animation: none !important; } .sheet, .banner { transition: none; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-mic" viewBox="0 0 24 24"><path fill="currentColor" d="M12 15a3.6 3.6 0 0 0 3.6-3.6V5.6a3.6 3.6 0 1 0-7.2 0v5.8A3.6 3.6 0 0 0 12 15z"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M5.5 11.2a6.5 6.5 0 0 0 13 0M12 17.8V21"/></symbol>
+  <symbol id="i-rocket" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2c3.2 2.3 5 5.8 5 9.6 0 1.6-.3 3.1-.9 4.4H7.9A10.8 10.8 0 0 1 7 11.6C7 7.8 8.8 4.3 12 2zm0 6.2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM6.2 13.2 3.5 17l3.4.6a13 13 0 0 1-.7-4.4zm11.6 0c0 1.6-.2 3-.7 4.4l3.4-.6-2.7-3.8zM10 17.5h4L12 22z"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-print" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 11a7 7 0 0 1 14 0v2"/><path d="M8.5 20c.7-1.7 1-3.5 1-5.2V11a2.5 2.5 0 0 1 5 0v3.5"/><path d="M12 11v3.8c0 2.2-.5 4.3-1.5 6.2"/><path d="M15 21c.6-1.2 1-2.5 1.2-3.9"/><path d="M5.5 16c.2-.8.2-1.5.2-2.3"/></g></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><path fill="currentColor" d="M6.6 3.5 9 3l1.8 4.3-1.9 1.6a12 12 0 0 0 6.2 6.2l1.6-1.9L21 15l-.5 2.4c-.2 1.1-1.2 1.9-2.3 1.8C10.300 18.700 5.300 13.700 4.800 5.800c-.1-1.100.7-2.100 1.800-2.300z"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path fill="currentColor" d="M4 5.500A2.500 2.500 0 0 1 6.500 3h11A2.500 2.500 0 0 1 20 5.500v8a2.500 2.500 0 0 1-2.500 2.500H10l-4.500 4v-4A2.500 2.500 0 0 1 4 13.500z"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.500"/><path d="M3.500 12h17M12 3.500c2.500 2.300 3.800 5.200 3.800 8.500s-1.300 6.200-3.800 8.500c-2.500-2.300-3.800-5.200-3.800-8.500S9.500 5.800 12 3.500z"/></g></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><path fill="currentColor" d="M9 4h6l1.500 2.500H20a1.500 1.500 0 0 1 1.500 1.500v10a1.500 1.500 0 0 1-1.500 1.500H4A1.500 1.500 0 0 1 2.500 18V8A1.500 1.500 0 0 1 4 6.500h3.500zm3 4.500a4.200 4.200 0 1 0 0 8.400 4.200 4.200 0 0 0 0-8.400z"/></symbol>
+</svg>
+
+<main class="stage">
+  <div class="phone-wrap" id="phoneWrap">
+    <div class="phone" id="phone">
+      <button class="side" id="side" aria-label="Hold the power button"></button>
+      <div class="frame">
+        <div class="screen">
+          <div class="camera"></div>
+          <div class="bar"><span id="barTime">10:24</span><span class="bar-right"><span class="mic-dot" id="micDot"></span><span>5G</span><span>82%</span></span></div>
+
+          <section class="lock" id="lock">
+            <div class="big-clock" id="bigClock"></div>
+            <div class="date" id="date"></div>
+            <div class="notes" id="lockNotes"></div>
+            <p class="hint" id="lockHint">Say "Hey Rocket", or hold the power button</p>
+          </section>
+
+          <section class="home" id="home" hidden>
+            <div class="glance"><span id="homeDate"></span><small id="homeSummary"></small></div>
+            <div class="dock">
+              <span class="app"><svg><use href="#i-phone"/></svg></span>
+              <span class="app"><svg><use href="#i-chat"/></svg></span>
+              <span class="app"><svg><use href="#i-globe"/></svg></span>
+              <button class="app pr-app" data-nav="home-app" aria-label="Open PocketRocket"><svg><use href="#i-rocket"/></svg></button>
+            </div>
+            <div class="bubble" id="bubble"><button class="round-mic" data-open aria-label="Talk to Rocket"><svg><use href="#i-mic"/></svg></button></div>
+          </section>
+
+          <section class="appv" id="appView" hidden></section>
+
+          <div class="banner" id="banner"><button class="note" id="bannerBtn"><div class="note-row"><span class="mark"><svg><use href="#i-rocket"/></svg></span><span class="note-body"><div class="note-title">pocketrocket failed</div><div class="note-text">2 tests are red</div></span></div></button></div>
+
+          <div class="scrim" id="scrim"></div>
+          <section class="sheet" id="sheet" aria-label="Rocket assistant">
+            <div class="sheet-top">
+              <span class="who"><svg><use href="#i-rocket"/></svg>Rocket <small id="whoCtx"></small></span>
+              <button class="close" id="close" aria-label="Close"><svg><use href="#i-x"/></svg></button>
+            </div>
+            <div class="talk">
+              <div class="you" id="you"></div>
+              <div class="reply" id="reply"></div>
+              <div id="card"></div>
+            </div>
+            <div class="chips" id="chips"></div>
+            <div class="mic-zone" id="micZone">
+              <span class="orb"></span>
+              <button class="mic-btn" id="micBtn" aria-label="Talk"><svg><use href="#i-mic"/></svg></button>
+              <span class="mic-state" id="micState"></span>
+            </div>
+          </section>
+
+          <div class="print" id="print" hidden>
+            <div><h3 id="printTitle">Touch to allow</h3><code id="printCmd"></code></div>
+            <button class="sensor" id="sensor" aria-label="Touch the fingerprint sensor"><svg><use href="#i-print"/></svg></button>
+            <small>Click the circle as your fingerprint</small>
+            <button class="cancel" id="printCancel">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="guide">
+    <div><h1>Try being the user</h1><p>Use your real voice. The sessions here are fake, and nothing is built in the app yet.</p></div>
+    <div class="g-tabs"><button id="gLock" data-guide="lock">On the lock screen</button><button id="gApp" data-guide="app">Inside the app</button></div>
+    <ol class="steps" id="steps"></ol>
+    <p class="alert" id="alert" hidden></p>
+    <div class="tools">
+      <button class="tool main" id="fail">Make a session fail</button>
+      <button class="tool" id="wakeToggle" aria-pressed="false">Listen for "Hey Rocket"</button>
+      <button class="tool" id="soundToggle" aria-pressed="true">Voice replies</button>
+      <button class="tool" id="lockBtn">Lock phone</button>
+      <button class="tool" id="reset">Start over</button>
+    </div>
+  </aside>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const STEPS = [
+  ['wake', 'Wake it', 'Tap the orange mic, click the power button on the phone\'s right edge, or turn on "Hey Rocket" below.'],
+  ['status', 'Ask for status', 'Say "What\'s happening?"'],
+  ['allow', 'Approve a request', 'Say "What does API server want?", then "Allow", then "Yes", then touch the sensor.'],
+  ['told', 'Get told', 'Press "Make a session fail", listen, then say "Tell it to fix them".'],
+  ['start', 'Start an agent', 'Say "Start an agent in notes to update the readme".'],
+];
+const APP_STEPS = [
+  ['a_rocket', 'Rocket opens first', 'Tap the mic and ask "What\'s happening?", or type it. Elsewhere in the app, click the power button for the popup.'],
+  ['a_allow', 'Approve a request', 'Tap Review on the Rocket screen, then Allow. Or say "Allow", then "Yes". The session\'s chat records how you answered.'],
+  ['a_visual', 'See it, don\'t just hear it', 'Tap the mic and say "Show what changed" or "Show the page". It says the short version and puts the rest on screen.'],
+  ['a_start', 'Start an agent by voice', 'Say "Start an agent in notes to update the readme". Its card is marked as started by Rocket.'],
+  ['a_settings', 'Set it up', 'Tap the sliders at the top of Rocket for quick controls, like the wake word. Settings › Assistant has everything.'],
+  ['a_activity', 'See what it did', 'Settings › Assistant › Activity lists everything Rocket did.'],
+];
+const LABEL = { needs: 'Needs you', working: 'Working', done: 'Done', error: 'Failed' };
+const ORDER = { needs: 0, error: 1, working: 2, done: 3 };
+const freshSessions = () => [
+  { id: 'api-server', say: 'API server', st: 'needs', cmd: 'npm run migrate', title: 'Add the orders table', folder: 'work/api-server', where: 'api · main', last: 'Allow Bash? npm run migrate', log: [
+    { t: 'user', text: 'Add an orders table and migrate the dev database.' },
+    { t: 'claude', text: "I've written the migration. I need to run it against dev." },
+    { t: 'tool', kind: 'Edit', path: 'db/0042_orders.sql' } ] },
+  { id: 'pocketrocket', say: 'Pocketrocket', st: 'working', title: 'Fix login bug', folder: 'work/pocketrocket', where: 'app · feat/auth', last: 'Running the auth tests (3 of 7)', log: [
+    { t: 'user', text: 'Login fails on the second try. Find why and fix it.' },
+    { t: 'claude', text: 'The refresh path reuses the old token. Fixing it, then running the auth tests.' },
+    { t: 'tool', kind: 'Edit', path: 'src/auth/session.ts' } ] },
+  { id: 'notes', say: 'Notes', st: 'done', title: 'Tidy notes', folder: 'personal/notes', where: 'notes · main', last: 'Merged 14 files into 6.', log: [
+    { t: 'user', text: 'Merge the duplicate notes.' },
+    { t: 'claude', text: 'Merged 14 files into 6. Nothing was lost.' } ] },
+];
+const ACCOUNTS = [{ id: 'default', name: 'Default', sub: 'Follows your default login: personal' }, { id: 'personal', name: 'personal', sub: 'Max · 34% of the limit used' }, { id: 'work', name: 'work', sub: 'Team · 12% of the limit used' }];
+const freshPrefs = () => ({ enabled: true, account: 'default', earbud: true, needs: true, errors: true, finished: false, listen: 'auto', speak: 'phones' });
+const now = () => new Date().toTimeString().slice(0, 5);
+const S = { locked: true, open: false, awaiting: null, sessions: freshSessions(), voice: false, sound: true, wake: false, done: new Set(), view: null, guide: 'lock', convo: [], chipList: null, modeNow: '', modeText: '', prefs: freshPrefs(), activity: [{ time: '08:42', text: 'Told you <code>notes</code> finished', how: 'On request' }, { time: '08:15', text: 'Denied <code>rm -rf build</code> in notes', how: 'By voice, over earbuds' }] };
+const logIt = (text, how) => S.activity.unshift({ time: now(), text, how });
+const howNow = () => S.voice ? 'By voice' : 'By tap';
+const pending = () => S.sessions.find(s => s.st === 'needs');
+const failed = () => S.sessions.find(s => s.st === 'error');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* drawing */
+function drawClock() {
+  const d = new Date();
+  const h = String(d.getHours()).padStart(2, '0'), m = String(d.getMinutes()).padStart(2, '0');
+  $('barTime').textContent = `${h}:${m}`;
+  $('bigClock').innerHTML = `${h}<br>${m}`;
+  const day = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  $('date').textContent = day; $('homeDate').textContent = day;
+}
+function summary() {
+  const n = st => S.sessions.filter(s => s.st === st).length;
+  const bits = [];
+  if (n('working')) bits.push(`${n('working')} working`);
+  if (n('needs')) bits.push(`${n('needs')} needs you`);
+  if (n('error')) bits.push(`${n('error')} failed`);
+  return bits.join(' · ') || 'All finished';
+}
+function drawPhone() {
+  $('lock').hidden = !S.locked; $('home').hidden = S.locked || !!S.view; $('appView').hidden = S.locked || !S.view; drawApp();
+  $('homeSummary').textContent = summary();
+  $('lockHint').hidden = !S.prefs.enabled; $('bubble').hidden = !S.prefs.enabled;
+  const ask = pending();
+  $('lockNotes').innerHTML = `
+    <div class="note"><div class="note-row"><span class="mark"><svg><use href="#i-rocket"/></svg></span>
+      <div class="note-body"><div class="note-title">PocketRocket</div><div class="note-text">${summary()}</div></div>
+      ${S.prefs.enabled ? '<button class="round-mic" data-open aria-label="Talk to Rocket"><svg><use href="#i-mic"/></svg></button>' : ''}</div></div>
+    ${ask ? `<div class="note ask"><div class="note-title">${ask.id} needs you</div><div class="note-text">Wants to run a command</div></div>` : ''}`;
+}
+const ICON = n => `<svg><use href="#i-${n}"/></svg>`;
+const NAV = [['rocket', 'Rocket', '<path d="M12 3c2.800 2 4.300 5 4.300 8.300 0 1.500-.3 2.900-.8 4.200H8.500a10 10 0 0 1-.8-4.200C7.700 8 9.200 5 12 3zM9.700 18.500h4.600L12 22z"/><circle cx="12" cy="10.500" r="1.400"/>'], ['sessions', 'Sessions', '<rect x="3" y="3" width="7" height="7" rx="1.500"/><rect x="14" y="3" width="7" height="7" rx="1.500"/><rect x="3" y="14" width="7" height="7" rx="1.500"/><rect x="14" y="14" width="7" height="7" rx="1.500"/>'], ['workspaces', 'Workspaces', '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'], ['settings', 'Settings', '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/>']];
+const navBar = on => `<nav class="nav">${NAV.filter(([k]) => k !== 'rocket' || S.prefs.enabled).map(([k, l, d]) => `<button class="${k === on ? 'on' : ''}" data-nav="${k}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${d}</svg>${l}</button>`).join('')}</nav>`;
+const chip = st => `<span class="st-chip ${st}"><i></i>${LABEL[st]}</span>`;
+const viaTag = text => `<span class="via">${ICON('rocket')}${text}</span>`;
+const backBar = (title, to) => `<div class="t-head"><button class="t-back" data-nav="${to}" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button><div class="t-name"><b>${title}</b></div></div>`;
+const toggle = (key, title, sub) => `<button class="set-row" data-pref="${key}"><span class="r-text">${title}${sub ? `<small>${sub}</small>` : ''}</span><span class="switch ${S.prefs[key] ? 'on' : ''}"></span></button>`;
+const seg = (key, opts) => `<div class="seg">${opts.map(([v, l]) => `<button class="${S.prefs[key] === v ? 'on' : ''}" data-seg="${key}" data-val="${v}">${l}</button>`).join('')}</div>`;
+const row = (title, val, sub) => `<div class="set-row"><span class="r-text">${title}${sub ? `<small>${sub}</small>` : ''}</span><span class="val">${val}</span></div>`;
+
+const rocketFab = () => S.prefs.enabled ? `<button class="rocket-fab" data-open aria-label="Talk to Rocket">${ICON('mic')}</button>` : '';
+const acctLabel = () => { const a = ACCOUNTS.find(x => x.id === S.prefs.account); return a.id === 'default' ? 'Default (personal)' : a.name; };
+const pickerHtml = () => S.picker ? `<div class="pick-scrim" data-picker-close><div class="pick-sheet"><h3>Claude login for Rocket</h3><p>Its questions count against this login's limit. Changing it starts a fresh Rocket conversation. Your sessions aren't affected.</p>${ACCOUNTS.map(x => `<button class="acct ${S.prefs.account === x.id ? 'on' : ''}" data-account="${x.id}"><span class="radio"></span><span class="set-text"><b>${x.name}</b><span>${x.sub}</span></span></button>`).join('')}</div></div>` : '';
+const quickHtml = () => { if (!S.quick) return '';
+  const tile = (attrs, on, title, sub) => `<button class="q-tile ${on ? 'on' : ''}" ${attrs} aria-pressed="${!!on}"><b>${title}</b><span>${sub}</span></button>`;
+  const speakerOn = S.prefs.speak === 'speaker';
+  return `<div class="pick-scrim" data-quick-close><div class="quick-sheet"><div class="grip"></div><div class="sec-t">LISTENING AND SPEAKING</div><div class="q-tiles">
+    ${tile('data-wake', S.wake, 'Hey Rocket', S.wake ? 'On, wakes when you say it' : 'Off, use the mic or power button')}
+    ${tile('data-pref="errors"', S.prefs.errors, 'Announcements', S.prefs.errors ? 'On, tells you what changes' : 'Off, only when you ask')}
+    ${tile(`data-seg="speak" data-val="${speakerOn ? 'phones' : 'speaker'}"`, speakerOn, 'Speaker', speakerOn ? 'On, speaks out loud' : 'Off, headphones only')}
+    ${tile('data-pref="quiet"', S.prefs.quiet, 'Quiet for 1 hour', S.prefs.quiet ? 'On, no listening or speaking' : 'No listening or speaking')}
+    </div><div class="sec-t" style="padding-top:4px">CLAUDE LOGIN</div>
+    <button class="q-row" data-picker><span><b>${acctLabel()}</b><small>Rocket's questions count against this login</small></span><span class="chev">▾</span></button>
+    <div class="q-head"><span class="sec-t">ROCKET'S MEMORY</span><span>12k of 200k</span></div><div class="q-meter"><i></i></div>
+    <div class="q-btns"><button class="q-btn" data-quick-compact>Compact</button><button class="q-btn" data-quick-fresh>Start fresh</button>
+    <button class="q-btn q-wide" data-nav="activity">Activity…</button><button class="q-btn q-wide" data-nav="assistant">All assistant settings…</button></div></div></div>`; };
+const onTab = () => S.view === 'rocket' && !S.locked;
+const firstView = () => S.prefs.enabled ? 'rocket' : 'sessions';
+const VIEWS = {
+  rocket() {
+    const ask = pending();
+    const n = ask ? 'One thing needs you.' : failed() ? 'One session failed.' : 'All clear for now.';
+    const others = [...S.sessions].filter(x => x.st !== 'needs').sort((a, b) => ORDER[a.st] - ORDER[b.st]);
+    const body = S.convo.length ? S.convo.map((m, i) => m.who === 'you' ? `<div class="r-you">${m.text}</div>` : `<div class="r-item ${i === S.convo.length - 1 ? '' : 'old'}"><div class="r-say">${m.html}</div>${m.card || ''}</div>`).join('')
+      : `<div class="r-big">${n}</div>
+         ${ask ? `<div class="r-need"><b>${ask.id} wants to run a command</b><div class="perm-btns"><button data-tap-deny>Deny</button><button class="ok" data-say="What does ${ask.say} want?">Review</button></div></div>` : ''}
+         <div class="sec"><div class="sec-t">RIGHT NOW</div><div class="rows">${others.map(x => `<button class="set-row" data-session="${x.id}"><span class="r-text">${x.id}</span><span class="s-row ${x.st}" style="padding:0;width:auto"><span class="s-state">${LABEL[x.st]}</span></span></button>`).join('')}</div></div>`;
+    return `<div class="a-head"><div class="a-title">Rocket</div><button class="tune" data-quick aria-label="Quick controls"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></button></div><div class="r-wrap"><div class="r-scroll" id="rScroll">${body}</div>
+      <div class="r-chips" id="tabChips">${chipHtml(S.chipList || [])}</div>
+      <div class="r-bar ${S.modeNow || ''}" id="tabBar"><input class="r-input" id="typeBox" aria-label="Ask Rocket" placeholder="${S.modeText || 'Ask Rocket'}"><button class="r-mic" data-tab-mic aria-label="Talk to Rocket">${ICON('mic')}</button></div></div>${navBar('rocket')}${quickHtml()}${pickerHtml()}`;
+  },
+  sessions() {
+    const n = st => S.sessions.filter(x => x.st === st).length;
+    const pills = [['needs', '#F5B83D', 'needs you'], ['error', '#FF6B6B', 'failed'], ['working', '#7AB4FF', 'working']].filter(([k]) => n(k)).map(([k, c, l]) => `<span class="pdot" style="background:${c}"></span>${n(k)} ${l}`).join(' ');
+    const folders = [...new Set(S.sessions.map(x => x.folder))];
+    const groups = folders.map(f => `<div class="group"><div class="g-path">${f}</div>${S.sessions.filter(x => x.folder === f).map(x => `
+      <button class="s-card ${x.st}" data-session="${x.id}"><span class="c-top"><span class="c-title">${x.title}</span>${chip(x.st)}</span>
+      <span class="c-where"><span>${x.where}</span>${x.byRocket ? viaTag('Started by Rocket') : ''}</span><span class="c-last">${x.last}</span></button>`).join('')}</div>`).join('');
+    return `<div class="a-head"><div class="a-title">Sessions</div><div class="a-pill">${pills || 'All finished'}</div></div>
+      <div class="a-body fabbed">${groups}</div>
+      <div class="fabs"><button class="new-fab">+ New session</button></div>${navBar('sessions')}`;
+  },
+  workspaces() {
+    return `<div class="a-head"><div class="a-title">Workspaces</div></div><div class="a-body"><div class="group">${['work/api-server', 'work/pocketrocket', 'personal/notes'].map(f => `<div class="s-card"><span class="c-title g-path">${f}</span></div>`).join('')}</div></div>
+      ${navBar('workspaces')}`;
+  },
+  session() {
+    const x = S.sessions.find(i => i.id === S.sessionId) || S.sessions[0];
+    const items = x.log.map(m => {
+      if (m.t === 'user') return `<div class="m-user">${m.text}</div>${m.via ? `<div class="m-tag">${viaTag('Sent through Rocket')}</div>` : ''}`;
+      if (m.t === 'claude') return `<div class="m-claude">${m.text}</div>`;
+      if (m.t === 'tool') return `<div class="m-tool"><em>${m.kind}</em><span>${m.path}</span><span>✓</span></div>`;
+      if (m.t === 'error') return `<div class="m-error">${m.text}</div>`;
+      return `<div class="m-verdict">${m.rocket ? ICON('rocket') : ''}${m.text}</div>`;
+    }).join('');
+    const perm = x.st === 'needs' ? `<div class="perm"><b>Claude wants to run a command</b><code>${x.cmd}</code><div class="perm-btns"><button data-tap-deny>Deny</button><button class="ok" data-allow>Allow</button></div><button class="always" data-allow>Always allow in this workspace</button></div>` : '';
+    const tabs = S.sessions.map(i => `<button class="t-tab ${i.id === x.id ? 'on' : ''} ${i.st === 'needs' ? 'needs' : ''}" data-session="${i.id}"><span class="pdot" style="background:${{ needs: '#F5B83D', working: '#7AB4FF', done: '#5BD69A', error: '#FF6B6B' }[i.st]}"></span>${i.title}</button>`).join('');
+    return `<div class="t-head"><button class="t-back" data-nav="sessions" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button><div class="t-name"><b>${x.id}</b><span>${x.where}</span></div></div>
+      <div class="t-tabs">${tabs}</div>
+      <div class="chat" id="chat">${items}${perm}</div>
+      <div class="composer-row"><div class="c-row"><button class="c-slash" aria-label="Slash commands">/</button><div class="c-input">Message Claude</div><button class="c-dict" aria-label="Dictate">${ICON('mic')}</button></div><div class="c-line">${x.where.split(' · ')[0]} │ main │ Opus 5.5 │ 160k/1M</div></div>`;
+  },
+  settings() {
+    return `<div class="a-head"><div class="a-title">Settings</div></div><div class="a-body">
+      <div class="sec"><div class="sec-t">ACCOUNTS</div>
+        <div class="set-card"><span class="tile2 flame">C</span><span class="set-text"><b>Claude</b><span>personal · Max · default</span></span><span class="chev">2 ›</span></div>
+        <div class="set-card"><span class="tile2">G</span><span class="set-text"><b>GitHub</b><span>default account</span></span><span class="chev">2 ›</span></div></div>
+      <button class="set-card hot" data-nav="assistant"><span class="tile2 flame">${ICON('rocket')}</span><span class="set-text"><b>Assistant</b><span>${!S.prefs.enabled ? 'Off' : `${S.wake ? 'On · "Hey Rocket"' : 'On · power button'} · ${acctLabel()}`}</span></span><span class="chev">›</span></button>
+      <div class="set-card"><span class="tile2">H</span><span class="set-text"><b>Health</b><span>All good</span></span><span class="chev">›</span></div>
+      <div class="sec"><div class="sec-t">APP</div><div class="rows">${row('Tools', '1 installed ›')}${row('Theme', 'Dark ›')}${row('Updates', 'Up to date ›')}</div></div>
+    </div>${navBar('settings')}`;
+  },
+  assistant() {
+    const on = S.prefs.enabled;
+    const master = `<button class="set-card master ${on ? 'hot' : 'is-off'}" data-pref="enabled"><span class="tile2 ${on ? 'flame' : ''}">${ICON('rocket')}</span><span class="set-text"><b>Voice assistant</b><span>${on ? 'On' : 'Off'}</span></span><span class="switch ${on ? 'on' : ''}"></span></button>`;
+    if (!on) return `${backBar('Assistant', 'settings')}<div class="a-body">${master}<p class="off-note">Rocket won't listen, speak or appear anywhere, and no Claude session runs for it. Session notifications and your Allow and Deny buttons still work.</p></div>`;
+    const picker = pickerHtml();
+    return `${backBar('Assistant', 'settings')}<div class="a-body">${master}
+      <button class="try" data-open><span class="round-mic">${ICON('mic')}</span><span class="set-text"><b>Try it</b><span>Ask "What's happening?"</span></span></button>
+      <div class="sec"><div class="sec-t">CLAUDE</div><div class="rows"><button class="set-row" data-picker><span class="r-text">Login<small>Status, Allow and Deny don't use it</small></span><span class="val">${acctLabel()} ›</span></button>${row('Model', 'Haiku 5.5 ›')}</div></div>
+      <div class="sec"><div class="sec-t">WAKE IT</div><div class="rows">
+        <button class="set-row" data-wake><span class="r-text">"Hey Rocket"<small>Listens on the phone, nothing is sent until you say it</small></span><span class="switch ${S.wake ? 'on' : ''}"></span></button>
+        ${row('Power button', 'Hold to talk ›')}
+        ${toggle('earbud', 'Earbud button', 'Press and hold to talk')}
+      </div></div>
+      <div class="sec"><div class="sec-t">WHEN IT LISTENS</div>${seg('listen', [['auto', 'Sessions or charging'], ['always', 'Always']])}<div class="rows">${row('Battery today', '3% ›')}</div></div>
+      <div class="sec"><div class="sec-t">ANNOUNCEMENTS</div><div class="rows">${toggle('needs', 'Needs you')}${toggle('errors', 'Errors')}${toggle('finished', 'Finished', 'Off, so many sessions stay quiet')}</div>${seg('speak', [['phones', 'Headphones only'], ['speaker', 'Speaker too']])}</div>
+      <div class="sec"><div class="sec-t">ON A LOCKED PHONE</div><div class="rows">${row('Allow', 'Fingerprint ›', 'Spoken yes is enough over your earbuds or car')}${row('Commands and code', 'Hidden ›', 'Shown after you unlock')}</div></div>
+      <button class="set-card" data-nav="activity"><span class="tile2">${ICON('rocket')}</span><span class="set-text"><b>Activity</b><span>Everything Rocket did</span></span><span class="chev">${S.activity.length} ›</span></button>
+    </div>${picker}`;
+  },
+  activity() {
+    return `${backBar('Activity', 'assistant')}<div class="a-body"><div class="rows">${S.activity.map(a => `<div class="log-row"><span class="log-time">${a.time}</span><span class="log-text">${a.text}<small>${a.how}</small></span></div>`).join('')}</div></div>`;
+  },
+};
+function drawApp() {
+  if (!S.view || S.locked) return;
+  const body = document.querySelector('#appView .a-body');
+  const top = body && drawApp.was === S.view ? body.scrollTop : 0;
+  $('appView').innerHTML = VIEWS[S.view]();
+  drawApp.was = S.view;
+  const next = document.querySelector('#appView .a-body');
+  if (next) next.scrollTop = top;
+  const c = $('chat'); if (c) c.scrollTop = c.scrollHeight;
+  const r = $('rScroll'); if (r) r.scrollTop = r.scrollHeight;
+}
+function go(view) {
+  S.quick = false;
+  if (view === 'home-app') view = firstView();
+  if (view !== 'rocket') { stopRec(); turn++; if ('speechSynthesis' in window) speechSynthesis.cancel(); }
+  S.view = view;
+  S.open = view === 'rocket' && !S.locked;
+  if (S.open && !S.chipList) defaultChips();
+  if (view === 'settings') complete('a_settings');
+  if (view === 'activity') complete('a_activity');
+  drawPhone();
+}
+function setGuide(g) {
+  close();
+  S.guide = g;
+  S.locked = g === 'lock';
+  S.view = g === 'app' ? firstView() : null;
+  S.open = onTab(); if (S.open) defaultChips();
+  drawSteps(); drawPhone();
+}
+function drawSteps() {
+  $('gLock').classList.toggle('on', S.guide === 'lock'); $('gApp').classList.toggle('on', S.guide === 'app');
+  $('steps').innerHTML = (S.guide === 'app' ? APP_STEPS : STEPS).map(([k, t, d], i) => `<li class="step ${S.done.has(k) ? 'done' : ''}"><span class="tick">${S.done.has(k) ? '✓' : i + 1}</span><div><b>${t}</b><span>${d}</span></div></li>`).join('');
+}
+function complete(k) { S.done.add(k); drawSteps(); }
+function statusCard() {
+  const rows = [...S.sessions].sort((a, b) => ORDER[a.st] - ORDER[b.st]).map(s =>
+    `<button class="s-row ${s.st}" data-say="${s.st === 'needs' ? `What does ${s.say} want?` : `Tell me about ${s.say}`}"><span class="s-icon"></span><span class="s-name">${s.id}</span><span class="s-state">${LABEL[s.st]}</span></button>`).join('');
+  return `<div class="card">${rows}</div>`;
+}
+function askCard(s) {
+  return `<div class="card"><div class="ask-box"><div class="ask-label">${s.id} wants to run</div><div class="ask-cmd">${s.cmd}</div>
+    <div class="ask-btns"><button class="btn" data-say="Deny">Deny</button><button class="btn go" data-allow>Allow</button></div></div></div>`;
+}
+const chipHtml = list => list.map(c => `<button class="chip" data-say="${c}">${c}</button>`).join('');
+function chips(list) { S.chipList = list; $('chips').innerHTML = chipHtml(list); const t = $('tabChips'); if (t) t.innerHTML = chipHtml(list); }
+function defaultChips() {
+  const list = [];
+  if (failed()) list.push('Tell it to fix them');
+  if (pending()) list.push(`What does ${pending().say} want?`);
+  if (failed()) list.push('Show the failing tests');
+  list.push("What's happening?", 'Show what changed', 'Show the page', 'Start an agent in notes');
+  chips(list);
+}
+function mode(m, text) {
+  $('micZone').className = `mic-zone ${m}`;
+  $('micState').textContent = text;
+  $('micDot').classList.toggle('on', m === 'listening' || S.wake);
+  S.modeNow = m; S.modeText = { listening: 'Listening', thinking: 'Thinking', speaking: 'Speaking' }[m] || '';
+  const bar = $('tabBar'); if (bar) { bar.className = `r-bar ${m}`; $('typeBox').placeholder = S.modeText || 'Ask Rocket'; }
+}
+function show(reply, card = '') {
+  $('reply').innerHTML = reply;
+  $('card').innerHTML = card;
+  if (reply === 'How can I help?') return;
+  const last = S.convo[S.convo.length - 1];
+  if (last && last.html === 'One moment.') S.convo.pop();
+  S.convo.push({ who: 'rocket', html: reply, card });
+  if (onTab()) drawApp();
+}
+
+/* speech out */
+let voice = null;
+function pickVoice() {
+  if (!('speechSynthesis' in window)) return;
+  const all = speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
+  voice = all.find(v => /Google UK English Female|Samantha|Google US English/.test(v.name)) || all[0] || null;
+}
+if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+function speak(text) {
+  const plain = text.replace(/<[^>]+>/g, '');
+  const quiet = 500 + plain.split(' ').length * 240;
+  return new Promise(resolve => {
+    let over = false;
+    const end = () => { if (!over) { over = true; resolve(); } };
+    if (!S.sound || !('speechSynthesis' in window)) { setTimeout(end, Math.min(quiet, 1200)); return; }
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(plain);
+    if (voice) u.voice = voice;
+    u.rate = 1.05;
+    u.onend = end; u.onerror = end;
+    setTimeout(end, quiet + 2500);
+    speechSynthesis.speak(u);
+  });
+}
+let turn = 0;
+async function say(reply, card = '', opts = {}) {
+  const mine = ++turn;
+  show(reply, card);
+  mode('speaking', 'Speaking');
+  await speak(opts.speak || reply);
+  if (mine !== turn || !S.open) return;
+  if (opts.listenAfter && S.voice) listen();
+  else idle();
+}
+function idle() { mode('', 'Tap to talk'); }
+
+/* speech in */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null;
+function stopRec() { if (rec) { rec.onend = null; rec.onresult = null; rec.onerror = null; try { rec.abort(); } catch (e) {} rec = null; } }
+function warn(text) { $('alert').textContent = text; $('alert').hidden = !text; }
+function listen() {
+  stopRec();
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  turn++;
+  if (!SR) { warn('This browser has no speech recognition. Use Chrome, or tap the suggestions on the phone.'); idle(); return; }
+  warn('');
+  rec = new SR();
+  rec.lang = navigator.language || 'en-US'; rec.interimResults = true; rec.continuous = false;
+  let heard = '';
+  rec.onresult = e => {
+    heard = [...e.results].map(r => r[0].transcript).join('');
+    $('you').textContent = heard;
+    const tb = $('typeBox'); if (tb) tb.placeholder = heard;
+    if (e.results[e.results.length - 1].isFinal) { stopRec(); handle(heard, true); }
+  };
+  rec.onerror = e => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') warn('The browser blocked the mic. Allow it in the address bar, or tap the suggestions on the phone.');
+    else if (e.error === 'network') warn('Speech recognition needs internet in this browser.');
+    stopRec(); idle();
+  };
+  rec.onend = () => { rec = null; idle(); resumeWake(); };
+  rec.start();
+  mode('listening', 'Listening');
+}
+document.addEventListener('keydown', e => {
+  if (e.target.id === 'typeBox' && e.key === 'Enter' && e.target.value.trim()) { const v = e.target.value.trim(); e.target.value = ''; stopRec(); handle(v, false); }
+});
+function resumeWake() {
+  if (!S.wake || S.open || rec || !SR) return;
+  rec = new SR();
+  rec.lang = navigator.language || 'en-US'; rec.continuous = true; rec.interimResults = true;
+  rec.onresult = e => {
+    const t = [...e.results].slice(e.resultIndex).map(r => r[0].transcript).join(' ').toLowerCase();
+    if (/rocket/.test(t)) { stopRec(); open(true); }
+  };
+  rec.onerror = e => { if (e.error === 'not-allowed') { S.wake = false; syncTools(); warn('The browser blocked the mic. Allow it in the address bar.'); } };
+  rec.onend = () => { rec = null; setTimeout(resumeWake, 250); };
+  rec.start();
+}
+
+/* opening and closing */
+function open(thenListen, keep) {
+  if (onTab()) { if (thenListen) { S.voice = true; listen(); } return; }
+  S.open = true;
+  $('sheet').classList.add('show'); $('scrim').classList.add('show');
+  $('banner').classList.remove('show');
+  complete('wake');
+  if (S.view && !S.locked) complete('a_rocket');
+  const ctx = S.view === 'session' && !S.locked ? S.sessions.find(i => i.id === S.sessionId) : null;
+  $('whoCtx').textContent = ctx ? `· ${ctx.id}` : '';
+  if (!keep) { $('you').textContent = ''; show('How can I help?'); S.awaiting = null; defaultChips(); idle(); }
+  if (thenListen) { S.voice = true; listen(); }
+}
+function close() {
+  S.open = false; turn++; stopRec();
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  $('sheet').classList.remove('show'); $('scrim').classList.remove('show');
+  $('print').hidden = true; S.awaiting = null;
+  mode('', ''); S.open = onTab(); resumeWake();
+}
+
+/* what you said */
+const has = (t, re) => re.test(t);
+const YES = /\b(yes|yeah|yep|confirm|sure|go ahead|do it|ok|okay)\b/;
+const NO = /\b(no|nope|cancel|deny|reject|don'?t|stop)\b/;
+async function handle(raw, viaVoice) {
+  const t = raw.toLowerCase().trim();
+  S.voice = !!viaVoice;
+  $('you').textContent = raw;
+  S.convo.push({ who: 'you', text: raw });
+  if (onTab()) { complete('a_rocket'); drawApp(); }
+  const ask = pending();
+
+  if (S.awaiting === 'confirm' && ask) {
+    if (has(t, NO)) return denied(ask);
+    if (has(t, YES)) return authorize(ask);
+    return say(`Allow <code>${ask.cmd}</code>? Say yes or no.`, askCard(ask), { listenAfter: true });
+  }
+  if (ask && has(t, /\b(allow|approve|accept)\b/)) {
+    S.awaiting = 'confirm';
+    chips(['Yes', 'No']);
+    return say(`Allow <code>${ask.cmd}</code>? Say yes to confirm.`, askCard(ask), { listenAfter: true });
+  }
+  if (ask && S.awaiting === 'approval' && has(t, NO)) return denied(ask);
+  if (ask && has(t, /\b(deny|reject)\b/)) return denied(ask);
+
+  if (has(t, /(start|launch|spin up|new).*(agent|session)|run an agent/)) return startAgent(t);
+  if (failed() && has(t, /\b(tell|fix|ask it|sort|unblock|retry|continue)\b/)) return fixIt(failed());
+  if (!has(t, /\b(tell|fix|ask it)\b/)) {
+    if (has(t, /\b(diff|changes?|changed)\b/)) return showVisual('diff', t);
+    if (has(t, /\b(tests?|failing|failure|wrong|broke)\b/)) return showVisual('tests', t);
+    if (has(t, /\b(page|screen ?shot|site|look like|looks)\b/)) return showVisual('page', t);
+  }
+  if (ask && has(t, /\bwant|waiting|need|ask|api|blocked|unblock\b/)) {
+    S.awaiting = 'approval';
+    chips([]);
+    return say('Allow or deny?', askCard(ask), { listenAfter: true, speak: `${ask.say} wants to run ${ask.cmd}. Allow or deny?` });
+  }
+  if (has(t, /happening|status|going on|update|how.*(things|going)|what.*running|sessions?\b/)) {
+    complete('status');
+    defaultChips();
+    const parts = [...S.sessions].sort((a, b) => ORDER[a.st] - ORDER[b.st]).map(s => `${s.say} ${{ needs: 'needs you', working: 'is working', done: 'is done', error: 'failed' }[s.st]}`);
+    return say(`${parts.join('. ')}.`, statusCard());
+  }
+  const named = S.sessions.find(s => t.includes(s.id) || t.includes(s.say.toLowerCase()));
+  if (named) { defaultChips(); return say(`${named.say} ${{ needs: 'needs you', working: 'is working', done: 'is done', error: 'failed. 2 tests are red' }[named.st]}.`); }
+  defaultChips();
+  return say('This demo only knows a few things. Try asking what\'s happening, or start an agent.');
+}
+const VISUALS = {
+  diff: x => ({
+    say: `Two files changed in ${x.say}, mostly the token refresh. Here it is.`,
+    lock: 'I can show you what changed. Touch the sensor first.',
+    log: `Showed what changed in ${x.id}`,
+    card: `<div class="v-head"><b>src/auth/session.ts</b><span><span class="add">+12</span> <span class="del">−3</span></span></div>
+      <div class="diff"><div>  async function refresh() {</div><div class="d">-   return retry(oldToken)</div><div class="a">+   const token = await renew()</div><div class="a">+   store.save(token)</div><div class="a">+   return retry(token)</div><div>  }</div></div>
+      <div class="v-head"><b>src/auth/session.test.ts</b><span><span class="add">+31</span> <span class="del">−0</span></span></div>`,
+  }),
+  tests: x => ({
+    say: `Two tests failed in ${x.say}. Both are about expired tokens.`,
+    lock: 'I can show you the failing tests. Touch the sensor first.',
+    log: `Showed the failing tests in ${x.id}`,
+    card: `<div class="fail-row"><b>refresh › renews an expired token</b><code>expected 200, got 401 · session.test.ts:42</code></div><div class="fail-row"><b>login › second try succeeds</b><code>token was undefined · login.test.ts:18</code></div>`,
+  }),
+  page: x => ({
+    say: `This is the checkout page from ${x.say}, at phone width.`,
+    lock: 'I can show you the page. Touch the sensor first.',
+    log: `Showed a screenshot from ${x.id}`,
+    card: `<div class="shot-frame"><b>Checkout</b><div class="shot-line"><span>Blue mug</span><span>₹450</span></div><div class="shot-line"><span>Delivery</span><span>₹40</span></div><div class="shot-line"><span>Total</span><span>₹490</span></div><div class="shot-btn">Pay now</div></div><p class="v-note">Screenshot Claude took in its own browser</p>`,
+  }),
+};
+function showVisual(kind, t) {
+  const x = S.sessions.find(i => t.includes(i.id) || t.includes(i.say.toLowerCase())) || failed() || S.sessions.find(i => i.id === S.sessionId) || S.sessions.find(i => i.id === 'pocketrocket');
+  const v = VISUALS[kind](x);
+  const present = () => {
+    complete('a_visual'); logIt(v.log, howNow()); defaultChips();
+    say(v.say, `<div class="v-card">${v.card}<div class="v-actions"><button data-later="${v.log}">Later</button><button class="go" data-full="${x.id}">Open full</button></div></div>`);
+  };
+  if (!S.locked) return present();
+  S.after = present;
+  $('printTitle').textContent = 'Touch to see it';
+  $('printCmd').textContent = x.id;
+  $('print').hidden = false;
+  show(v.lock);
+  speak(v.lock);
+}
+async function authorize(ask) {
+  S.awaiting = null;
+  if (S.locked) {
+    $('printTitle').textContent = 'Touch to allow';
+    $('printCmd').textContent = ask.cmd;
+    $('print').hidden = false;
+    show('Touch the sensor to allow it.', '');
+    mode('speaking', 'Speaking');
+    await speak('Touch the sensor to allow it.');
+    return;
+  }
+  applied(ask);
+}
+function applied(ask) {
+  $('print').hidden = true;
+  const how = S.locked && !S.voice ? 'With fingerprint' : S.locked ? 'By voice and fingerprint' : howNow();
+  const viaRocket = S.open;
+  logIt(`Allowed <code>${ask.cmd}</code> in ${ask.id}`, how);
+  ask.log.push({ t: 'verdict', text: `Allowed ${how.toLowerCase()} · ${now()}`, rocket: viaRocket });
+  ask.log.push({ t: 'tool', kind: 'Bash', path: ask.cmd });
+  ask.last = `Running ${ask.cmd}`;
+  S.locked = false;
+  ask.st = 'working'; delete ask.cmd;
+  complete('allow'); complete('a_allow');
+  drawPhone(); defaultChips();
+  if (viaRocket) say("Done, it's running.");
+}
+function denied(ask) {
+  S.awaiting = null; $('print').hidden = true;
+  const viaRocket = S.open;
+  logIt(`Denied <code>${ask.cmd}</code> in ${ask.id}`, howNow());
+  ask.log.push({ t: 'verdict', text: `Denied ${howNow().toLowerCase()} · ${now()}`, rocket: viaRocket });
+  ask.last = 'Told no, looking for another way';
+  ask.st = 'working'; delete ask.cmd;
+  drawPhone(); defaultChips();
+  if (viaRocket) say(`Denied. ${ask.say} was told no.`);
+}
+async function fixIt(s) {
+  S.awaiting = null;
+  const mine = ++turn;
+  show('One moment.'); mode('thinking', 'Thinking'); chips([]);
+  speak('One moment.');
+  await sleep(1500);
+  if (mine !== turn) return;
+  s.st = 'working'; complete('told');
+  s.log.push({ t: 'user', text: 'Fix the failing tests and open a PR.', via: true });
+  s.last = 'Fixing the failing tests';
+  logIt(`Told ${s.id} to fix the tests and open a PR`, howNow());
+  drawPhone(); defaultChips();
+  say(`Sent. ${s.say} is fixing the tests.`);
+}
+async function startAgent(t) {
+  S.awaiting = null;
+  const m = t.match(/\bin (?:the )?([a-z0-9-]+)/);
+  const name = m ? m[1] : 'notes';
+  const mine = ++turn;
+  show('One moment.'); mode('thinking', 'Thinking'); chips([]);
+  speak('One moment.');
+  await sleep(1500);
+  if (mine !== turn) return;
+  const id = S.sessions.some(s => s.id === name) ? `${name}-2` : name;
+  const task = (t.match(/\bto (.+)$/) || [])[1] || 'New task';
+  const title = task[0].toUpperCase() + task.slice(1);
+  const known = S.sessions.find(i => i.id === name);
+  S.sessions.push({ id, say: name, st: 'working', title, folder: known ? known.folder : `work/${name}`, where: `${name} · main`, last: 'Reading the project', byRocket: true, log: [{ t: 'user', text: title + '.', via: true }] });
+  logIt(`Started an agent in ${name}`, `${howNow()} · Manual mode`);
+  complete('start'); complete('a_start'); drawPhone(); defaultChips();
+  say(`Started in ${name}. I'll tell you if it needs you.`, statusCard());
+}
+async function makeFail() {
+  const s = S.sessions.find(x => x.id === 'pocketrocket');
+  s.st = 'error'; delete s.cmd;
+  s.last = '2 tests are red';
+  s.log.push({ t: 'error', text: 'The run stopped: 2 tests are red.' });
+  if (S.prefs.errors) logIt(`Told you ${s.id} failed`, 'Announcement');
+  drawPhone();
+  if (S.open) { defaultChips(); return say('Pocketrocket failed. 2 tests are red.', statusCard()); }
+  $('banner').classList.add('show');
+  if (!S.prefs.enabled || !S.prefs.errors || S.prefs.quiet) return;
+  await speak('Pocketrocket failed. 2 tests are red.');
+  if (S.open || !$('banner').classList.contains('show')) return;
+  S.voice = true;
+  open(false);
+  show('Pocketrocket failed. 2 tests are red.', statusCard());
+  defaultChips();
+  if (SR) listen();
+}
+
+/* wiring */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-say],[data-allow],[data-open],[data-nav],[data-session],[data-pref],[data-seg],[data-guide],[data-tap-deny],[data-wake],[data-picker],[data-picker-close],[data-account],[data-full],[data-later],[data-tab-mic],[data-quick],[data-quick-close],[data-quick-compact],[data-quick-fresh]');
+  if (!b) return;
+  if ('quick' in b.dataset) { S.quick = true; return drawPhone(); }
+  if ('quickClose' in b.dataset) { if (e.target === b) { S.quick = false; drawPhone(); } return; }
+  if ('quickFresh' in b.dataset) { S.convo = []; S.quick = false; complete('a_settings'); logIt('Started a fresh Rocket conversation', 'In quick controls'); return drawPhone(); }
+  if ('quickCompact' in b.dataset) { S.quick = false; logIt("Compacted Rocket's memory", 'In quick controls'); return drawPhone(); }
+  if ('tabMic' in b.dataset) { if (S.modeNow === 'listening') { stopRec(); idle(); } else { S.voice = true; listen(); } return; }
+  if (b.dataset.guide) return setGuide(b.dataset.guide);
+  if (b.dataset.nav) return go(b.dataset.nav);
+  if (b.dataset.session) { S.sessionId = b.dataset.session; return go('session'); }
+  if (b.dataset.account) { S.prefs.account = b.dataset.account; S.picker = false; complete('a_settings'); logIt(`Switched Rocket to the ${acctLabel()} login`, 'In Settings'); return drawPhone(); }
+  if ('picker' in b.dataset) { S.picker = true; return drawPhone(); }
+  if ('pickerClose' in b.dataset) { if (e.target === b) { S.picker = false; drawPhone(); } return; }
+  if (b.dataset.full) { S.sessionId = b.dataset.full; close(); S.locked = false; return go('session'); }
+  if (b.dataset.later) { logIt(`Saved for later: ${b.dataset.later}`, 'Open it from here'); return say('Saved in Activity.'); }
+  if (b.dataset.pref === 'enabled' && S.prefs.enabled) { S.wake = false; stopRec(); close(); syncTools(); }
+  if (b.dataset.pref) { S.prefs[b.dataset.pref] = !S.prefs[b.dataset.pref]; return drawPhone(); }
+  if (b.dataset.seg) { S.prefs[b.dataset.seg] = b.dataset.val; return drawPhone(); }
+  if (b.dataset.seg || b.dataset.pref) complete('a_settings');
+  if ('wake' in b.dataset) { $('wakeToggle').click(); return drawPhone(); }
+  if ('tapDeny' in b.dataset) { const a = pending(); if (a) { S.voice = false; denied(a); } return; }
+  if (b.dataset.say) { stopRec(); handle(b.dataset.say, false); }
+  else if ('allow' in b.dataset) { stopRec(); const a = pending(); if (a) { S.voice = false; authorize(a); } }
+  else open(true);
+});
+$('micBtn').addEventListener('click', () => { if ($('micZone').classList.contains('listening')) { stopRec(); idle(); } else { S.voice = true; listen(); } });
+$('side').addEventListener('click', () => { if (!S.prefs.enabled) return; if (onTab()) { S.voice = true; listen(); } else { S.open ? close() : open(true); } });
+$('close').addEventListener('click', close);
+$('scrim').addEventListener('click', close);
+$('bannerBtn').addEventListener('click', () => { open(true); });
+$('sensor').addEventListener('click', () => { if (S.after) { const f = S.after; S.after = null; $('print').hidden = true; S.locked = false; drawPhone(); f(); return; } const a = pending(); $('print').hidden = true; if (a) applied(a); });
+$('printCancel').addEventListener('click', () => { $('print').hidden = true; if (S.after) { S.after = null; say('Okay, it stays hidden.'); return; } const a = pending(); S.awaiting = 'approval'; if (a) { chips([]); say('Not allowed yet. It\'s still waiting.', askCard(a)); } });
+$('fail').addEventListener('click', makeFail);
+$('lockBtn').addEventListener('click', () => { close(); S.guide = 'lock'; S.view = null; S.locked = true; drawSteps(); drawPhone(); });
+function syncTools() { $('wakeToggle').setAttribute('aria-pressed', S.wake); $('soundToggle').setAttribute('aria-pressed', S.sound); mode($('micZone').className.replace('mic-zone', '').trim(), $('micState').textContent); }
+$('wakeToggle').addEventListener('click', () => {
+  if (!SR) { warn('This browser has no speech recognition. Use Chrome.'); return; }
+  if (!S.prefs.enabled) { warn('Turn the assistant on first, in Settings › Assistant.'); return; }
+  S.wake = !S.wake; syncTools();
+  if (S.wake) { if (!S.open) { stopRec(); resumeWake(); } } else if (!S.open) stopRec();
+});
+$('soundToggle').addEventListener('click', () => { S.sound = !S.sound; syncTools(); if (!S.sound && 'speechSynthesis' in window) speechSynthesis.cancel(); });
+$('reset').addEventListener('click', () => {
+  close(); S.sessions = freshSessions(); S.done.clear(); S.prefs = freshPrefs(); S.locked = S.guide === 'lock'; S.view = S.guide === 'app' ? firstView() : null; S.convo = []; S.open = onTab(); if (S.open) defaultChips(); warn('');
+  $('banner').classList.remove('show'); drawPhone(); drawSteps();
+});
+
+function fit() {
+  const small = innerWidth <= 860;
+  const scale = Math.min(1, (innerHeight - 48) / 820, small ? (innerWidth - 40) / 390 : 1);
+  $('phone').style.transform = `scale(${scale})`;
+  $('phoneWrap').style.width = `${390 * scale}px`;
+  $('phoneWrap').style.height = `${820 * scale}px`;
+}
+addEventListener('resize', fit);
+fit(); drawClock(); setInterval(drawClock, 15000); drawPhone(); drawSteps();
+
+/* Screenshot states, used only to check the look: index.html#status and so on. */
+(async () => {
+  const h = location.hash.slice(1);
+  if (!h) return;
+  S.sound = false;
+  const inApp = { rocket: 'rocket', app: 'sessions', chatview: 'session', settings: 'settings', assistant: 'assistant', activity: 'activity' }[h];
+  if (inApp) { S.guide = 'app'; S.locked = false; S.sessionId = 'api-server'; go(inApp); drawSteps(); }
+  if (h === 'quick') { S.guide = 'app'; S.locked = false; go('rocket'); S.quick = true; drawSteps(); drawPhone(); }
+  if (h === 'rtalk') { S.guide = 'app'; S.locked = false; go('rocket'); drawSteps(); handle("What's happening?"); await sleep(1300); handle('Show what changed in pocketrocket'); }
+  if (h === 'diff' || h === 'page') { S.guide = 'app'; S.locked = false; S.sessionId = 'pocketrocket'; go('session'); drawSteps(); open(false); handle(h === 'diff' ? 'Show what changed' : 'Show the page'); }
+  if (h === 'acct') { S.guide = 'app'; S.locked = false; S.picker = true; go('assistant'); drawSteps(); }
+  if (h === 'off') { S.guide = 'app'; S.locked = false; S.prefs.enabled = false; go('assistant'); drawSteps(); }
+  if (h === 'appsheet') { S.guide = 'app'; S.locked = false; S.sessionId = 'api-server'; go('session'); drawSteps(); open(false); handle('Allow'); }
+  if (h === 'status') { open(false); handle("What's happening?"); }
+  if (h === 'ask') { open(false); handle('What does API server want?'); }
+  if (h === 'print') { open(false); handle('What does API server want?'); await sleep(100); handle('Allow'); await sleep(100); handle('Yes'); }
+  if (h === 'home') { open(false); handle('What does API server want?'); await sleep(100); authorize(pending()); await sleep(100); $('sensor').click(); await sleep(1400); close(); }
+})();
+</script>
+</body>
+</html>

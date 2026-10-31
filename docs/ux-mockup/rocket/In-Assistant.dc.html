@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings: Assistant</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 1500px; box-sizing: border-box; background: #0F1218; color: #E8EAF0; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; gap: 22px; padding: 18px 20px 32px">
+  <div style="display: flex; align-items: center; gap: 8px"><a href="In-Settings.dc.html" aria-label="Back" style="font-size: 24px; width: 32px">‹</a><span style="font-size: 18px; font-weight: 600">Assistant</span></div>
+
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; border-radius: 14px; background: #1E1A16; border: 1.5px solid #FF8A3D">
+    <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 600">Voice assistant</span><span style="font-size: 12px; color: #C9CFDA">On</span></span>
+    <button aria-label="Voice assistant" aria-pressed="true" style="width: 48px; height: 28px; border-radius: 14px; border: 0; background: #FF8A3D; display: flex; align-items: center; justify-content: flex-end; padding: 3px"><span style="width: 22px; height: 22px; border-radius: 50%; background: #1A0D04"></span></button>
+  </div>
+
+  <div style="display: flex; flex-direction: column"><div style="font-size: 11px; font-weight: 600; color: #AEB6C4; letter-spacing: 0.5px; padding-bottom: 4px">CLAUDE</div>
+    <a href="In-Login.dc.html" style="display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 2px; border-bottom: 1px solid #1E232D"><span style="display: flex; flex-direction: column; gap: 2px; font-size: 14px">Login<span style="font-size: 12px; color: #AEB6C4">Status, Allow and Deny don't use it</span></span><span style="font-size: 13px; color: #AEB6C4; flex: none">Default (personal) ›</span></a>
+    <div style="display: flex; justify-content: space-between; padding: 14px 2px; border-bottom: 1px solid #1E232D; font-size: 14px"><span>Model</span><span style="font-size: 13px; color: #AEB6C4">Haiku 5.5 ›</span></div>
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 2px"><span style="display: flex; flex-direction: column; gap: 2px; font-size: 14px">Memory<span style="font-size: 12px; color: #AEB6C4">Remembers the day's conversation, compacts itself</span></span><span style="font-size: 13px; color: #FF9A57; flex: none">Start fresh</span></div>
+  </div>
+
+  <div style="display: flex; flex-direction: column"><div style="font-size: 11px; font-weight: 600; color: #AEB6C4; letter-spacing: 0.5px; padding-bottom: 4px">WAKE IT</div>
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 2px; border-bottom: 1px solid #1E232D"><span style="display: flex; flex-direction: column; gap: 2px; font-size: 14px">"Hey Rocket"<span style="font-size: 12px; color: #AEB6C4">Listens on the phone, nothing is sent until you say it</span></span><button aria-label="Hey Rocket" aria-pressed="true" style="flex: none; width: 48px; height: 28px; border-radius: 14px; border: 0; background: #FF8A3D; display: flex; justify-content: flex-end; padding: 3px"><span style="width: 22px; height: 22px; border-radius: 50%; background: #1A0D04"></span></button></div>
+    <div style="display: flex; justify-content: space-between; padding: 14px 2px; border-bottom: 1px solid #1E232D; font-size: 14px"><span>Power button</span><span style="font-size: 13px; color: #AEB6C4">Hold to talk ›</span></div>
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 2px; font-size: 14px"><span>Earbud button</span><button aria-label="Earbud button" aria-pressed="true" style="width: 48px; height: 28px; border-radius: 14px; border: 0; background: #FF8A3D; display: flex; justify-content: flex-end; padding: 3px"><span style="width: 22px; height: 22px; border-radius: 50%; background: #1A0D04"></span></button></div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px"><div style="font-size: 11px; font-weight: 600; color: #AEB6C4; letter-spacing: 0.5px">WHEN IT LISTENS</div>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 3px; border-radius: 12px; background: #161A22; border: 1px solid #232833"><button style="min-height: 44px; border-radius: 9px; border: 0; background: #E8EAF0; color: #0F1218; font: inherit; font-size: 13px; font-weight: 600">Sessions or charging</button><button style="min-height: 44px; border-radius: 9px; border: 0; background: none; color: #C9CFDA; font: inherit; font-size: 13px">Always</button></div>
+    <div style="display: flex; justify-content: space-between; padding: 8px 2px; font-size: 14px"><span>Battery used</span><span style="font-size: 13px; color: #AEB6C4">[MEASURED ON PHONE] ›</span></div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px"><div style="font-size: 11px; font-weight: 600; color: #AEB6C4; letter-spacing: 0.5px">IT TELLS YOU WHEN</div>
+    <div style="display: flex; flex-direction: column">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 2px; border-bottom: 1px solid #1E232D; font-size: 14px"><span>A session needs you</span><button aria-label="A session needs you" aria-pressed="true" style="width: 48px; height: 28px; border-radius: 14px; border: 0; background: #FF8A3D; display: flex; justify-content: flex-end; padding: 3px"><span style="width: 22px; height: 22px; border-radius: 50%; background: #1A0D04"></span></button></div>
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 2px; border-bottom: 1px solid #1E232D; font-size: 14px"><span>A session fails</span><button aria-label="A session fails" aria-pressed="true" style="width: 48px; height: 28px; border-radius: 14px; border: 0; background: #FF8A3D; display: flex; justify-content: flex-end; padding: 3px"><span style="width: 22px; height: 22px; border-radius: 50%; background: #1A0D04"></span></button></div>
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 2px; font-size: 14px"><span>A session is done</span><button aria-label="A session is done" aria-pressed="true" style="width: 48px; height: 28px; border-radius: 14px; border: 0; background: #FF8A3D; display: flex; justify-content: flex-end; padding: 3px"><span style="width: 22px; height: 22px; border-radius: 50%; background: #1A0D04"></span></button></div>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 3px; border-radius: 12px; background: #161A22; border: 1px solid #232833"><button style="min-height: 44px; border-radius: 9px; border: 0; background: #E8EAF0; color: #0F1218; font: inherit; font-size: 13px; font-weight: 600">Headphones only</button><button style="min-height: 44px; border-radius: 9px; border: 0; background: none; color: #C9CFDA; font: inherit; font-size: 13px">Speaker too</button></div>
+  </div>
+
+  <div style="display: flex; flex-direction: column"><div style="font-size: 11px; font-weight: 600; color: #AEB6C4; letter-spacing: 0.5px; padding-bottom: 4px">ON A LOCKED PHONE</div>
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 2px; border-bottom: 1px solid #1E232D"><span style="display: flex; flex-direction: column; gap: 2px; font-size: 14px">Allow, push, Auto mode<span style="font-size: 12px; color: #AEB6C4">Spoken yes is enough over your earbuds or car</span></span><span style="font-size: 13px; color: #AEB6C4; flex: none">Fingerprint ›</span></div>
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 2px"><span style="display: flex; flex-direction: column; gap: 2px; font-size: 14px">Commands and code<span style="font-size: 12px; color: #AEB6C4">Shown after you unlock</span></span><span style="font-size: 13px; color: #AEB6C4; flex: none">Hidden ›</span></div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px"><div style="font-size: 11px; font-weight: 600; color: #AEB6C4; letter-spacing: 0.5px">WHAT IT CAN DO</div>
+    <a href="In-Projects.dc.html" style="display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; background: #161A22; border: 1px solid #232833"><span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 600">Projects</span><span style="font-size: 12px; color: #AEB6C4">3 workspaces it can act in</span></span><span style="color: #AEB6C4">›</span></a>
+    <a href="In-Activity.dc.html" style="display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; background: #161A22; border: 1px solid #232833"><span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 600">Activity</span><span style="font-size: 12px; color: #AEB6C4">Everything Rocket did</span></span><span style="color: #AEB6C4">›</span></a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1500}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

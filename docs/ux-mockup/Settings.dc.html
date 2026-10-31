@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #0F1218; color: #E8EAF0; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; position: relative; overflow: hidden">
+  <div style="padding: 28px 24px 10px; font-size: 22px; font-weight: 700; letter-spacing: -0.3px">Settings</div>
+
+  <div style="flex: 1; overflow: auto; padding: 6px 24px 110px; display: flex; flex-direction: column; gap: 22px">
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <div style="font-size: 11px; font-weight: 600; color: #9AA3B2; letter-spacing: 0.5px">ACCOUNTS</div>
+      <a href="ClaudeAccounts.dc.html" style="display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; background: #161A22; border: 1px solid #232833">
+        <span style="width: 36px; height: 36px; border-radius: 10px; background: rgba(255,138,61,0.14); color: #FF8A3D; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700">C</span>
+        <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 600">Claude</span><span style="font-size: 12px; color: #9AA3B2">personal · Max · default</span></span>
+        <span style="font-size: 12px; color: #9AA3B2">2 ›</span>
+      </a>
+      <a href="GitHubAccounts.dc.html" style="display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; background: #161A22; border: 1px solid #232833">
+        <span style="width: 36px; height: 36px; border-radius: 10px; background: #232833; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="6" cy="6" r="2.5"></circle><circle cx="6" cy="18" r="2.5"></circle><circle cx="18" cy="9" r="2.5"></circle><path d="M6 8.5v7M18 11.5c0 3-4 3-9.5 4.5"></path></svg></span>
+        <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 600">GitHub</span><span style="font-size: 12px; color: #9AA3B2">ShankarKakumani · default</span></span>
+        <span style="font-size: 12px; color: #9AA3B2">2 ›</span>
+      </a>
+    </div>
+
+    <a href="Health.dc.html" style="display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; background: #2A2416; border: 1.5px solid #F5B83D">
+      <span style="width: 36px; height: 36px; border-radius: 10px; background: rgba(245,184,61,0.16); color: #F5B83D; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"></path></svg></span>
+      <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 600">Health</span><span style="font-size: 12px; color: #F5D48A">2 things need attention</span></span>
+      <span style="color: #9AA3B2">›</span>
+    </a>
+
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <div style="font-size: 11px; font-weight: 600; color: #9AA3B2; letter-spacing: 0.5px; padding-bottom: 6px">APP</div>
+      <div style="display: flex; justify-content: space-between; padding: 13px 2px; border-bottom: 1px solid #1E232D; font-size: 14px"><span>Tools</span><span style="color: #9AA3B2">1 installed ›</span></div>
+      <div style="display: flex; justify-content: space-between; padding: 13px 2px; border-bottom: 1px solid #1E232D; font-size: 14px"><span>Theme</span><span style="color: #9AA3B2">Dark ›</span></div>
+      <a href="Updates.dc.html" style="display: flex; justify-content: space-between; padding: 13px 2px; font-size: 14px"><span>Updates</span><span style="color: #FF8A3D">1 update ›</span></a>
+    </div>
+  </div>
+
+  <nav style="position: absolute; left: 0; right: 0; bottom: 0; height: 76px; background: #141821; border-top: 1px solid #2A303C; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center; text-align: center; font-size: 11px">
+    <a href="Main.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; color: #9AA3B2"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>Sessions</a>
+    <a href="Workspaces.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; color: #9AA3B2"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>Workspaces</a>
+    <a href="Settings.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; color: #FF8A3D"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><circle cx="12" cy="12" r="8"></circle></svg>Settings</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

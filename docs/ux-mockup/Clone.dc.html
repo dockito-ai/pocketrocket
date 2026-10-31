@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Clone a repo</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #0F1218; color: #E8EAF0; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <div style="padding: 18px 12px 6px; display: flex; align-items: center; gap: 8px">
+    <a href="Workspaces.dc.html" aria-label="Back" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></a>
+    <div style="flex: 1; font-size: 18px; font-weight: 600">Clone a repo</div>
+    <span style="font-size: 12px; color: #9AA3B2; padding-right: 8px">GitHub · ShankarKakumani</span>
+  </div>
+  <div style="padding: 6px 18px 10px">
+    <label style="display: flex"><span style="position: absolute; left: -9999px">Search repos</span><input placeholder="Search your repos, or paste a URL" style="flex: 1; height: 44px; box-sizing: border-box; border-radius: 12px; border: 1px solid #2A303C; background: #181C24; color: #E8EAF0; padding: 0 14px; font: inherit; font-size: 14px"></label>
+  </div>
+
+  <div style="flex: 1; overflow: auto; padding: 0 18px; display: flex; flex-direction: column; gap: 6px">
+    <sc-for list="{{repos}}" as="r" hint-placeholder-count="5">
+      <button onClick="{{r.pick}}" style="{{r.style}}">
+        <span style="display: flex; justify-content: space-between; gap: 8px"><span style="font-size: 14px; font-weight: 600">{{r.name}}</span><span style="font-size: 11px; color: #9AA3B2">{{r.vis}}</span></span>
+        <span style="font-size: 12px; color: #9AA3B2">{{r.desc}}</span>
+      </button>
+    </sc-for>
+  </div>
+
+  <div style="padding: 14px 18px 22px; border-top: 1px solid #2A303C; background: #141821; display: flex; flex-direction: column; gap: 10px">
+    <div style="font-size: 12px; font-weight: 600; color: #9AA3B2; letter-spacing: 0.4px">INTO FOLDER</div>
+    <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-family: 'JetBrains Mono', monospace; font-size: 13px">
+      <span style="padding: 6px 8px; border-radius: 8px; background: #20252F">~/projects</span><span style="color: #4A5262">/</span>
+      <span style="padding: 6px 8px; border-radius: 8px; background: #20252F">work</span><span style="color: #4A5262">/</span>
+      <span style="padding: 6px 8px; border-radius: 8px; background: #20252F">pocketrocket</span><span style="color: #4A5262">/</span>
+      <span style="padding: 6px 8px; border-radius: 8px; border: 1px dashed #FF8A3D; color: #FF8A3D">{{target}}</span>
+    </div>
+    <div style="font-size: 12px; color: #9AA3B2">Tap a folder to change it, or create a new one. Same folder can hold several repos.</div>
+    <a href="Workspace.dc.html" style="display: flex; align-items: center; justify-content: center; height: 52px; border-radius: 16px; background: #FF8A3D; color: #1A1206; font-weight: 600; font-size: 15px">Clone {{target}}</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { pick: 'shared' }; }
+  renderVals() {
+    const repos = [
+      ['shared', 'private', 'Types and utils used by app and api'],
+      ['app', 'private', 'Android client'],
+      ['api', 'private', 'Backend service'],
+      ['pocketrocket', 'private', 'Claude Code on Android'],
+      ['notes', 'private', 'Personal notes'],
+      ['dotfiles', 'public', 'Shell and editor config']
+    ].map(([name, vis, desc]) => {
+      const on = this.state.pick === name;
+      return { name, vis, desc, pick: () => this.setState({ pick: name }),
+        style: 'display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 12px 14px; border-radius: 12px; font: inherit; color: #E8EAF0; cursor: pointer; background: ' + (on ? 'rgba(255,138,61,0.10)' : '#181C24') + '; border: 1.5px solid ' + (on ? '#FF8A3D' : '#2A303C') };
+    });
+    return { repos, target: this.state.pick };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+#!/data/data/app.pocket/files/usr/bin/bash
+# PocketRocket launcher for Claude Code, installed as $PREFIX/bin/claude.
+#
+# Runs ~/.pocketrocket/claude/current/claude, the official linux-arm64 binary
+# that pocketrocket-setup.sh downloaded, verified and pointed at Termux's
+# glibc loader. It does not update anything; that is the updater's job.
+#
+# Ported from the claude-code-android launcher by ferrumclaudepilgrim
+# (MIT License, Copyright (c) 2026 ferrumclaudepilgrim),
+# https://github.com/ferrumclaudepilgrim/claude-code-android
+
+PR_HOME="${POCKETROCKET_HOME:-$HOME/.pocketrocket}"
+bin="$PR_HOME/claude/current/claude"
+
+if [ ! -x "$bin" ]; then
+  echo "[claude] Claude Code is not installed yet. Run PocketRocket setup again." >&2
+  exit 127
+fi
+
+# PocketRocket's updater owns updates; Termux's ripgrep replaces the bundled one.
+export DISABLE_AUTOUPDATER=1
+export USE_BUILTIN_RIPGREP=0
+
+# Optional DNS preload (decision 5: off unless the Settings toggle is on).
+# Bun's own resolver can hang on Android without a reachable nameserver;
+# this preload points it at 8.8.8.8. As in claude-code-android, the path is
+# passed relative to the physical working directory when possible (Bun
+# resolves preloads from there; this avoids harmless EACCES noise), with the
+# absolute path as the fallback.
+dns_on="${POCKETROCKET_DNS_PRELOAD:-}"
+[ -z "$dns_on" ] && [ -f "$PR_HOME/settings/dns_preload" ] && dns_on=1
+if [ "$dns_on" = 1 ]; then
+  setdns="$PR_HOME/setdns.js"
+  [ -s "$setdns" ] || printf '%s\n' \
+    'try { require("dns").setServers(["8.8.8.8", "8.8.4.4"]); } catch (e) {}' >"$setdns" 2>/dev/null
+  if [ -s "$setdns" ]; then
+    preload="$(realpath --relative-to="$PWD" "$setdns" 2>/dev/null)" || preload=""
+    case "$preload" in
+      ./*|../*) ;;
+      ""|/*) preload="$setdns" ;;
+      *) preload="./$preload" ;;
+    esac
+    export BUN_OPTIONS="--preload $preload${BUN_OPTIONS:+ $BUN_OPTIONS}"
+  fi
+fi
+
+# Termux's LD_PRELOAD (libtermux-exec) is a bionic library; loaded into the
+# glibc binary it crashes it. The ELF interpreter was already set to Termux's
+# glibc loader at install time, so nothing else is needed.
+unset LD_PRELOAD
+exec "$bin" "$@"

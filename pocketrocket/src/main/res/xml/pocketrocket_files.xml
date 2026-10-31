@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What PocketRocket's FileProvider may hand out: chat attachments only (AttachmentFiles). -->
+<paths>
+    <files-path name="attachments" path="home/.pocketrocket/attachments/" />
+</paths>

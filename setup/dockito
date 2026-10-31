@@ -1,0 +1,23 @@
+#!/data/data/app.pocket/files/usr/bin/bash
+# PocketRocket launcher for Dockito's CLI, installed as $PREFIX/bin/dockito.
+#
+# Runs ~/.pocketrocket/dockito/current/dockito, the linux-arm64 binary from
+# Dockito's Homebrew tap that `pocketrocket-setup.sh --only dockito` downloaded,
+# checked against the formula's SHA-256 and pointed at Termux's glibc loader.
+# Optional: installed only from Settings › Dockito.
+
+PR_HOME="${POCKETROCKET_HOME:-$HOME/.pocketrocket}"
+bin="$PR_HOME/dockito/current/dockito"
+
+if [ ! -x "$bin" ]; then
+  echo "[dockito] Dockito is not installed. Install it from PocketRocket's Settings › Dockito." >&2
+  exit 127
+fi
+
+# Every login lives in one store that the app, terminals and Claude share; the CLI picks one by
+# email (DOCKITO_ACCOUNT or --account), else the login in use.
+export DOCKITO_CONFIG_DIR="${DOCKITO_CONFIG_DIR:-$HOME/.pocketrocket/accounts/dockito}"
+
+# Termux's LD_PRELOAD (libtermux-exec) is a bionic library and crashes a glibc binary.
+unset LD_PRELOAD
+exec "$bin" "$@"

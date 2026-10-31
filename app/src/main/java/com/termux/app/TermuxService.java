@@ -7,6 +7,7 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
 import android.content.res.Resources;
 import android.net.wifi.WifiManager;
 import android.os.Binder;
@@ -18,6 +19,7 @@ import android.os.PowerManager;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.pocketrocket.keepalive.SessionKeepAlive;
 import com.termux.R;
 import com.termux.app.event.SystemEventReceiver;
 import com.termux.app.terminal.TermuxTerminalSessionActivityClient;
@@ -107,6 +109,9 @@ public final class TermuxService extends Service implements AppShell.AppShellCli
 
     private static final String LOG_TAG = "TermuxService";
 
+    /** PocketRocket: held while a chat session's Claude Code is working; separate from the user's wake lock toggle. */
+    private PowerManager.WakeLock mChatSessionsWakeLock;
+
     @Override
     public void onCreate() {
         Logger.logVerbose(LOG_TAG, "onCreate");
@@ -120,6 +125,25 @@ public final class TermuxService extends Service implements AppShell.AppShellCli
         runStartForeground();
 
         SystemEventReceiver.registerPackageUpdateEvents(this);
+
+        // PocketRocket: chat sessions keep this service in the foreground too
+        SessionKeepAlive.setHost(() -> mHandler.post(this::onChatSessionsChanged));
+        if (SessionKeepAlive.isActive()) onChatSessionsChanged();
+    }
+
+    /** PocketRocket: chat sessions started, ended or changed status. */
+    private void onChatSessionsChanged() {
+        boolean wants = SessionKeepAlive.wantsWakeLock();
+        if (wants && mChatSessionsWakeLock == null) {
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            mChatSessionsWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "pocketrocket:sessions");
+            mChatSessionsWakeLock.acquire();
+        } else if (!wants && mChatSessionsWakeLock != null) {
+            mChatSessionsWakeLock.release();
+            mChatSessionsWakeLock = null;
+        }
+        SessionKeepAlive.setWakeLockHeld(mChatSessionsWakeLock != null);
+        updateNotification();
     }
 
     @SuppressLint("Wakelock")
@@ -172,6 +196,12 @@ public final class TermuxService extends Service implements AppShell.AppShellCli
         TermuxShellUtils.clearTermuxTMPDIR(true);
 
         actionReleaseWakeLock(false);
+        SessionKeepAlive.setHost(null);
+        if (mChatSessionsWakeLock != null) {
+            mChatSessionsWakeLock.release();
+            mChatSessionsWakeLock = null;
+        }
+        SessionKeepAlive.setWakeLockHeld(false);
         if (!mWantsToStop)
             killAllTermuxExecutionCommands();
 
@@ -203,7 +233,11 @@ public final class TermuxService extends Service implements AppShell.AppShellCli
     /** Make service run in foreground mode. */
     private void runStartForeground() {
         setupNotificationChannel();
-        startForeground(TermuxConstants.TERMUX_APP_NOTIFICATION_ID, buildNotification());
+        // PocketRocket: Android 14+ wants a declared type; long-running user work fits only specialUse (no 6 h cap)
+        if (Build.VERSION.SDK_INT >= 34)
+            startForeground(TermuxConstants.TERMUX_APP_NOTIFICATION_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+        else
+            startForeground(TermuxConstants.TERMUX_APP_NOTIFICATION_ID, buildNotification());
     }
 
     /** Make service leave foreground mode. */
@@ -222,6 +256,7 @@ public final class TermuxService extends Service implements AppShell.AppShellCli
     private void actionStopService() {
         mWantsToStop = true;
         killAllTermuxExecutionCommands();
+        SessionKeepAlive.onExitRequested();
         requestStopService();
     }
 
@@ -783,8 +818,8 @@ public final class TermuxService extends Service implements AppShell.AppShellCli
         Resources res = getResources();
 
         // Set pending intent to be launched when notification is clicked
-        Intent notificationIntent = TermuxActivity.newInstance(this);
-        PendingIntent contentIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
+        // PocketRocket: Home, not the terminal, also when only plain terminals run
+        PendingIntent contentIntent = SessionKeepAlive.openAppIntent(this);
 
 
         // Set notification text
@@ -819,18 +854,23 @@ public final class TermuxService extends Service implements AppShell.AppShellCli
         builder.setSmallIcon(R.drawable.ic_service_notification);
 
         // Set background color for small notification icon
-        builder.setColor(0xFF607D8B);
+        builder.setColor(0xFFFF8A3D); // PocketRocket accent
 
         // TermuxSessions are always ongoing
         builder.setOngoing(true);
 
+        // PocketRocket: chat sessions' states, colours and an Open button replace the text above
+        final boolean chatSessions = SessionKeepAlive.describe(this, builder, sessionCount);
+
 
         // Set Exit button action
         Intent exitIntent = new Intent(this, TermuxService.class).setAction(TERMUX_SERVICE.ACTION_STOP_SERVICE);
-        builder.addAction(android.R.drawable.ic_delete, res.getString(R.string.notification_action_exit), PendingIntent.getService(this, 0, exitIntent, 0));
+        builder.addAction(android.R.drawable.ic_delete, res.getString(chatSessions ? R.string.notification_action_stop_all : R.string.notification_action_exit), PendingIntent.getService(this, 0, exitIntent, 0));
 
 
-        // Set Wakelock button actions
+        // Set Wakelock button actions. PocketRocket holds its own lock while chat sessions work, so the button only
+        // shows for terminals and tasks, or to release a lock taken by hand.
+        if (chatSessions && sessionCount == 0 && taskCount == 0 && !wakeLockHeld) return builder.build();
         String newWakeAction = wakeLockHeld ? TERMUX_SERVICE.ACTION_WAKE_UNLOCK : TERMUX_SERVICE.ACTION_WAKE_LOCK;
         Intent toggleWakeLockIntent = new Intent(this, TermuxService.class).setAction(newWakeAction);
         String actionTitle = res.getString(wakeLockHeld ? R.string.notification_action_wake_unlock : R.string.notification_action_wake_lock);
@@ -850,7 +890,7 @@ public final class TermuxService extends Service implements AppShell.AppShellCli
 
     /** Update the shown foreground service notification after making any changes that affect it. */
     private synchronized void updateNotification() {
-        if (mWakeLock == null && mShellManager.mTermuxSessions.isEmpty() && mShellManager.mTermuxTasks.isEmpty()) {
+        if (mWakeLock == null && mShellManager.mTermuxSessions.isEmpty() && mShellManager.mTermuxTasks.isEmpty() && !SessionKeepAlive.isActive()) {
             // Exit if we are updating after the user disabled all locks with no sessions or tasks running.
             requestStopService();
         } else {

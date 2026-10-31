@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only: lets the emulator run Hey Rocket's detector on a WAV file (WakeFileCheck). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <receiver
+            android:name="com.pocketrocket.assistant.WakeFileCheck"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="app.pocket.wake.CHECK" />
+                <action android:name="app.pocket.wake.INSTALL" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

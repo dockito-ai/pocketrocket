@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rocket tab</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #0F1218; color: #E8EAF0; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 18px; padding: 28px 20px 12px">
+    <div style="display: flex; align-items: center; justify-content: space-between"><span style="font-size: 22px; font-weight: 700">Rocket</span><a href="In-RocketControls.dc.html" aria-label="Quick controls" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; border: 1px solid #2A303C; color: #C9CFDA"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"></path><circle cx="15" cy="7" r="2"></circle><circle cx="9" cy="17" r="2"></circle></svg></a></div>
+    <div style="font-size: 30px; line-height: 1.15; font-weight: 600; letter-spacing: -0.7px">One thing needs you.</div>
+    <div style="display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; background: #2A2416; border: 1.5px solid #F5B83D">
+      <div style="font-size: 14px; font-weight: 600">api-server wants to run a command</div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+        <button style="height: 44px; border-radius: 12px; border: 1px solid #5A5030; background: none; color: #E8EAF0; font: inherit; font-size: 14px">Deny</button>
+        <button style="height: 44px; border-radius: 12px; border: 0; background: #F5B83D; color: #1A1206; font: inherit; font-size: 14px; font-weight: 600">Review</button>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column">
+      <div style="font-size: 11px; font-weight: 600; color: #AEB6C4; letter-spacing: 0.5px; padding-bottom: 4px">RIGHT NOW</div>
+      <a href="In-Chat.dc.html" style="display: flex; justify-content: space-between; align-items: center; min-height: 46px; border-bottom: 1px solid #1E232D; font-size: 14px"><span>pocketrocket</span><span style="font-size: 13px; color: #7AB4FF">Working</span></a>
+      <a href="In-Chat.dc.html" style="display: flex; justify-content: space-between; align-items: center; min-height: 46px; font-size: 14px"><span>notes</span><span style="font-size: 13px; color: #5BD69A">Done</span></a>
+    </div>
+    <div style="flex: 1"></div>
+    <div style="display: flex; gap: 8px; overflow: hidden">
+      <button style="flex: none; height: 38px; padding: 0 13px; border-radius: 19px; border: 1px solid #2A303C; background: none; color: #E8EAF0; font: inherit; font-size: 13px">Show what changed</button>
+      <button style="flex: none; height: 38px; padding: 0 13px; border-radius: 19px; border: 1px solid #2A303C; background: none; color: #E8EAF0; font: inherit; font-size: 13px">Start an agent</button>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px">
+      <label style="flex: 1; display: flex"><span style="position: absolute; left: -9999px">Ask Rocket</span><input placeholder="Ask Rocket" style="flex: 1; min-width: 0; height: 56px; box-sizing: border-box; border-radius: 28px; border: 1px solid #2A303C; background: #161A22; color: #E8EAF0; padding: 0 20px; font: inherit; font-size: 15px"></label>
+      <button aria-label="Talk to Rocket" style="flex: none; width: 56px; height: 56px; border-radius: 50%; border: 0; background: #FF8A3D; color: #1A0D04; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></button>
+    </div>
+  </div>
+  <div style="flex: none; height: 76px; background: #141821; border-top: 1px solid #2A303C; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: center; text-align: center; font-size: 12px; color: #AEB6C4"><span style="color: #FF8A3D; font-weight: 600">Rocket</span><span>Sessions</span><span>Workspaces</span><span>Settings</span></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

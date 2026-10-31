@@ -1,0 +1,15 @@
+#!/data/data/app.pocket/files/usr/bin/bash
+# dockito-accounts: the Dockito accounts on this phone, and which one applies here.
+# Installed as $PREFIX/bin/dockito-accounts with Dockito (Settings › Dockito).
+#
+# The list is the CLI's own (`dockito accounts`); this adds which account this folder's
+# workspace picked in PocketRocket (DOCKITO_ACCOUNT in this shell). To act as another
+# account for one command: dockito --account <email> …  Arguments go to `dockito accounts`
+# (--json for JSON).
+
+if [ -n "${DOCKITO_ACCOUNT:-}" ]; then
+  echo "This folder uses $DOCKITO_ACCOUNT (its workspace's pick; DOCKITO_ACCOUNT)." >&2
+else
+  echo "This folder uses the login in use (✓), the default." >&2
+fi
+exec dockito accounts "$@"

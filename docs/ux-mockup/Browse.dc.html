@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Browse files</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #0F1218; color: #E8EAF0; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <div style="padding: 18px 12px 6px; display: flex; align-items: center; gap: 8px">
+    <a href="Git.dc.html" aria-label="Back" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></a>
+    <div style="flex: 1; display: flex; align-items: center; gap: 4px; font-family: 'JetBrains Mono', monospace; font-size: 13px; flex-wrap: wrap">
+      <span style="color: #9AA3B2">app</span><span style="color: #4A5262">/</span><span style="color: #9AA3B2">src</span><span style="color: #4A5262">/</span><span>auth</span>
+    </div>
+    <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #5BD69A; padding-right: 8px">main</span>
+  </div>
+
+  <div style="margin: 6px 18px 10px; padding: 12px 14px; border-radius: 12px; background: #181C24; border: 1px solid #2A303C; display: flex; gap: 10px; align-items: center; font-size: 12px">
+    <span style="width: 24px; height: 24px; border-radius: 12px; background: #2A303C; display: flex; align-items: center; justify-content: center; font-size: 11px">C</span>
+    <span style="flex: 1; color: #C9CFDA">Add token retry</span><span style="color: #9AA3B2">20 min</span>
+  </div>
+
+  <div style="margin: 0 18px; border-radius: 14px; border: 1px solid #2A303C; overflow: hidden">
+    <sc-for list="{{items}}" as="it" hint-placeholder-count="6">
+      <button onClick="{{it.open}}" style="width: 100%; display: flex; align-items: center; gap: 12px; padding: 13px 14px; border: 0; border-bottom: 1px solid #20252F; background: #141821; color: #E8EAF0; font: inherit; text-align: left; cursor: pointer">
+        <span style="{{it.iconStyle}}">{{it.icon}}</span>
+        <span style="flex: 1; font-family: 'JetBrains Mono', monospace; font-size: 13px">{{it.name}}</span>
+        <span style="font-size: 11px; color: #F5B83D">{{it.flag}}</span>
+      </button>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{hasFile}}" hint-placeholder-val="{{ true }}">
+    <div style="flex: 1; margin: 12px 18px 18px; border-radius: 14px; border: 1px solid #2A303C; background: #0B0E13; overflow: hidden; display: flex; flex-direction: column">
+      <div style="padding: 10px 14px; border-bottom: 1px solid #20252F; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #9AA3B2; display: flex; justify-content: space-between"><span>{{file}}</span><span>read only</span></div>
+      <div style="padding: 10px 0; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.7; overflow: auto">
+        <div style="padding: 0 14px; white-space: pre"><span style="color: #4A5262">1  </span><span style="color: #C4A8FF">export</span> <span style="color: #C4A8FF">async function</span> <span style="color: #7AB4FF">retry</span>&lt;T&gt;(</div>
+        <div style="padding: 0 14px; white-space: pre"><span style="color: #4A5262">2  </span>  fn: () =&gt; Promise&lt;T&gt;,</div>
+        <div style="padding: 0 14px; white-space: pre"><span style="color: #4A5262">3  </span>  { attempts, backoffMs }: RetryOpts,</div>
+        <div style="padding: 0 14px; white-space: pre"><span style="color: #4A5262">4  </span>): Promise&lt;T&gt; {</div>
+        <div style="padding: 0 14px; white-space: pre"><span style="color: #4A5262">5  </span>  <span style="color: #C4A8FF">for</span> (<span style="color: #C4A8FF">let</span> i = <span style="color: #FF8A3D">0</span>; i &lt; attempts; i++) {</div>
+        <div style="padding: 0 14px; white-space: pre"><span style="color: #4A5262">6  </span>    <span style="color: #C4A8FF">try</span> { <span style="color: #C4A8FF">return await</span> fn(); }</div>
+        <div style="padding: 0 14px; white-space: pre"><span style="color: #4A5262">7  </span>    <span style="color: #C4A8FF">catch</span> { <span style="color: #C4A8FF">await</span> sleep(backoffMs * (i + <span style="color: #FF8A3D">1</span>)); }</div>
+        <div style="padding: 0 14px; white-space: pre"><span style="color: #4A5262">8  </span>  }</div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { file: 'retry.ts' }; }
+  renderVals() {
+    const dir = "width: 22px; text-align: center; color: #7AB4FF; font-size: 14px";
+    const doc = "width: 22px; text-align: center; color: #9AA3B2; font-size: 14px";
+    const it = (icon, name, flag, isDir) => ({ icon, name, flag, iconStyle: isDir ? dir : doc, open: () => { if (!isDir) this.setState({ file: name }); } });
+    return {
+      items: [
+        it('▸', 'providers', '', true),
+        it('≡', 'retry.ts', 'new', false),
+        it('≡', 'session.ts', 'modified', false),
+        it('≡', 'store.ts', '', false),
+        it('≡', 'index.ts', '', false)
+      ],
+      hasFile: !!this.state.file, file: this.state.file
+    };
+  }
+}
+</script>
+</body>
+</html>

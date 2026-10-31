@@ -5,6 +5,7 @@
 # Built application files
 build/
 release/
+!.claude/skills/release/
 *.apk
 *.so
 .externalNativeBuild

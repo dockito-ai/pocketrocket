@@ -1,0 +1,285 @@
+# Builds, signs and publishes a PocketRocket release (decision 67; docs/app-updates.md, .claude/skills/release/SKILL.md).
+#
+#   gh workflow run release.yml -f version=X.Y.Z -f notes="$(cat notes.md)" [-f dry_run=true]
+#
+# build: checks the version, sets it in app/build.gradle, builds the arm64 release APK signed with the release key
+#   from the Actions secrets, checks package, version and signer (against scripts/release-cert.sha256), names it
+#   pocketrocket-vX.Y.Z-arm64.apk, computes its SHA-256 and writes the notes with the SHA-256 line the updater reads.
+#   A dry run signs with the real key when the secrets exist, else with a throwaway key made in the job (then the
+#   signer is checked against that key instead of the pin), prints what would be published and stops.
+# publish (real runs from main only): commits the bump, tags vX.Y.Z, pushes both, creates the prerelease in this
+#   repo, and in ShankarKakumani/pocketrocket-releases too when the RELEASES_REPO_TOKEN secret is set (decision 66).
+#
+# Secrets: RELEASE_KEYSTORE_BASE64 (the PKCS12 keystore, base64), RELEASE_KEYSTORE_PASSWORD (store and key share it),
+# RELEASES_REPO_TOKEN (optional; fine-grained token with Contents read/write on pocketrocket-releases).
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, X.Y.Z (newer than app/build.gradle's)
+        required: true
+        type: string
+      notes:
+        description: Release notes (Markdown). The SHA-256 line and code link are added.
+        required: false
+        type: string
+      dry_run:
+        description: Build and check only; publish nothing
+        required: false
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  KEY_ALIAS: pocketrocket
+  RELEASES_REPO: ShankarKakumani/pocketrocket-releases
+
+jobs:
+  build:
+    name: Build and check
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      sha256: ${{ steps.apk.outputs.sha256 }}
+      built_from: ${{ steps.version.outputs.built_from }}
+    steps:
+      - name: Real releases run from main only
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [ "$GITHUB_REF" != refs/heads/main ] && [ "$DRY_RUN" != true ]; then
+            echo "::error::A real release runs from main only (this is $GITHUB_REF). Dry runs may use any branch."
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check the version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${INPUT_VERSION#v}"
+          # X.Y.Z with minor and patch below 100 (versionCode = 1000 + major*10000 + minor*100 + patch).
+          if ! [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.([0-9]|[1-9][0-9])\.([0-9]|[1-9][0-9])$ ]]; then
+            echo "::error::version must be X.Y.Z with minor and patch below 100, got '$VERSION'"; exit 1
+          fi
+          CURRENT="$(sed -n 's/^ *def pocketRocketVersion = "\([^"]*\)".*/\1/p' app/build.gradle)"
+          [ -n "$CURRENT" ] || { echo "::error::no pocketRocketVersion line in app/build.gradle"; exit 1; }
+          if [ "$VERSION" = "$CURRENT" ] || [ "$(printf '%s\n%s\n' "$VERSION" "$CURRENT" | sort -V | tail -1)" != "$VERSION" ]; then
+            echo "::error::$VERSION is not newer than the current $CURRENT"; exit 1
+          fi
+          TAG="v$VERSION"
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --silent 2>/dev/null; then
+            echo "::error::tag $TAG already exists in $GITHUB_REPOSITORY"; exit 1
+          fi
+          echo "Release $TAG (current $CURRENT) from $GITHUB_REF at $GITHUB_SHA"
+          { echo "version=$VERSION"; echo "tag=$TAG"; echo "built_from=$GITHUB_SHA"; } >> "$GITHUB_OUTPUT"
+
+      - name: Set the version in app/build.gradle
+        run: scripts/set-version.sh "${{ steps.version.outputs.version }}"
+
+      - uses: ./.github/actions/android-setup
+        with:
+          cache-read-only: "true"
+
+      - name: Prepare the signing key
+        id: key
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          KEYSTORE="$RUNNER_TEMP/pocketrocket-signing.jks"
+          PIN="$(tr -d '[:space:]' < scripts/release-cert.sha256)"
+          if [ -n "$RELEASE_KEYSTORE_BASE64" ] && [ -n "$RELEASE_KEYSTORE_PASSWORD" ]; then
+            printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE"
+            PASSWORD="$RELEASE_KEYSTORE_PASSWORD"
+            KIND=release
+          elif [ "$DRY_RUN" = true ]; then
+            PASSWORD="$(openssl rand -hex 24)"
+            echo "::add-mask::$PASSWORD"
+            PASSWORD_ENV="$PASSWORD" keytool -genkeypair -keystore "$KEYSTORE" -storetype pkcs12 -alias "$KEY_ALIAS" \
+              -keyalg RSA -keysize 2048 -validity 1 -dname "CN=PocketRocket dry run throwaway" -storepass:env PASSWORD_ENV
+            KIND=throwaway
+          else
+            echo "::error::RELEASE_KEYSTORE_BASE64 and RELEASE_KEYSTORE_PASSWORD must be set for a real release (docs/app-updates.md)"
+            exit 1
+          fi
+          CERT="$(PASSWORD_ENV="$PASSWORD" keytool -exportcert -keystore "$KEYSTORE" -storetype pkcs12 -alias "$KEY_ALIAS" \
+            -storepass:env PASSWORD_ENV 2>/dev/null | sha256sum | cut -d' ' -f1)"
+          [ "$CERT" != "$(printf '' | sha256sum | cut -d' ' -f1)" ] || { echo "::error::couldn't read alias $KEY_ALIAS from the $KIND keystore"; exit 1; }
+          if [ "$KIND" = release ] && [ "$CERT" != "$PIN" ]; then
+            echo "::error::the keystore's certificate ($CERT) isn't the pinned release certificate ($PIN)"; exit 1
+          fi
+          echo "Signing with the $KIND key, certificate SHA-256 $CERT"
+          # The password goes to the build step through a file in RUNNER_TEMP, deleted at the end, never the log.
+          printf '%s' "$PASSWORD" > "$RUNNER_TEMP/pocketrocket-signing.pass"
+          { echo "keystore=$KEYSTORE"; echo "kind=$KIND"; echo "cert=$CERT"; } >> "$GITHUB_OUTPUT"
+
+      - name: Build the signed arm64 release APK
+        env:
+          POCKETROCKET_KEYSTORE: ${{ steps.key.outputs.keystore }}
+          TERMUX_SPLIT_APKS_FOR_RELEASE_BUILDS: "1"
+        run: |
+          POCKETROCKET_KEY_PASSWORD="$(cat "$RUNNER_TEMP/pocketrocket-signing.pass")" POCKETROCKET_KEY_ALIAS="$KEY_ALIAS" \
+            ./gradlew --stacktrace :app:assembleRelease
+
+      - name: Check the APK, name it and hash it
+        id: apk
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+          CERT: ${{ steps.key.outputs.cert }}
+        run: |
+          OUT="$RUNNER_TEMP/release"
+          APK="$OUT/pocketrocket-$TAG-arm64.apk"
+          mkdir -p "$OUT"
+          cp app/build/outputs/apk/release/termux-app_apt-android-7-release_arm64-v8a.apk "$APK"
+          scripts/check-release-apk.sh "$APK" "$VERSION" "$CERT"
+          SHA="$(sha256sum "$APK" | cut -d' ' -f1)"
+          echo "  $(basename "$APK"), $(stat -c %s "$APK") bytes, SHA-256 $SHA"
+          { echo "sha256=$SHA"; echo "apk=$APK"; echo "dir=$OUT"; } >> "$GITHUB_OUTPUT"
+
+      - name: Write the release notes
+        env:
+          NOTES: ${{ inputs.notes }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+          SHA: ${{ steps.apk.outputs.sha256 }}
+          OUT: ${{ steps.apk.outputs.dir }}
+        run: |
+          {
+            if [ -n "$(printf '%s' "$NOTES" | tr -d '[:space:]')" ]; then printf '%s\n' "$NOTES"
+            else echo "PocketRocket $VERSION, arm64. Update from Settings › PocketRocket, or install over the current app; don't uninstall first."; fi
+            echo
+            echo "Code: https://github.com/$GITHUB_REPOSITORY/tree/$TAG"
+            echo
+            echo "SHA-256: \`$SHA\`"
+          } > "$OUT/notes-$TAG.md"
+
+      - name: Summary
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+          KIND: ${{ steps.key.outputs.kind }}
+          APK: ${{ steps.apk.outputs.apk }}
+          OUT: ${{ steps.apk.outputs.dir }}
+          HAS_RELEASES_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN != '' }}
+        run: |
+          {
+            if [ "$DRY_RUN" = true ]; then echo "## Dry run: $TAG, nothing published"; else echo "## Release $TAG"; fi
+            echo
+            echo "Signed with the **$KIND** key. Built from \`$GITHUB_SHA\` on \`$GITHUB_REF\`."
+            echo
+            if [ "$DRY_RUN" = true ]; then echo "Would run:"; else echo "The publish job runs:"; fi
+            echo '```'
+            echo "git commit -m 'Release $TAG' app/build.gradle"
+            echo "git tag -a $TAG -m 'PocketRocket $VERSION'"
+            echo "git push --atomic origin HEAD:main $TAG"
+            echo "gh release create $TAG $(basename "$APK") --repo $GITHUB_REPOSITORY --verify-tag --prerelease --title 'PocketRocket $VERSION' --notes-file notes-$TAG.md"
+            if [ "$HAS_RELEASES_TOKEN" = true ]; then
+              echo "gh release create $TAG $(basename "$APK") --repo $RELEASES_REPO --prerelease --title 'PocketRocket $VERSION' --notes-file notes-$TAG.md"
+            else
+              echo "# RELEASES_REPO_TOKEN not set: $RELEASES_REPO is skipped"
+            fi
+            echo '```'
+            echo
+            echo "Notes:"
+            echo
+            echo '```markdown'
+            cat "$OUT/notes-$TAG.md"
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the APK and notes for publishing
+        if: ${{ !inputs.dry_run }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: ${{ steps.apk.outputs.dir }}
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Delete the keystore and password
+        if: always()
+        run: rm -f "$RUNNER_TEMP/pocketrocket-signing.jks" "$RUNNER_TEMP/pocketrocket-signing.pass"
+
+  publish:
+    name: Commit, tag and publish
+    needs: build
+    if: ${{ !inputs.dry_run && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+      TAG: ${{ needs.build.outputs.tag }}
+      SHA: ${{ needs.build.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+
+      - name: Check main hasn't moved since the build
+        env:
+          BUILT_FROM: ${{ needs.build.outputs.built_from }}
+        run: |
+          [ "$(git rev-parse HEAD)" = "$BUILT_FROM" ] ||
+            { echo "::error::main moved during the build ($BUILT_FROM -> $(git rev-parse HEAD)); nothing was published, run it again"; exit 1; }
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: ${{ runner.temp }}/release
+
+      - name: Check the APK is the one built
+        run: |
+          APK="$RUNNER_TEMP/release/pocketrocket-$TAG-arm64.apk"
+          [ "$(sha256sum "$APK" | cut -d' ' -f1)" = "$SHA" ] || { echo "::error::the APK's SHA-256 changed between jobs"; exit 1; }
+          grep -qx "SHA-256: \`$SHA\`" "$RUNNER_TEMP/release/notes-$TAG.md"
+
+      - name: Commit the bump, tag and push
+        run: |
+          git config user.name "Shankar Kakumani"
+          git config user.email "ShankarKakumani@users.noreply.github.com"
+          scripts/set-version.sh "$VERSION"
+          [ "$(git diff --name-only)" = app/build.gradle ] || { echo "::error::unexpected changes: $(git diff --name-only)"; exit 1; }
+          git commit -q -m "Release $TAG" app/build.gradle
+          git tag -a "$TAG" -m "PocketRocket $VERSION"
+          git push --atomic origin HEAD:main "$TAG"
+
+      - name: Create the prerelease here
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" "$RUNNER_TEMP/release/pocketrocket-$TAG-arm64.apk" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --prerelease --title "PocketRocket $VERSION" --notes-file "$RUNNER_TEMP/release/notes-$TAG.md"
+          DIGEST="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[0].digest // ""')"
+          [ -z "$DIGEST" ] || [ "$DIGEST" = "sha256:$SHA" ] || { echo "::error::GitHub's digest $DIGEST isn't sha256:$SHA"; exit 1; }
+          echo "Published https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Create the prerelease in the old releases repo (updater fallback, decision 66)
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then echo "RELEASES_REPO_TOKEN not set; skipping $RELEASES_REPO"; exit 0; fi
+          gh release create "$TAG" "$RUNNER_TEMP/release/pocketrocket-$TAG-arm64.apk" --repo "$RELEASES_REPO" \
+            --prerelease --title "PocketRocket $VERSION" --notes-file "$RUNNER_TEMP/release/notes-$TAG.md"
+          echo "Published https://github.com/$RELEASES_REPO/releases/tag/$TAG" | tee -a "$GITHUB_STEP_SUMMARY"

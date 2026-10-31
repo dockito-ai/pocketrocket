@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PocketRocket placeholder launcher mark: a small rocket. Content kept inside the 66dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Flame -->
+    <path
+        android:fillColor="#FF7A1A"
+        android:pathData="M48,66 L54,80 L60,66 Z" />
+    <!-- Body with a window cut out, plus fins -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M54,28 C62,36 64,48 62,64 L46,64 C44,48 46,36 54,28 Z M58,46 A4,4 0 1,0 50,46 A4,4 0 1,0 58,46 Z M46,52 L38,68 L46,64 Z M62,52 L70,68 L62,64 Z" />
+</vector>

@@ -38,20 +38,26 @@ android {
 
         implementation project(":terminal-view")
         implementation project(":termux-shared")
+        implementation project(":pocketrocket")
     }
 
     defaultConfig {
         minSdkVersion project.properties.minSdkVersion.toInteger()
         targetSdkVersion project.properties.targetSdkVersion.toInteger()
-        versionCode 118
-        versionName "0.118.0"
+        // PocketRocket's own version (decision 26); scripts/release.sh sets it. versionCode is
+        // 1000 + major*10000 + minor*100 + patch (minor and patch below 100), always above Termux's 118.
+        def pocketRocketVersion = "1.0.5"
+        versionName pocketRocketVersion
+        versionCode pocketRocketVersion.tokenize(".").with { 1000 + it[0].toInteger() * 10000 + it[1].toInteger() * 100 + it[2].toInteger() }
 
         if (appVersionName) versionName = appVersionName
         validateVersionName(versionName)
 
         buildConfigField "String", "TERMUX_PACKAGE_VARIANT", "\"" + project.ext.packageVariant + "\"" // Used by TermuxApplication class
 
-        manifestPlaceholders.TERMUX_PACKAGE_NAME = "com.termux"
+        // PocketRocket's own id (decision 33); the Java namespace stays com.termux.
+        applicationId "app.pocket"
+        manifestPlaceholders.TERMUX_PACKAGE_NAME = "app.pocket"
         manifestPlaceholders.TERMUX_APP_NAME = "Termux"
         manifestPlaceholders.TERMUX_API_APP_NAME = "Termux:API"
         manifestPlaceholders.TERMUX_BOOT_APP_NAME = "Termux:Boot"
@@ -84,6 +90,17 @@ android {
             storePassword 'xrj45yWGLbsO7W0v'
             keyPassword 'xrj45yWGLbsO7W0v'
         }
+        // PocketRocket's release key (decision 30): only from the environment (scripts/release.sh reads the
+        // password from the Keychain), so nothing secret is committed. Without it, release builds stay unsigned.
+        if (System.getenv("POCKETROCKET_KEYSTORE")) {
+            release {
+                storeFile file(System.getenv("POCKETROCKET_KEYSTORE"))
+                storeType "pkcs12"
+                keyAlias System.getenv("POCKETROCKET_KEY_ALIAS") ?: "pocketrocket"
+                storePassword System.getenv("POCKETROCKET_KEY_PASSWORD")
+                keyPassword System.getenv("POCKETROCKET_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -91,6 +108,7 @@ android {
             minifyEnabled true
             shrinkResources false // Reproducible builds
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (System.getenv("POCKETROCKET_KEYSTORE")) signingConfig signingConfigs.release
         }
 
         debug {

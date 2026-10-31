@@ -347,9 +347,12 @@ public final class TermuxConstants {
      */
 
     /** Termux app name */
-    public static final String TERMUX_APP_NAME = "Termux"; // Default: "Termux"
+    public static final String TERMUX_APP_NAME = "PocketRocket"; // Default: "Termux"
     /** Termux package name */
-    public static final String TERMUX_PACKAGE_NAME = "com.termux"; // Default: "com.termux"
+    public static final String TERMUX_PACKAGE_NAME = "app.pocket"; // Default: "com.termux". PocketRocket's own id (decision 36)
+    /** Java package of the app's classes and the prefix of its intent actions and extras. It stays
+     * "com.termux" so class names and the actions Termux's own scripts send keep working (decision 36). */
+    public static final String TERMUX_APP_NAMESPACE = "com.termux";
     /** Termux GitHub repo name */
     public static final String TERMUX_GITHUB_REPO_NAME = "termux-app"; // Default: "termux-app"
     /** Termux GitHub repo url */
@@ -925,17 +928,17 @@ public final class TermuxConstants {
 
 
         /** Termux app BuildConfig class name */
-        public static final String BUILD_CONFIG_CLASS_NAME = TERMUX_PACKAGE_NAME + ".BuildConfig"; // Default: "com.termux.BuildConfig"
+        public static final String BUILD_CONFIG_CLASS_NAME = TERMUX_APP_NAMESPACE + ".BuildConfig"; // Default: "com.termux.BuildConfig"
 
         /** Termux app FileShareReceiverActivity class name */
-        public static final String FILE_SHARE_RECEIVER_ACTIVITY_CLASS_NAME = TERMUX_PACKAGE_NAME + ".app.api.file.FileShareReceiverActivity"; // Default: "com.termux.app.api.file.FileShareReceiverActivity"
+        public static final String FILE_SHARE_RECEIVER_ACTIVITY_CLASS_NAME = TERMUX_APP_NAMESPACE + ".app.api.file.FileShareReceiverActivity"; // Default: "com.termux.app.api.file.FileShareReceiverActivity"
 
         /** Termux app FileViewReceiverActivity class name */
-        public static final String FILE_VIEW_RECEIVER_ACTIVITY_CLASS_NAME = TERMUX_PACKAGE_NAME + ".app.api.file.FileViewReceiverActivity"; // Default: "com.termux.app.api.file.FileViewReceiverActivity"
+        public static final String FILE_VIEW_RECEIVER_ACTIVITY_CLASS_NAME = TERMUX_APP_NAMESPACE + ".app.api.file.FileViewReceiverActivity"; // Default: "com.termux.app.api.file.FileViewReceiverActivity"
 
 
         /** Termux app core activity name. */
-        public static final String TERMUX_ACTIVITY_NAME = TERMUX_PACKAGE_NAME + ".app.TermuxActivity"; // Default: "com.termux.app.TermuxActivity"
+        public static final String TERMUX_ACTIVITY_NAME = TERMUX_APP_NAMESPACE + ".app.TermuxActivity"; // Default: "com.termux.app.TermuxActivity"
 
         /**
          * Termux app core activity.
@@ -943,25 +946,25 @@ public final class TermuxConstants {
         public static final class TERMUX_ACTIVITY {
 
             /** Intent extra for if termux failsafe session needs to be started and is used by {@link TERMUX_ACTIVITY} and {@link TERMUX_SERVICE#ACTION_STOP_SERVICE} */
-            public static final String EXTRA_FAILSAFE_SESSION = TermuxConstants.TERMUX_PACKAGE_NAME + ".app.failsafe_session"; // Default: "com.termux.app.failsafe_session"
+            public static final String EXTRA_FAILSAFE_SESSION = TermuxConstants.TERMUX_APP_NAMESPACE + ".app.failsafe_session"; // Default: "com.termux.app.failsafe_session"
 
 
             /** Intent action to make termux app notify user that a crash happened. */
-            public static final String ACTION_NOTIFY_APP_CRASH = TermuxConstants.TERMUX_PACKAGE_NAME + ".app.notify_app_crash"; // Default: "com.termux.app.notify_app_crash"
+            public static final String ACTION_NOTIFY_APP_CRASH = TermuxConstants.TERMUX_APP_NAMESPACE + ".app.notify_app_crash"; // Default: "com.termux.app.notify_app_crash"
 
 
             /** Intent action to make termux reload its termux session styling */
-            public static final String ACTION_RELOAD_STYLE = TermuxConstants.TERMUX_PACKAGE_NAME + ".app.reload_style"; // Default: "com.termux.app.reload_style"
+            public static final String ACTION_RELOAD_STYLE = TermuxConstants.TERMUX_APP_NAMESPACE + ".app.reload_style"; // Default: "com.termux.app.reload_style"
             /** Intent {@code String} extra for what to reload for the TERMUX_ACTIVITY.ACTION_RELOAD_STYLE intent. This has been deperecated. */
             @Deprecated
-            public static final String EXTRA_RELOAD_STYLE = TermuxConstants.TERMUX_PACKAGE_NAME + ".app.reload_style"; // Default: "com.termux.app.reload_style"
+            public static final String EXTRA_RELOAD_STYLE = TermuxConstants.TERMUX_APP_NAMESPACE + ".app.reload_style"; // Default: "com.termux.app.reload_style"
 
             /**  Intent {@code boolean} extra for whether to recreate activity for the TERMUX_ACTIVITY.ACTION_RELOAD_STYLE intent. */
             public static final String EXTRA_RECREATE_ACTIVITY = TERMUX_APP.TERMUX_ACTIVITY_NAME + ".EXTRA_RECREATE_ACTIVITY"; // Default: "com.termux.app.TermuxActivity.EXTRA_RECREATE_ACTIVITY"
 
 
             /** Intent action to make termux request storage permissions */
-            public static final String ACTION_REQUEST_PERMISSIONS = TermuxConstants.TERMUX_PACKAGE_NAME + ".app.request_storage_permissions"; // Default: "com.termux.app.request_storage_permissions"
+            public static final String ACTION_REQUEST_PERMISSIONS = TermuxConstants.TERMUX_APP_NAMESPACE + ".app.request_storage_permissions"; // Default: "com.termux.app.request_storage_permissions"
         }
 
 
@@ -969,14 +972,14 @@ public final class TermuxConstants {
 
 
         /** Termux app settings activity name. */
-        public static final String TERMUX_SETTINGS_ACTIVITY_NAME = TERMUX_PACKAGE_NAME + ".app.activities.SettingsActivity"; // Default: "com.termux.app.activities.SettingsActivity"
+        public static final String TERMUX_SETTINGS_ACTIVITY_NAME = TERMUX_APP_NAMESPACE + ".app.activities.SettingsActivity"; // Default: "com.termux.app.activities.SettingsActivity"
 
 
 
 
 
         /** Termux app core service name. */
-        public static final String TERMUX_SERVICE_NAME = TERMUX_PACKAGE_NAME + ".app.TermuxService"; // Default: "com.termux.app.TermuxService"
+        public static final String TERMUX_SERVICE_NAME = TERMUX_APP_NAMESPACE + ".app.TermuxService"; // Default: "com.termux.app.TermuxService"
 
         /**
          * Termux app core service.
@@ -984,73 +987,73 @@ public final class TermuxConstants {
         public static final class TERMUX_SERVICE {
 
             /** Intent action to stop TERMUX_SERVICE */
-            public static final String ACTION_STOP_SERVICE = TERMUX_PACKAGE_NAME + ".service_stop"; // Default: "com.termux.service_stop"
+            public static final String ACTION_STOP_SERVICE = TERMUX_APP_NAMESPACE + ".service_stop"; // Default: "com.termux.service_stop"
 
 
             /** Intent action to make TERMUX_SERVICE acquire a wakelock */
-            public static final String ACTION_WAKE_LOCK = TERMUX_PACKAGE_NAME + ".service_wake_lock"; // Default: "com.termux.service_wake_lock"
+            public static final String ACTION_WAKE_LOCK = TERMUX_APP_NAMESPACE + ".service_wake_lock"; // Default: "com.termux.service_wake_lock"
 
 
             /** Intent action to make TERMUX_SERVICE release wakelock */
-            public static final String ACTION_WAKE_UNLOCK = TERMUX_PACKAGE_NAME + ".service_wake_unlock"; // Default: "com.termux.service_wake_unlock"
+            public static final String ACTION_WAKE_UNLOCK = TERMUX_APP_NAMESPACE + ".service_wake_unlock"; // Default: "com.termux.service_wake_unlock"
 
 
             /** Intent action to execute command with TERMUX_SERVICE */
-            public static final String ACTION_SERVICE_EXECUTE = TERMUX_PACKAGE_NAME + ".service_execute"; // Default: "com.termux.service_execute"
+            public static final String ACTION_SERVICE_EXECUTE = TERMUX_APP_NAMESPACE + ".service_execute"; // Default: "com.termux.service_execute"
 
             /** Uri scheme for paths sent via intent to TERMUX_SERVICE */
-            public static final String URI_SCHEME_SERVICE_EXECUTE = TERMUX_PACKAGE_NAME + ".file"; // Default: "com.termux.file"
+            public static final String URI_SCHEME_SERVICE_EXECUTE = TERMUX_APP_NAMESPACE + ".file"; // Default: "com.termux.file"
             /** Intent {@code String[]} extra for arguments to the executable of the command for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
-            public static final String EXTRA_ARGUMENTS = TERMUX_PACKAGE_NAME + ".execute.arguments"; // Default: "com.termux.execute.arguments"
+            public static final String EXTRA_ARGUMENTS = TERMUX_APP_NAMESPACE + ".execute.arguments"; // Default: "com.termux.execute.arguments"
             /** Intent {@code String} extra for stdin of the command for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
-            public static final String EXTRA_STDIN = TERMUX_PACKAGE_NAME + ".execute.stdin"; // Default: "com.termux.execute.stdin"
+            public static final String EXTRA_STDIN = TERMUX_APP_NAMESPACE + ".execute.stdin"; // Default: "com.termux.execute.stdin"
             /** Intent {@code String} extra for command current working directory for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
-            public static final String EXTRA_WORKDIR = TERMUX_PACKAGE_NAME + ".execute.cwd"; // Default: "com.termux.execute.cwd"
+            public static final String EXTRA_WORKDIR = TERMUX_APP_NAMESPACE + ".execute.cwd"; // Default: "com.termux.execute.cwd"
             /** Intent {@code boolean} extra for whether to run command in background {@link Runner#APP_SHELL} or foreground {@link Runner#TERMINAL_SESSION} for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
             @Deprecated
-            public static final String EXTRA_BACKGROUND = TERMUX_PACKAGE_NAME + ".execute.background"; // Default: "com.termux.execute.background"
+            public static final String EXTRA_BACKGROUND = TERMUX_APP_NAMESPACE + ".execute.background"; // Default: "com.termux.execute.background"
             /** Intent {@code String} extra for command the {@link Runner} for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
-            public static final String EXTRA_RUNNER = TERMUX_PACKAGE_NAME + ".execute.runner"; // Default: "com.termux.execute.runner"
+            public static final String EXTRA_RUNNER = TERMUX_APP_NAMESPACE + ".execute.runner"; // Default: "com.termux.execute.runner"
             /** Intent {@code String} extra for custom log level for background commands defined by {@link com.termux.shared.logger.Logger} for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
-            public static final String EXTRA_BACKGROUND_CUSTOM_LOG_LEVEL = TERMUX_PACKAGE_NAME + ".execute.background_custom_log_level"; // Default: "com.termux.execute.background_custom_log_level"
+            public static final String EXTRA_BACKGROUND_CUSTOM_LOG_LEVEL = TERMUX_APP_NAMESPACE + ".execute.background_custom_log_level"; // Default: "com.termux.execute.background_custom_log_level"
             /** Intent {@code String} extra for session action for {@link Runner#TERMINAL_SESSION} commands for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
-            public static final String EXTRA_SESSION_ACTION = TERMUX_PACKAGE_NAME + ".execute.session_action"; // Default: "com.termux.execute.session_action"
+            public static final String EXTRA_SESSION_ACTION = TERMUX_APP_NAMESPACE + ".execute.session_action"; // Default: "com.termux.execute.session_action"
             /** Intent {@code String} extra for shell name for commands for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
-            public static final String EXTRA_SHELL_NAME = TERMUX_PACKAGE_NAME + ".execute.shell_name"; // Default: "com.termux.execute.shell_name"
+            public static final String EXTRA_SHELL_NAME = TERMUX_APP_NAMESPACE + ".execute.shell_name"; // Default: "com.termux.execute.shell_name"
             /** Intent {@code String} extra for the {@link ExecutionCommand.ShellCreateMode}  for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent. */
-            public static final String EXTRA_SHELL_CREATE_MODE = TERMUX_PACKAGE_NAME + ".execute.shell_create_mode"; // Default: "com.termux.execute.shell_create_mode"
+            public static final String EXTRA_SHELL_CREATE_MODE = TERMUX_APP_NAMESPACE + ".execute.shell_create_mode"; // Default: "com.termux.execute.shell_create_mode"
             /** Intent {@code String} extra for label of the command for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
-            public static final String EXTRA_COMMAND_LABEL = TERMUX_PACKAGE_NAME + ".execute.command_label"; // Default: "com.termux.execute.command_label"
+            public static final String EXTRA_COMMAND_LABEL = TERMUX_APP_NAMESPACE + ".execute.command_label"; // Default: "com.termux.execute.command_label"
             /** Intent markdown {@code String} extra for description of the command for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
-            public static final String EXTRA_COMMAND_DESCRIPTION = TERMUX_PACKAGE_NAME + ".execute.command_description"; // Default: "com.termux.execute.command_description"
+            public static final String EXTRA_COMMAND_DESCRIPTION = TERMUX_APP_NAMESPACE + ".execute.command_description"; // Default: "com.termux.execute.command_description"
             /** Intent markdown {@code String} extra for help of the command for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
-            public static final String EXTRA_COMMAND_HELP = TERMUX_PACKAGE_NAME + ".execute.command_help"; // Default: "com.termux.execute.command_help"
+            public static final String EXTRA_COMMAND_HELP = TERMUX_APP_NAMESPACE + ".execute.command_help"; // Default: "com.termux.execute.command_help"
             /** Intent markdown {@code String} extra for help of the plugin API for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent (Internal Use Only) */
-            public static final String EXTRA_PLUGIN_API_HELP = TERMUX_PACKAGE_NAME + ".execute.plugin_api_help"; // Default: "com.termux.execute.plugin_help"
+            public static final String EXTRA_PLUGIN_API_HELP = TERMUX_APP_NAMESPACE + ".execute.plugin_api_help"; // Default: "com.termux.execute.plugin_help"
             /** Intent {@code Parcelable} extra for the pending intent that should be sent with the
              * result of the execution command to the execute command caller for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
             public static final String EXTRA_PENDING_INTENT = "pendingIntent"; // Default: "pendingIntent"
             /** Intent {@code String} extra for the directory path in which to write the result of the
              * execution command for the execute command caller for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
-            public static final String EXTRA_RESULT_DIRECTORY = TERMUX_PACKAGE_NAME + ".execute.result_directory"; // Default: "com.termux.execute.result_directory"
+            public static final String EXTRA_RESULT_DIRECTORY = TERMUX_APP_NAMESPACE + ".execute.result_directory"; // Default: "com.termux.execute.result_directory"
             /** Intent {@code boolean} extra for whether the result should be written to a single file
              * or multiple files (err, errmsg, stdout, stderr, exit_code) in
              * {@link #EXTRA_RESULT_DIRECTORY} for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
-            public static final String EXTRA_RESULT_SINGLE_FILE = TERMUX_PACKAGE_NAME + ".execute.result_single_file"; // Default: "com.termux.execute.result_single_file"
+            public static final String EXTRA_RESULT_SINGLE_FILE = TERMUX_APP_NAMESPACE + ".execute.result_single_file"; // Default: "com.termux.execute.result_single_file"
             /** Intent {@code String} extra for the basename of the result file that should be created
              * in {@link #EXTRA_RESULT_DIRECTORY} if {@link #EXTRA_RESULT_SINGLE_FILE} is {@code true}
              * for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
-            public static final String EXTRA_RESULT_FILE_BASENAME = TERMUX_PACKAGE_NAME + ".execute.result_file_basename"; // Default: "com.termux.execute.result_file_basename"
+            public static final String EXTRA_RESULT_FILE_BASENAME = TERMUX_APP_NAMESPACE + ".execute.result_file_basename"; // Default: "com.termux.execute.result_file_basename"
             /** Intent {@code String} extra for the output {@link Formatter} format of the
              * {@link #EXTRA_RESULT_FILE_BASENAME} result file for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
-            public static final String EXTRA_RESULT_FILE_OUTPUT_FORMAT = TERMUX_PACKAGE_NAME + ".execute.result_file_output_format"; // Default: "com.termux.execute.result_file_output_format"
+            public static final String EXTRA_RESULT_FILE_OUTPUT_FORMAT = TERMUX_APP_NAMESPACE + ".execute.result_file_output_format"; // Default: "com.termux.execute.result_file_output_format"
             /** Intent {@code String} extra for the error {@link Formatter} format of the
              * {@link #EXTRA_RESULT_FILE_BASENAME} result file for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
-            public static final String EXTRA_RESULT_FILE_ERROR_FORMAT = TERMUX_PACKAGE_NAME + ".execute.result_file_error_format"; // Default: "com.termux.execute.result_file_error_format"
+            public static final String EXTRA_RESULT_FILE_ERROR_FORMAT = TERMUX_APP_NAMESPACE + ".execute.result_file_error_format"; // Default: "com.termux.execute.result_file_error_format"
             /** Intent {@code String} extra for the optional suffix of the result files that should
              * be created in {@link #EXTRA_RESULT_DIRECTORY} if {@link #EXTRA_RESULT_SINGLE_FILE} is
              * {@code false} for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
-            public static final String EXTRA_RESULT_FILES_SUFFIX = TERMUX_PACKAGE_NAME + ".execute.result_files_suffix"; // Default: "com.termux.execute.result_files_suffix"
+            public static final String EXTRA_RESULT_FILES_SUFFIX = TERMUX_APP_NAMESPACE + ".execute.result_files_suffix"; // Default: "com.termux.execute.result_files_suffix"
 
 
 
@@ -1120,7 +1123,7 @@ public final class TermuxConstants {
 
 
         /** Termux app run command service name. */
-        public static final String RUN_COMMAND_SERVICE_NAME = TERMUX_PACKAGE_NAME + ".app.RunCommandService"; // Termux app service to receive commands from 3rd party apps "com.termux.app.RunCommandService"
+        public static final String RUN_COMMAND_SERVICE_NAME = TERMUX_APP_NAMESPACE + ".app.RunCommandService"; // Termux app service to receive commands from 3rd party apps "com.termux.app.RunCommandService"
 
         /**
          * Termux app run command service to receive commands sent by 3rd party apps.

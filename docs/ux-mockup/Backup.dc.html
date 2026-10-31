@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backup</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root { --bg:#0F1218; --card:#161A22; --edge:#232833; --line:#2A303C; --rule:#1E232D; --text:#E8EAF0; --muted:#9AA3B2; --dim:#4A5262; --orange:#FF8A3D; --green:#5BD69A; --blue:#6AA8FF; --red:#FF8F8F; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #07090D; color: var(--text); font-family: Inter, system-ui, sans-serif; }
+  a { color: inherit; text-decoration: none; }
+  .page { max-width: 1680px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .lead { color: var(--muted); font-size: 14px; margin: 0 0 28px; line-height: 1.5; max-width: 760px; }
+  h2 { font-size: 15px; margin: 40px 0 14px; color: var(--orange); }
+  .row { display: flex; flex-wrap: wrap; gap: 20px; }
+  .shot { width: 390px; max-width: 100%; }
+  .cap { font-size: 12px; color: var(--muted); margin: 8px 4px 0; line-height: 1.4; }
+
+  /* Phone frame: same as Tools.dc.html (full screen, no bottom nav) */
+  .phone { width: 100%; height: 844px; background: var(--bg); border: 1px solid var(--line); border-radius: 22px; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+  .bar { padding: 18px 12px 6px; display: flex; align-items: center; gap: 8px; }
+  .back { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+  .bar b { font-size: 17px; font-weight: 600; flex: 1; }
+  .bar .act { font-size: 14px; font-weight: 600; color: var(--orange); padding: 10px 12px; }
+  .bar .act.off { color: var(--muted); font-weight: 500; }
+  .body { flex: 1; overflow: hidden; padding: 8px 24px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .intro { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .label { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: 0.5px; }
+
+  .tile { display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--edge); }
+  .tile.hot { border-color: #3A2E22; }
+  .tline { display: flex; align-items: center; gap: 12px; }
+  .icon { width: 36px; height: 36px; flex: none; border-radius: 10px; background: #232833; color: var(--text); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; }
+  .icon.orange { background: rgba(255,138,61,0.14); color: var(--orange); }
+  .icon.blue { background: rgba(106,168,255,0.14); color: var(--blue); }
+  .stack { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .stack .n { font-size: 14px; font-weight: 600; }
+  .stack .s { font-size: 12px; color: var(--muted); }
+  .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+
+  .pill { font-size: 11px; font-weight: 600; padding: 4px 9px; border-radius: 999px; white-space: nowrap; }
+  .pill.green { color: var(--green); background: rgba(91,214,154,0.14); }
+  .pill.blue { color: var(--blue); background: rgba(106,168,255,0.14); }
+  .sbtn { height: 34px; padding: 0 14px; border-radius: 10px; border: 0; font: inherit; font-size: 13px; font-weight: 600; background: var(--orange); color: #1A1206; white-space: nowrap; }
+  .sbtn.busy { background: #2A303C; color: var(--muted); }
+
+  .btn { height: 48px; border-radius: 12px; border: 0; font: inherit; font-size: 15px; font-weight: 600; width: 100%; }
+  .btn.primary { background: var(--orange); color: #1A1206; }
+  .btn.busy { background: #2A303C; color: var(--muted); }
+  .bottom { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
+  .foot { font-size: 11px; color: var(--muted); line-height: 1.45; }
+  .checked { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+
+  .steps { display: flex; flex-direction: column; gap: 10px; padding: 12px 0 2px; border-top: 1px solid var(--rule); }
+  .step { display: flex; align-items: flex-start; gap: 12px; font-size: 13px; }
+  .dot { width: 20px; height: 20px; flex: none; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+  .dot.done { background: rgba(91,214,154,0.16); color: var(--green); }
+  .dot.now { border: 2px solid var(--blue); border-right-color: transparent; }
+  .dot.wait { border: 1.5px solid var(--dim); }
+  .step .stack { gap: 6px; }
+  .step .n { font-size: 13px; font-weight: 500; }
+  .step.wait .n { color: var(--muted); font-weight: 400; }
+  .step .s { font-size: 12px; color: var(--muted); }
+  .track { height: 6px; background: #2A303C; border-radius: 3px; }
+  .track > div { height: 6px; border-radius: 3px; background: var(--blue); }
+  .log { border-radius: 10px; border: 1px solid var(--edge); background: #0B0E13; }
+  .log .h { display: flex; justify-content: space-between; padding: 10px 12px; font-size: 12px; color: var(--muted); }
+
+  /* Settings strip */
+  .srow { display: flex; justify-content: space-between; padding: 13px 2px; border-bottom: 1px solid var(--rule); font-size: 14px; }
+  .srow:last-child { border-bottom: 0; }
+  .srow span:last-child { color: var(--muted); }
+
+  .notes { max-width: 860px; font-size: 13px; line-height: 1.6; color: #D5D9E2; }
+  .notes table { border-collapse: collapse; width: 100%; margin: 6px 0 16px; }
+  .notes td, .notes th { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--rule); }
+  .notes th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  .notes code { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #C9D1DE; }
+  .notes ul { padding-left: 18px; margin: 6px 0; }
+
+  .btn.outline { background: transparent; border: 1px solid var(--line); color: var(--text); }
+  .btn.danger { background: transparent; border: 1px solid #5A2E2E; color: var(--red); }
+  .kv { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; font-size: 13px; border-top: 1px solid var(--rule); }
+  .kv:first-child { border-top: 0; padding-top: 0; }
+  .kv:last-child { padding-bottom: 0; }
+  .kv span:last-child { color: var(--muted); text-align: right; }
+  .field { height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); display: flex; align-items: center; padding: 0 14px; font-size: 14px; color: var(--text); justify-content: space-between; }
+  .field.ph { color: var(--muted); }
+  .field.bad { border-color: #5A2E2E; }
+  .msg { font-size: 13px; line-height: 1.5; padding: 12px 14px; border-radius: 12px; }
+  .msg.warn { color: var(--orange); background: rgba(255,138,61,0.10); }
+  .msg.err { color: var(--red); background: rgba(255,143,143,0.10); }
+  .msg.ok { color: var(--green); background: rgba(91,214,154,0.10); }
+  .err { font-size: 12px; color: var(--red); }
+  .dot.fail { background: rgba(255,143,143,0.16); color: var(--red); }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Backup</h1>
+  <p class="lead">Settings › Backup (decision 53, <code>docs/backup-restore.md</code>). One encrypted file, Downloads/PocketRocket/pocketrocket.backup, replaced only after the new one is written and checked. Restore is by hand, after setup, over a phone that may already be signed in. Full screen with no bottom nav, the same as Updates. Sample data is made up.</p>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"></path></symbol></svg>
+  <h2>1. The row in Settings</h2>
+  <div class="row"><div class="shot"><div class="phone" style="height:auto;padding:20px 24px 16px"><div class="label" style="padding-bottom:6px">APP</div><div class="srow"><span>Tools</span><span>1 installed ›</span></div><div class="srow"><span>Theme</span><span>Dark ›</span></div><div class="srow"><span>Updates</span><span>Up to date ›</span></div><div class="srow"><span>Backup</span><span>Not backed up ›</span></div></div><div class="cap">No backup in Downloads/PocketRocket.</div></div><div class="shot"><div class="phone" style="height:auto;padding:20px 24px 16px"><div class="label" style="padding-bottom:6px">APP</div><div class="srow"><span>Tools</span><span>1 installed ›</span></div><div class="srow"><span>Theme</span><span>Dark ›</span></div><div class="srow"><span>Updates</span><span>Up to date ›</span></div><div class="srow"><span>Backup</span><span>Today, 14:02 ›</span></div></div><div class="cap">The date of the file. Earlier days read "28 Oct ›".</div></div><div class="shot"><div class="phone" style="height:auto;padding:20px 24px 16px"><div class="label" style="padding-bottom:6px">APP</div><div class="srow"><span>Tools</span><span>1 installed ›</span></div><div class="srow"><span>Theme</span><span>Dark ›</span></div><div class="srow"><span>Updates</span><span>Up to date ›</span></div><div class="srow"><span>Backup</span><span style="color:var(--blue)">Backing up · 42% ›</span></div></div><div class="cap">While a backup or restore runs, in blue ("Restoring · 42% ›").</div></div></div>
+  <h2>2. Back up</h2>
+  <div class="row">    <div class="shot">
+      <div class="phone">
+        <div class="bar"><a class="back" href="#" aria-label="Back"><svg width="22" height="22"><use href="#back"/></svg></a><b>Backup</b></div>
+        <div class="body">
+          <div class="tile"><div class="tline"><span class="icon orange">B</span><span class="stack"><span class="n">No backup yet</span><span class="s">Downloads/PocketRocket/pocketrocket.backup</span></span></div></div>
+          <div class="label">WHAT GOES IN</div>
+          <div class="tile" style="gap:0">
+            <div class="kv"><span>Repos and folders</span><span>6 · 640 MB</span></div>
+            <div class="kv"><span>Claude config and logins</span><span>2 accounts · 96 MB</span></div>
+            <div class="kv"><span>Git and GitHub logins</span><span>1 account · 8 KB</span></div>
+            <div class="kv"><span>Dockito config and logins</span><span>1 account · 6 KB</span></div>
+            <div class="kv"><span>Workspace list and accounts in use</span><span>4 KB</span></div>
+          </div>
+          <div class="foot">Encrypted with your passphrase. Chats and tools stay out. node_modules and build folders are skipped.</div>
+          <div class="bottom"><button class="btn primary">Back up</button><button class="btn outline">Restore</button></div>
+        </div>
+      </div>
+      <div class="cap">2a. No backup yet. Sizes come from a scan when the page opens ("Working out sizes…" until it ends).</div>
+    </div>
+    <div class="shot">
+      <div class="phone">
+        <div class="bar"><a class="back" href="#" aria-label="Back"><svg width="22" height="22"><use href="#back"/></svg></a><b>Backup</b></div>
+        <div class="body">
+          <div class="tile"><div class="tline"><span class="icon orange">B</span><span class="stack"><span class="n">pocketrocket.backup</span><span class="s">Today, 14:02 · 742 MB</span></span><span class="pill green">Saved</span></div></div>
+          <div class="label">WHAT GOES IN</div>
+          <div class="tile" style="gap:0">
+            <div class="kv"><span>Repos and folders</span><span>6 · 640 MB</span></div>
+            <div class="kv"><span>Claude config and logins</span><span>2 accounts · 96 MB</span></div>
+            <div class="kv"><span>Git and GitHub logins</span><span>1 account · 8 KB</span></div>
+            <div class="kv"><span>Dockito config and logins</span><span>1 account · 6 KB</span></div>
+            <div class="kv"><span>Workspace list and accounts in use</span><span>4 KB</span></div>
+          </div>
+          <div class="foot">Encrypted with your passphrase. Chats and tools stay out. node_modules and build folders are skipped.</div>
+          <div class="bottom"><div class="foot">Backing up again replaces this file once the new one is written and checked.</div><button class="btn primary">Back up</button><button class="btn outline">Restore</button></div>
+        </div>
+      </div>
+      <div class="cap">2b. A backup exists: its date and size. Back up replaces it, and only after the new one is checked.</div>
+    </div>
+    <div class="shot">
+      <div class="phone">
+        <div class="bar"><a class="back" href="#" aria-label="Back"><svg width="22" height="22"><use href="#back"/></svg></a><b>Set a passphrase</b></div>
+        <div class="body">
+          <div class="intro">The whole file is encrypted with this passphrase, because it holds your logins and sits in shared storage.</div>
+          <div class="label">PASSPHRASE</div><div class="field">••••••••••••</div>
+          <div class="label">SAME AGAIN</div><div class="field ph">Type it again</div>
+          <div class="msg warn">If you forget it, this backup can't be opened. Nobody can recover it.</div>
+          <div class="bottom"><button class="btn primary">Back up</button></div>
+        </div>
+      </div>
+      <div class="cap">2c. Set passphrase, every time. It is never saved. Back up stays greyed until both fields match and it is at least 8 characters.</div>
+    </div>
+    <div class="shot">
+      <div class="phone">
+        <div class="bar"><a class="back" href="#" aria-label="Back"><svg width="22" height="22"><use href="#back"/></svg></a><b>Backup</b></div>
+        <div class="body">
+          <div class="tile"><div class="tline"><span class="icon orange">B</span><span class="stack"><span class="n">pocketrocket.backup</span><span class="s">Today, 14:02 · 742 MB</span></span><span class="pill green">Saved</span></div></div>
+          <div class="msg err">Not enough space. The new backup needs up to 742 MB and shared storage has 310 MB free. Your old backup is untouched.</div>
+          <div class="bottom"><button class="btn busy" disabled>Back up</button><button class="btn outline">Restore</button></div>
+        </div>
+      </div>
+      <div class="cap">2d. Not enough space, checked before anything is written. The old backup is untouched.</div>
+    </div>
+    <div class="shot">
+      <div class="phone">
+        <div class="bar"><a class="back" href="#" aria-label="Back"><svg width="22" height="22"><use href="#back"/></svg></a><b>Backup</b></div>
+        <div class="body">
+          <div class="tile"><div class="tline"><span class="icon orange">B</span><span class="stack"><span class="n">No backup yet</span><span class="s">Downloads/PocketRocket/pocketrocket.backup</span></span></div></div>
+          <div class="msg warn">Saving to Downloads needs access to shared storage.</div>
+          <div class="label">WHAT GOES IN</div>
+          <div class="tile" style="gap:0">
+            <div class="kv"><span>Repos and folders</span><span>6 · 640 MB</span></div>
+            <div class="kv"><span>Claude config and logins</span><span>2 accounts · 96 MB</span></div>
+            <div class="kv"><span>Git and GitHub logins</span><span>1 account · 8 KB</span></div>
+            <div class="kv"><span>Dockito config and logins</span><span>1 account · 6 KB</span></div>
+            <div class="kv"><span>Workspace list and accounts in use</span><span>4 KB</span></div>
+          </div>
+          <div class="foot">Encrypted with your passphrase. Chats and tools stay out. node_modules and build folders are skipped.</div>
+          <div class="bottom"><button class="btn primary">Allow access</button><button class="btn outline">Restore</button></div>
+        </div>
+      </div>
+      <div class="cap">2e. Storage access missing: the same access as Health › Files. The button asks Android. Restore needs no access, so it stays.</div>
+    </div>
+    <div class="shot">
+      <div class="phone">
+        <div class="bar"><a class="back" href="#" aria-label="Back"><svg width="22" height="22"><use href="#back"/></svg></a><b>Backup</b></div>
+        <div class="body">
+<div class="tile" style="border-color:#24364F"><div class="tline"><span class="icon blue">B</span><span class="stack"><span class="n">Backing up dockito-api · 42%</span><span class="s" style="color:var(--blue)">310 of 740 MB</span></span></div><div class="steps"><div class="step"><span class="dot done">✓</span><span class="stack"><span class="n">Working out what goes in</span><span class="s">740 MB in 18,204 files</span></span></div><div class="step"><span class="dot now"></span><span class="stack"><span class="n">Packing and encrypting</span><span class="s">dockito-api · 310 of 740 MB</span><span class="track"><div style="width:42%"></div></span></span></div><div class="step wait"><span class="dot wait"></span><span class="stack"><span class="n">Reading it back and checking</span></span></div><div class="step wait"><span class="dot wait"></span><span class="stack"><span class="n">Replacing the old backup</span></span></div></div></div>
+          <div class="bottom"><div class="foot">You can leave this page. The backup keeps going.</div><button class="btn outline">Cancel</button></div>
+        </div>
+      </div>
+      <div class="cap">2f. Backing up. A real percentage from the total worked out first, the item in hand and the sizes. The notification shows the same with Cancel.</div>
+    </div>
+    <div class="shot">
+      <div class="phone">
+        <div class="bar"><a class="back" href="#" aria-label="Back"><svg width="22" height="22"><use href="#back"/></svg></a><b>Backup</b></div>
+        <div class="body">
+          <div class="tile"><div class="tline"><span class="icon orange">B</span><span class="stack"><span class="n">pocketrocket.backup</span><span class="s">Today, 14:02 · 742 MB</span></span><span class="pill green">Saved</span></div></div>
+          <div class="tile"><div class="steps"><div class="step"><span class="dot done">✓</span><span class="stack"><span class="n">Working out what goes in</span></span></div><div class="step"><span class="dot fail">✕</span><span class="stack"><span class="n">Packing and encrypting</span></span></div></div></div>
+          <div class="msg err">Couldn't back up: no space left on the device. Your old backup is untouched.</div>
+          <div class="bottom"><button class="btn primary">Try again</button></div>
+        </div>
+      </div>
+      <div class="cap">2g. Failed or cancelled: the temporary file is gone and the old backup stays. A cancel reads "Cancelled. Your old backup is untouched."</div>
+    </div>
+    <div class="shot">
+      <div class="phone">
+        <div class="bar"><a class="back" href="#" aria-label="Back"><svg width="22" height="22"><use href="#back"/></svg></a><b>Backup</b></div>
+        <div class="body">
+          <div class="tile"><div class="tline"><span class="icon orange">B</span><span class="stack"><span class="n">pocketrocket.backup</span><span class="s">Just now · 742 MB</span></span><span class="pill green">Saved</span></div></div>
+          <div class="msg ok">Backed up and checked with your passphrase.</div>
+          <div class="foot">Saved in Downloads/PocketRocket. Keep your passphrase safe: it isn't stored anywhere.</div>
+          <div class="bottom"><button class="btn outline">Done</button></div>
+        </div>
+      </div>
+      <div class="cap">2h. Done. The app does nothing else: what happens next is up to you.</div>
+    </div>
+</div>
+  <h2>3. Restore</h2>
+  <div class="row">    <div class="shot">
+      <div class="phone">
+        <div class="bar"><a class="back" href="#" aria-label="Back"><svg width="22" height="22"><use href="#back"/></svg></a><b>Restore</b></div>
+        <div class="body">
+          <div class="intro">Restore brings back a backup over this install. Finish first-run setup and sign in first, if you want to: logins on this phone are kept.</div>
+          <div class="tile"><div class="tline"><span class="icon">B</span><span class="stack"><span class="n">Choose the file</span><span class="s">Usually Downloads/PocketRocket/pocketrocket.backup</span></span></div></div>
+          <div class="bottom"><button class="btn primary">Choose backup file</button></div>
+        </div>
+      </div>
+      <div class="cap">3a. Pick a file with Android's file picker, so no permission is needed. Any .backup file works.</div>
+    </div>
+    <div class="shot">
+      <div class="phone">
+        <div class="bar"><a class="back" href="#" aria-label="Back"><svg width="22" height="22"><use href="#back"/></svg></a><b>Restore</b></div>
+        <div class="body">
+          <div class="tile"><div class="tline"><span class="icon">B</span><span class="stack"><span class="n">pocketrocket.backup</span><span class="s">742 MB</span></span></div></div>
+          <div class="label">PASSPHRASE</div><div class="field">••••••••••••</div>
+          <div class="bottom"><button class="btn primary">Open backup</button></div>
+        </div>
+      </div>
+      <div class="cap">3b. The passphrase for this file. Nothing has changed yet.</div>
+    </div>
+    <div class="shot">
+      <div class="phone">
+        <div class="bar"><a class="back" href="#" aria-label="Back"><svg width="22" height="22"><use href="#back"/></svg></a><b>Restore</b></div>
+        <div class="body">
+          <div class="tile"><div class="tline"><span class="icon">B</span><span class="stack"><span class="n">pocketrocket.backup</span><span class="s">742 MB</span></span></div></div>
+          <div class="label">PASSPHRASE</div><div class="field bad">••••••••••••</div>
+          <div class="err">That passphrase doesn't open this backup. Nothing has changed.</div>
+          <div class="bottom"><button class="btn primary">Open backup</button></div>
+        </div>
+      </div>
+      <div class="cap">3c. Wrong passphrase. Tell it apart from damage: the header check fails, nothing else is read.</div>
+    </div>
+    <div class="shot">
+      <div class="phone">
+        <div class="bar"><a class="back" href="#" aria-label="Back"><svg width="22" height="22"><use href="#back"/></svg></a><b>Restore</b></div>
+        <div class="body">
+          <div class="tile"><div class="tline"><span class="icon">B</span><span class="stack"><span class="n">pocketrocket.backup</span><span class="s">742 MB</span></span></div></div>
+          <div class="msg err">This backup is damaged and can't be restored. Nothing has changed.</div>
+          <div class="bottom"><button class="btn primary">Choose another file</button></div>
+        </div>
+      </div>
+      <div class="cap">3d. Damaged, cut short, tampered with, from a newer version, or holding a path it should not. Same page, the reason differs.</div>
+    </div>
+    <div class="shot">
+      <div class="phone">
+        <div class="bar"><a class="back" href="#" aria-label="Back"><svg width="22" height="22"><use href="#back"/></svg></a><b>Restore</b></div>
+        <div class="body">
+          <div class="label">IN THIS BACKUP · 28 OCT, 14:02</div>
+          <div class="tile" style="gap:0">
+            <div class="kv"><span>Workspaces</span><span>4</span></div>
+            <div class="kv"><span>Repos and folders</span><span>6 · 640 MB</span></div>
+            <div class="kv"><span>Claude accounts</span><span>2</span></div>
+            <div class="kv"><span>GitHub accounts</span><span>1</span></div>
+            <div class="kv"><span>Dockito accounts</span><span>1</span></div>
+          </div>
+          <div class="label">WILL MERGE</div>
+          <div class="tile" style="gap:0">
+            <div class="kv"><span>sam@example.com (Claude)</span><span>Same account. Its config comes back, this phone's login stays</span></div>
+            <div class="kv"><span>work@example.com (Claude)</span><span>Added, with its login</span></div>
+            <div class="kv"><span>samdev (GitHub)</span><span>Same account. Commit identity comes back, this phone's login and key stay</span></div>
+          </div>
+          <div class="msg warn">Replaces 2 repos on this phone: api, web. Anything else stays, including workspaces and accounts that aren't in this backup.</div>
+          <div class="bottom"><button class="btn primary">Restore</button></div>
+        </div>
+      </div>
+      <div class="cap">3e. What is in the file and what it does to this phone: what comes back, what it replaces, and how accounts merge. Accounts are matched by who they are, not by name.</div>
+    </div>
+    <div class="shot">
+      <div class="phone">
+        <div class="bar"><a class="back" href="#" aria-label="Back"><svg width="22" height="22"><use href="#back"/></svg></a><b>Restore</b></div>
+        <div class="body">
+          <div class="label">IN THIS BACKUP · 28 OCT, 14:02</div>
+          <div class="tile" style="gap:0"><div class="kv"><span>Workspaces</span><span>4</span></div><div class="kv"><span>Repos and folders</span><span>6 · 640 MB</span></div></div>
+          <div class="msg err">2 sessions are running. End them first: restoring changes the files they are working on.</div>
+          <div class="bottom"><button class="btn busy" disabled>Restore</button></div>
+        </div>
+      </div>
+      <div class="cap">3f. Sessions running: refused, here and again just before anything moves.</div>
+    </div>
+    <div class="shot">
+      <div class="phone">
+        <div class="bar"><a class="back" href="#" aria-label="Back"><svg width="22" height="22"><use href="#back"/></svg></a><b>Restore</b></div>
+        <div class="body">
+<div class="tile" style="border-color:#24364F"><div class="tline"><span class="icon blue">B</span><span class="stack"><span class="n">Restoring dockito-api · 42%</span><span class="s" style="color:var(--blue)">310 of 740 MB</span></span></div><div class="steps"><div class="step"><span class="dot now"></span><span class="stack"><span class="n">Unpacking and checking</span><span class="s">dockito-api · 310 of 740 MB</span><span class="track"><div style="width:42%"></div></span></span></div><div class="step wait"><span class="dot wait"></span><span class="stack"><span class="n">Merging accounts and reapplying setup defaults</span></span></div><div class="step wait"><span class="dot wait"></span><span class="stack"><span class="n">Moving into place</span></span></div><div class="step wait"><span class="dot wait"></span><span class="stack"><span class="n">Restarting PocketRocket</span></span></div></div></div>
+          <div class="bottom"><div class="foot">You can leave this page. The restore keeps going.</div><button class="btn outline">Cancel</button></div>
+        </div>
+      </div>
+      <div class="cap">3g. Restoring. Everything is unpacked and checked in a staging folder first, so a cancel or failure before "Moving into place" changes nothing.</div>
+    </div>
+    <div class="shot">
+      <div class="phone">
+        <div class="bar"><a class="back" href="#" aria-label="Back"><svg width="22" height="22"><use href="#back"/></svg></a><b>Restore</b></div>
+        <div class="body">
+          <div class="tile"><div class="steps"><div class="step"><span class="dot fail">✕</span><span class="stack"><span class="n">Unpacking and checking</span></span></div></div></div>
+          <div class="msg err">Couldn't restore: no space left on the device. Nothing on this phone has changed.</div>
+          <div class="bottom"><button class="btn primary">Try again</button></div>
+        </div>
+      </div>
+      <div class="cap">3h. Failed or cancelled, nothing changed. A failure while moving rolls back what had moved, so this holds there too.</div>
+    </div>
+    <div class="shot">
+      <div class="phone">
+        <div class="bar"><a class="back" href="#" aria-label="Back"><svg width="22" height="22"><use href="#back"/></svg></a><b>Restore</b></div>
+        <div class="body">
+          <div class="tile"><div class="steps"><div class="step"><span class="dot done">✓</span><span class="stack"><span class="n">Unpacking and checking</span></span></div><div class="step"><span class="dot done">✓</span><span class="stack"><span class="n">Merging accounts and reapplying setup defaults</span></span></div><div class="step"><span class="dot done">✓</span><span class="stack"><span class="n">Moving into place</span></span></div><div class="step"><span class="dot now"></span><span class="stack"><span class="n">Restarting PocketRocket</span></span></div></div></div>
+          <div class="msg ok">Restored. Restarting PocketRocket…</div>
+          
+        </div>
+      </div>
+      <div class="cap">3i. Done. The app restarts by itself so accounts and workspaces load; the notification says the same if the app is in the background.</div>
+    </div>
+</div>
+  <h2>Notes for the build</h2>
+  <div class="notes"><ul>
+    <li>Settings row: under APP, after Updates. The page is full screen with no bottom nav, like Updates.</li>
+    <li>It only backs up. There is no uninstall button, and Welcome and first-run setup don't change.</li>
+    <li>The flow Shankar uses: reinstall, first-run setup, sign in, then Settings › Backup › Restore by hand. Nothing restores itself.</li>
+    <li>Notification: "Backing up dockito-api · 42%" with a bar and Cancel, then "Backed up" or "Couldn't back up". Same for restore.</li>
+    <li>Steps use <code>StepList</code>'s compact style, as Updates does. Passphrases are never saved, logged or put in an intent.</li>
+  </ul></div>
+</div>
+</body>
+</html>

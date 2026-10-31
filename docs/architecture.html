@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PocketRocket architecture</title>
+<style>
+  :root { --bg:#fff; --fg:#1d1d1f; --muted:#6b6b70; --line:#e3e3e8; --card:#f7f7f9; --accent:#e8663d; --code:#f1f1f4; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#141416; --fg:#ececf0; --muted:#9a9aa2; --line:#2c2c31; --card:#1c1c20; --accent:#ff8a5c; --code:#232328; }
+  }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width:960px; margin:0 auto; padding:32px 20px 64px; }
+  h1 { font-size:30px; margin:0 0 4px; }
+  h1 span { color:var(--accent); }
+  h2 { font-size:21px; margin:40px 0 12px; padding-top:12px; border-top:1px solid var(--line); }
+  h3 { font-size:16px; margin:20px 0 6px; }
+  .sub { color:var(--muted); margin:0 0 24px; }
+  code { background:var(--code); padding:1px 5px; border-radius:4px; font:13px/1.4 ui-monospace, Menlo, monospace; }
+  pre { background:var(--code); padding:14px 16px; border-radius:8px; overflow-x:auto; font:13px/1.5 ui-monospace, Menlo, monospace; }
+  table { border-collapse:collapse; width:100%; font-size:14px; margin:8px 0; }
+  th, td { text-align:left; vertical-align:top; padding:7px 10px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:600; }
+  td:first-child { white-space:nowrap; }
+  .stack { display:grid; gap:8px; margin:16px 0; }
+  .layer { background:var(--card); border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:8px; padding:10px 14px; }
+  .layer b { display:block; }
+  .layer small { color:var(--muted); }
+  .flow { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:12px 0; font-size:14px; }
+  .flow span { background:var(--card); border:1px solid var(--line); border-radius:6px; padding:5px 9px; }
+  .flow i { color:var(--muted); font-style:normal; }
+  .note { color:var(--muted); font-size:14px; }
+</style>
+</head>
+<body>
+<main>
+<h1>Pocket<span>Rocket</span> architecture</h1>
+<p class="sub">30 Oct 2026. How the app is put together: layers, modules, and the main flows. The why is in the BRD; the rules are in decisions.md, which wins over this page.</p>
+
+<h2>1. In one paragraph</h2>
+<p>PocketRocket is a fork of Termux with its own id, <code>app.pocket</code>. Termux supplies the Linux userland, terminal and foreground service. A separate Gradle module, <code>:pocketrocket</code>, holds everything of ours: native Compose screens and the code that drives command-line tools. Claude Code runs as the real CLI in stream-json mode, behind a chat UI. It is downloaded at first run and patched to use Termux's glibc loader. Git, gh and Dockito are driven through their own CLIs. Accounts are wired per folder through environment variables and git <code>includeIf</code> blocks. There is no server and no network of our own.</p>
+
+<h2>2. Layers</h2>
+<div class="stack">
+  <div class="layer"><b>UI: Jetpack Compose, Material 3</b><small><code>ui/</code>: Rocket, Home (session grid), chat, workspaces, Git screens, Settings, Health, Tools, Updates, setup. Built exactly as <code>docs/ux-mockup/</code> (decision 23).</small></div>
+  <div class="layer"><b>Domain modules, one concern each</b><small>assistant · sessions · claudeconfig · setup · auth · profiles · github · git · workspaces · keepalive · notifications · health · usage · updater · appupdate · dockito · browser · dictation · relocate · storage · backup</small></div>
+  <div class="layer"><b>CLIs we drive</b><small><code>claude -p</code> (stream-json), <code>git</code>, <code>gh</code>, <code>dockito</code>, <code>apt</code>, plus the setup script <code>pocketrocket-setup.sh</code></small></div>
+  <div class="layer"><b>Termux userland, relocated to <code>/data/data/app.pocket</code></b><small>bootstrap and apt packages from Termux's mirrors, glibc-runner for Claude Code and Dockito, byte-swapped paths</small></div>
+  <div class="layer"><b>Termux app, close to upstream</b><small><code>:app</code>, <code>:termux-shared</code>, <code>:terminal-emulator</code>, <code>:terminal-view</code>: terminal, TermuxService (foreground service, wake lock), am socket server</small></div>
+</div>
+<p class="note">Upstream Termux files are touched as little as possible: <code>TermuxApplication.onCreate()</code> hands a few hooks to <code>PocketRocket.kt</code>, and TermuxService asks <code>SessionKeepAlive</code> whether it should stay up.</p>
+
+<h2>3. Modules</h2>
+<table>
+<tr><th>Module</th><th>Owns</th><th>Key types</th></tr>
+<tr><td><code>assistant</code></td><td>Rocket (decisions 51, 52 and 59 to 62, <code>docs/assistant.md</code>): request and response only, its tab a plain chat built from the session chat's parts. Its switches, questions typed or said answered from live session state with no Claude, spoken replies with the best on-device voice when he spoke, code and output inline in the chat, one conversation kept across restarts and cleared on request, the popup over other apps and the lock screen (assist request, earbud long-press), and Hey Rocket (off until switched on, decision 62): a foreground service with the mic open and sherpa-onnx on the phone, fetched and checked on first use, never bundled. Approving by voice or fingerprint: ConfirmGate reads the whole real command and hears its own yes, SensitiveActions decides what each thing needs, Approvals runs one approval at a time on ApprovalActivity. ActivityLog keeps what Rocket did, with commands in memory only. AssistantBrain runs one hidden Claude Code session in Auto with his own setup and a shell (decision 61), plus AssistantTools for app actions, served by McpServer on 127.0.0.1; every <code>ask_to_*</code> tool and every request from its own hook goes through Approvals, and it hands real work to sessions. AssistantMemory holds notes, nicknames that Router reads with no Claude, and the per-project switches. AutoModeNet answers an agent's <code>PreToolUse</code> hook in Auto and, stricter, Rocket's own. ScreenLaunch falls back to a notification when Android silently refuses a popup. WakeGain lifts quiet speech for the detector. SettingsTools and SettingsControl change settings through the calls the screens make; logins, secrets and safety rules have no tool</td><td>AssistantPrefs, Router, AssistantBrain, BrainFiles, BrainReply, AssistantTools, SettingsTools, SettingsControl, McpServer, RocketServices, AssistantMemory, AutoModeNet, SessionChanges, ConfirmGate, SensitiveActions, Approvals, ApprovalActivity, Fingerprint, ActivityLog, Briefing, Conversation, VoiceLoop, RocketVoice, Spoken, SpokenNames, AndroidVoice, Voices, AssistantActivity, AndroidAssist, WakeWord, WakeWordService, WakeDetector, WakeGain, WakeModel, ScreenLaunch</td></tr>
+<tr><td><code>sessions</code></td><td>Every Claude conversation for the life of the process: live state, persistence, resume, attachments, transcript history</td><td>SessionManager, Session, SessionReducer, ClaudeProcessTransport, StreamJsonParser/Writer, SessionStore</td></tr>
+<tr><td><code>claudeconfig</code></td><td>Claude Code's setup, per account (decision 43): MCP servers and connectors over control requests, from a live session or a short-lived process; local MCP servers and plugins through <code>claude mcp</code> and <code>claude plugin</code>; skills, settings, output style and effort over control requests; the <code>CLAUDE.md</code> editor</td><td>ControlChannel, ClaudeConfigProbe, McpPanel, McpParser, ClaudeConnections, ConfigCli, AccountCli, LocalMcpOps, LocalMcpPanel, PluginPanel, SetupPanel, SettingsParser, SkillsParser, MemoryFile, MemoryPanel</td></tr>
+<tr><td><code>setup</code></td><td>First run: Termux bootstrap, then the bundled setup script (packages, Claude Code, Dockito) with live apt progress</td><td>SetupRunner, SetupScript, SetupState</td></tr>
+<tr><td><code>relocate</code></td><td>Moving Termux's <code>com.termux</code> paths to <code>app.pocket</code> at install time; <code>am</code> wrapper</td><td>PrefixRelocation, AmWrapper</td></tr>
+<tr><td><code>auth</code></td><td>Claude sign-in through <code>claude auth login</code>, account status and plan usage</td><td>ClaudeLogin, ClaudeCli, ClaudeUsage</td></tr>
+<tr><td><code>profiles</code></td><td>Claude, GitHub and Dockito account lists and the per-folder bindings, plus the files generated from them</td><td>AccountRegistry, AccountWiring, AccountPaths</td></tr>
+<tr><td><code>github</code></td><td>Connecting a GitHub account: gh device login, SSH key, commit identity</td><td>GitHubConnect, GhCli, GitIdentity</td></tr>
+<tr><td><code>workspaces</code></td><td>The workspace list, clone, repo discovery, open PRs per repo</td><td>Workspaces, RepoClone, WorkspaceRepos, GhRepos</td></tr>
+<tr><td><code>git</code></td><td>Reading and changing a repo through the git CLI; commit graph; pull requests via gh</td><td>GitRepo, GitParsers, GraphLayout, PullRequests</td></tr>
+<tr><td><code>keepalive</code></td><td>Keeping sessions running with the screen off through Termux's own service</td><td>SessionKeepAlive, ProcessMemory</td></tr>
+<tr><td><code>notifications</code></td><td>"Needs you" and "Finished" notifications, with Allow/Deny actions</td><td>SessionNotifier, NotificationActionReceiver</td></tr>
+<tr><td><code>health</code></td><td>Settings › Health checks with Fix buttons, and the last stop reason</td><td>Health, *Checks, LastStop</td></tr>
+<tr><td><code>usage</code></td><td>Settings › Usage: the app's storage, memory, CPU time and battery, read only while the screen is open</td><td>StorageUsage, RamUsage, BatteryUsage, ProcessTable</td></tr>
+<tr><td><code>backup</code></td><td>Settings › Backup and Restore: one passphrase-encrypted file of workspaces, repos, Claude/Git/Dockito config and logins; staged restore with identity-based account merge; foreground service with progress</td><td>BackupManager, BackupRunner, BackupAllowlist, BackupScanner, AccountMerge, RestoreInstaller</td></tr>
+<tr><td><code>updater</code></td><td>Claude Code versions: daily check, update, rollback, restarting stale sessions</td><td>ClaudeUpdater, ClaudeVersions</td></tr>
+<tr><td><code>appupdate</code></td><td>PocketRocket's own updates from the public releases repo</td><td>AppUpdater, ReleaseSource, ApkInstaller</td></tr>
+<tr><td><code>dockito</code></td><td>Dockito CLI install/update through the setup script, its accounts and login</td><td>Dockito, DockitoCli, DockitoFormula</td></tr>
+<tr><td><code>node</code></td><td>Node.js and npm, a built-in tool: their versions (run through Termux's environment, once per app run) and size, for Settings › Tools</td><td>NodeJs</td></tr>
+<tr><td><code>browser</code></td><td>Optional headless Chromium and the Chrome DevTools MCP server for every Claude account</td><td>Chromium, ChromiumMcp</td></tr>
+<tr><td><code>androidbuild</code></td><td>Optional Android build tool: Java, Gradle and Google's SDK, installed from Settings → Tools once the SDK license is accepted</td><td>AndroidBuild, AndroidBuildTool, SdkLicense</td></tr>
+<tr><td><code>wrangler</code></td><td>Optional Wrangler tool: Cloudflare's CLI from npm at a pinned version, for deploying and managing Workers, with sign-in from its page. Local Workers aren't included</td><td>Wrangler, WranglerTool</td></tr>
+<tr><td><code>dictation</code></td><td>Mic button through Android's SpeechRecognizer</td><td>Dictation</td></tr>
+<tr><td><code>termux</code>, <code>storage</code></td><td>Thin adapters over Termux: bootstrap, running commands, ~/storage links</td><td>Termux, TermuxCommand, BootstrapInstaller</td></tr>
+</table>
+
+<h2>4. A chat session</h2>
+<div class="flow"><span>Composer</span><i>→</i><span>Session</span><i>→</i><span>StreamJsonWriter</span><i>→ stdin →</i><span><code>claude -p</code></span><i>→ stdout →</i><span>StreamJsonParser</span><i>→</i><span>SessionReducer</span><i>→</i><span>SessionState</span><i>→</i><span>Compose</span></div>
+<ul>
+  <li>One long-lived <code>claude -p --input-format stream-json --output-format stream-json --include-partial-messages --permission-prompt-tool stdio</code> per session. It starts with an SDK-style <code>initialize</code> handshake. Permission asks arrive as <code>can_use_tool</code> control requests.</li>
+  <li>Model, mode, rewind (Edit/Retry) and interrupt are control requests on the same pipe. <code>SessionReducer</code> is pure: event plus state gives the next state. The fake transport replays recorded lines for tests and the demo.</li>
+  <li>The env comes from <code>AccountWiring.envFor(folder)</code>: <code>CLAUDE_CONFIG_DIR</code>, <code>GH_CONFIG_DIR</code>, <code>DOCKITO_ACCOUNT</code>.</li>
+  <li><code>SessionStore</code> writes <code>sessions.json</code> on every change (temp file and rename). After a restart, sessions come back Paused. Opening one resumes it with <code>--resume</code>, and the conversation itself is read from Claude Code's own transcript.</li>
+  <li>Messages sent mid-turn wait in a Queued box until Claude reads them (decision 34). Attachments are copied to <code>~/.pocketrocket/attachments/</code>; images and PDFs go inline, other files by path.</li>
+</ul>
+
+<h3>Control requests without a chat</h3>
+<div class="flow"><span>McpPanel</span><i>→</i><span>ControlChannel</span><i>→</i><span>the session's process, or a short-lived <code>claude -p</code></span><i>→</i><span>McpParser</span><i>→</i><span>McpPanelState</span><i>→</i><span>Status sheet, Connections</span></div>
+<ul>
+  <li>The probe has no way to send a user message, so no model call and no usage. It starts only on a button and always ends, by its caller or a watchdog. Replies to <code>pr-config-</code> ids skip <code>SessionReducer</code>, so the chat doesn't change.</li>
+  <li><code>mcp_status</code> carries secrets in <code>config</code>. <code>McpParser</code> copies an allowlist, so they never reach the screen, the cache or a log. A request Claude Code doesn't know hides its action or falls back to the terminal.</li>
+</ul>
+
+<h3>Local MCP servers and plugins</h3>
+<div class="flow"><span>Claude account screen</span><i>→</i><span>LocalMcpPanel, PluginPanel</span><i>→</i><span>AccountCli, per account's config dir</span><i>→</i><span><code>claude mcp add-json</code>, <code>remove</code>, <code>claude plugin … --json</code></span></div>
+<ul>
+  <li>The server list is read from the account's <code>.claude.json</code> without values; whether one works comes only from <code>mcp_status</code>, in a check started after each change. Edit is remove then add, and a refused add puts the old entry back.</li>
+  <li>Values typed on the phone go only into Claude Code's config and are never shown again. <code>add-json</code> has no stdin, so a server's values are on its command line while it runs; plugin options go on stdin. Parsers copy an allowlist, and output is scrubbed before it is shown.</li>
+  <li>Adding a server or installing a plugin shows the command or source first, since both run code on the phone. <code>chrome-devtools</code> stays with Tools, and synced plugins are read-only. One change at a time per account.</li>
+</ul>
+
+<h3>Skills, settings, output style and memory</h3>
+<div class="flow"><span>Session's controls sheet, or Claude account screen</span><i>→</i><span>SetupPanel</span><i>→</i><span>the session's channel, or a probe</span><i>→</i><span><code>get_skills_dialog</code>, <code>get_settings</code>, <code>apply_flag_settings</code>, <code>update_settings</code></span></div>
+<div class="flow"><span>Claude account screen, or Workspace settings</span><i>→</i><span>MemoryPanel</span><i>→</i><span>MemoryFile</span><i>→</i><span><code>CLAUDE.md</code>, temp file then rename</span></div>
+<ul>
+  <li><code>SettingsParser</code> keeps only listed keys with plain values and a count of the rest, so <code>env</code>, hooks and helpers never reach the screen. Picks last for the session and are read back; saving is a separate button and only the two writes Claude Code allows. Managed values can't be changed.</li>
+  <li>A memory save compares a hash of the file with what was opened and writes nothing if it moved. Skill on/off isn't offered: its only route is a hidden CLI command.</li>
+</ul>
+
+<h2>5. Staying alive and telling you</h2>
+<div class="flow"><span>SessionManager</span><i>status change →</i><span>SessionKeepAlive</span><i>→</i><span>TermuxService + wake lock</span></div>
+<div class="flow"><span>SessionManager</span><i>status change →</i><span>SessionNotifier</span><i>→</i><span>"Needs you" / "Finished"</span></div>
+<div class="flow"><span>Question</span><i>→</i><span>Router</span><i>can't answer →</i><span>AssistantBrain (hidden Claude session)</span><i>MCP on 127.0.0.1 →</i><span>AssistantTools</span><i>ask_to_* →</i><span>Approvals</span></div>
+<div class="flow"><span>Agent in Auto</span><i>PreToolUse →</i><span>AutoModeNet</span><i>on the list: "ask" →</i><span>a normal request, fingerprint</span></div>
+<div class="flow"><span>Rocket's Bash or MCP call</span><i>PreToolUse /hook/rocket →</i><span>AutoModeNet.decideForRocket</span><i>"ask" →</i><span>Approvals: fingerprint or yes</span></div>
+<p>The service and wake lock are held only while some session is Starting, Working or waiting for permission. They are let go when every session is idle. Nothing starts on boot (decision 8). Notifications skip the session on screen, and the permission notification carries Deny, plus Allow when it shows the whole request, or Review when it doesn't. Allow needs an unlock, checked again in the receiver; the lock screen gets a private version.</p>
+
+<h2>6. Accounts, per folder</h2>
+<pre>~/.pocketrocket/accounts/
+  claude.json  github.json  dockito.json   lists and defaults, no secrets
+  bindings.json                            folder → {claude, github, dockito}
+  env.sh                                   same bindings for interactive shells (generated)
+  claude/&lt;id&gt;/                             CLAUDE_CONFIG_DIR (first account is ~/.claude)
+  github/&lt;login&gt;/gh/                       GH_CONFIG_DIR
+  github/&lt;login&gt;/id_ed25519, gitconfig     key, identity, core.sshCommand
+  dockito/                                 shared DOCKITO_CONFIG_DIR</pre>
+<p><code>bindings.json</code> is the single source. <code>~/.gitconfig</code> gets a managed block with an <code>[includeIf "gitdir:&lt;folder&gt;/"]</code> per bound folder. That way git from the app, from Claude or from a terminal uses the right key and author. The global <code>gh auth switch</code> is never used, because parallel sessions would fight over it (decision 21). Tokens stay in each tool's own config files.</p>
+
+<h2>7. First run and the relocated prefix</h2>
+<div class="flow"><span>Termux bootstrap</span><i>byte-swap paths →</i><span>pocketrocket-setup.sh</span><i>→</i><span>apt packages</span><i>→</i><span>Claude Code</span><i>→</i><span>Dockito</span><i>→</i><span>defaults</span></div>
+<ul>
+  <li><code>app.pocket</code> is exactly as long as <code>com.termux</code>, so paths are swapped byte for byte. This happens in the bootstrap as it is extracted, and in every <code>.deb</code> through an apt <code>DPkg::Pre-Install-Pkgs</code> hook, after the signature check and before dpkg unpacks. Termux's mirrors are used as they are (decision 36).</li>
+  <li>Claude Code comes from <code>downloads.claude.ai</code>, checked against <code>manifest.json</code> (SHA-256). Its ELF interpreter is patched to glibc-runner, it is smoke tested, and it runs with <code>autoUpdates: false</code>. It is never bundled.</li>
+  <li>Dockito comes from its Homebrew tap release, checked against the formula's sha256, and goes through the same glibc launcher.</li>
+  <li>The setup script is also the updater's engine. <code>--only claude</code>, <code>--switch X.Y.Z</code> and <code>--only dockito</code> reuse the same download, check and smoke-test steps. Running sessions keep their binary until restarted.</li>
+</ul>
+
+<h2>8. Updates</h2>
+<table>
+<tr><th>What</th><th>Source</th><th>How</th></tr>
+<tr><td>PocketRocket</td><td>public <code>pocketrocket-releases</code> on GitHub</td><td>Download, SHA-256, Android installer; only when tapped</td></tr>
+<tr><td>Claude Code</td><td><code>downloads.claude.ai</code></td><td>Checked daily on open; install or rollback via the setup script</td></tr>
+<tr><td>Git</td><td>Termux apt</td><td><code>apt</code> through the relocation hook</td></tr>
+<tr><td>Dockito</td><td>Homebrew tap formula</td><td>Setup script <code>--only dockito</code></td></tr>
+</table>
+<p class="note">All four are on one Updates screen (decision 41). Nothing installs on its own.</p>
+
+<h2>9. Design rules</h2>
+<ul>
+  <li>Drive the official CLIs and never reimplement them: Claude Code, git, gh, dockito, apt.</li>
+  <li>Each module has one concern and a small API. State is plain files under <code>~/.pocketrocket/</code> that a terminal or Claude can read too.</li>
+  <li>Termux changes stay minimal, so upstream merges stay possible.</li>
+  <li>Long work runs off the main thread and reports real progress (steps, bytes) to the screen.</li>
+  <li>Nothing secret is logged or copied. Conversations, codes and tokens stay where their tools put them.</li>
+</ul>
+</main>
+</body>
+</html>

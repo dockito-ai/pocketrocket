@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rocket home</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root { --bg:#07090E; --app:#0F1218; --card:#181C24; --line:#2A303C; --text:#F2F4F8; --soft:#C9CFDA; --muted:#AEB6C4; --flame:#FF8A3D; --amber:#F5B83D; --blue:#7AB4FF; --green:#5BD69A; --red:#FF6B6B; }
+* { box-sizing:border-box; }
+html,body { margin:0; height:100%; }
+body { background:#050608; color:var(--text); font-family:Inter,system-ui,sans-serif; display:flex; gap:28px; justify-content:center; align-items:center; padding:16px; flex-wrap:wrap; }
+button { font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
+button:focus-visible,input:focus-visible { outline:2px solid var(--flame); outline-offset:2px; }
+
+.phone { position:relative; width:min(390px,100%); height:min(844px,calc(100vh - 32px)); background:var(--bg); border-radius:30px; border:1px solid #1E232D; overflow:hidden; display:flex; flex-direction:column; }
+.screen { flex:1; min-height:0; display:flex; flex-direction:column; padding:20px; animation:in .28s ease-out; }
+@keyframes in { from { opacity:0; transform:translateY(6px); } }
+
+.tune { width:44px; height:44px; display:grid; place-items:center; border-radius:12px; border:1px solid var(--line); color:var(--soft); margin-left:auto; flex:none; }
+.tune svg { width:20px; height:20px; }
+
+.orb { border-radius:50%; flex:none; background:radial-gradient(circle at 50% 56%,#FFD9A8 0%,#FF8A3D 30%,#F0561E 55%,rgba(240,86,30,0) 72%); }
+.breathe { animation:breathe 4.5s ease-in-out infinite; }
+.pulse { animation:pulse 1.1s ease-in-out infinite; }
+.spin { animation:think 1.6s ease-in-out infinite; }
+@keyframes breathe { 50% { transform:scale(1.07); opacity:.86; } }
+@keyframes pulse { 50% { transform:scale(1.16); } }
+@keyframes think { 50% { transform:scale(.86); opacity:.65; } }
+.amber { background:radial-gradient(circle at 50% 56%,#FFF0C2 0%,#F5B83D 32%,#D98A16 56%,rgba(217,138,22,0) 72%); }
+
+.home-main { flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:6px; }
+.orb-btn { border-radius:50%; padding:0; }
+.say { font-size:30px; line-height:1.18; font-weight:600; letter-spacing:-.7px; margin:14px 0 0; }
+.sub { font-size:16px; line-height:1.4; color:var(--soft); margin:6px 0 0; }
+.status-link { margin-top:14px; font-size:14px; color:var(--muted); min-height:44px; padding:0 14px; }
+.status-link b { font-weight:500; }
+.need { width:100%; display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:18px; }
+.btn { height:50px; border-radius:14px; font-size:15px; font-weight:600; background:var(--card); }
+.btn.go { background:var(--flame); color:#1A0D04; }
+.btn.warn { background:var(--amber); color:#1A1206; }
+
+.chips { display:flex; gap:8px; overflow-x:auto; padding-bottom:12px; scrollbar-width:none; }
+.chips::-webkit-scrollbar { display:none; }
+.chip { flex:none; height:40px; padding:0 14px; border-radius:20px; border:1px solid var(--line); font-size:13.5px; }
+.ask { display:flex; gap:10px; align-items:center; }
+.ask input { flex:1; min-width:0; height:56px; border-radius:28px; border:1px solid var(--line); background:#161A22; color:var(--text); padding:0 20px; font:inherit; font-size:15px; }
+.ask input::placeholder { color:var(--muted); }
+.mic { flex:none; width:56px; height:56px; border-radius:50%; background:var(--flame); color:#1A0D04; display:grid; place-items:center; }
+.mic svg { width:24px; height:24px; }
+.mic.live { background:#F2F4F8; color:#C7420F; }
+
+.nav { flex:none; height:72px; background:#141821; border-top:1px solid var(--line); display:grid; grid-template-columns:repeat(4,1fr); align-items:center; text-align:center; font-size:12px; color:var(--muted); }
+.nav .on { color:var(--flame); font-weight:600; }
+
+.label { text-align:center; font-size:14px; font-weight:500; color:var(--muted); padding-top:28px; }
+.voice-main { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:44px; text-align:center; }
+.heard { font-size:30px; line-height:1.2; font-weight:600; letter-spacing:-.6px; min-height:72px; margin:0; }
+.voice-foot { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:10px; }
+.close { width:56px; height:56px; border-radius:50%; background:var(--card); font-size:20px; }
+.foot-note { font-size:13px; color:var(--muted); text-align:center; }
+
+.answer-head { display:flex; gap:12px; align-items:flex-start; padding-top:20px; }
+.answer-text { font-size:22px; line-height:1.25; font-weight:600; letter-spacing:-.3px; margin:0; }
+.card { background:#10131A; border-radius:18px; margin-top:20px; overflow:hidden; font-size:14px; }
+.row { display:flex; justify-content:space-between; align-items:center; width:100%; min-height:50px; padding:0 16px; border-bottom:1px solid #1E232D; text-align:left; }
+.row:last-child { border-bottom:0; }
+.diff { font-family:'JetBrains Mono',monospace; font-size:12.5px; line-height:1.75; padding:12px 0; }
+.diff div { padding:0 14px; white-space:pre; overflow:hidden; text-overflow:ellipsis; }
+.del { background:rgba(255,107,107,.13); color:#FFC2C2; }
+.add { background:rgba(91,214,154,.13); color:#B6F0D2; }
+.file { display:flex; justify-content:space-between; color:var(--soft); padding-bottom:6px !important; }
+.grow { flex:1; min-height:12px; }
+.pair { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.pair .btn { height:60px; border-radius:18px; font-size:16px; }
+
+.approve-main { flex:1; display:flex; flex-direction:column; justify-content:center; gap:20px; }
+.approve-who { font-size:18px; color:var(--soft); margin:0; }
+.approve-cmd { font-family:'JetBrains Mono',monospace; font-size:36px; line-height:1.15; font-weight:500; letter-spacing:-1px; color:#FF9A57; margin:0; overflow-wrap:anywhere; }
+.approve-where { font-size:15px; line-height:1.45; color:var(--muted); margin:0; }
+
+.panel { width:250px; color:var(--soft); font-size:14px; line-height:1.5; }
+.panel h1 { font-size:17px; color:var(--text); margin:0 0 6px; }
+.panel p { margin:0 0 14px; }
+.panel button { display:block; width:100%; text-align:left; min-height:44px; padding:0 14px; margin-bottom:6px; border-radius:12px; border:1px solid var(--line); }
+.panel button[aria-pressed="true"] { border-color:var(--flame); color:var(--text); }
+@media (max-width:760px) { body { padding:0; display:block; } .phone { width:100%; height:100vh; border-radius:0; border:0; } .panel { width:auto; padding:16px; } }
+@media (prefers-reduced-motion:reduce) { .orb,.screen { animation:none !important; } }
+</style>
+</head>
+<body>
+<main class="phone" id="phone"></main>
+<aside class="panel">
+  <h1>Rocket's first screen</h1>
+  <p>Sample data. See how it looks in each situation, then tap the mic or the orb, or type.</p>
+  <button data-set="clear">Nothing happening</button>
+  <button data-set="busy">Agents working</button>
+  <button data-set="need">Something needs you</button>
+</aside>
+<script>
+const $ = s => document.querySelector(s);
+const phone = $('#phone');
+const hour = new Date().getHours();
+const hello = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+const MIC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+const TUNE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>';
+const COLOR = { Working:'--blue', Done:'--green', 'Needs you':'--amber', Ready:'--muted' };
+const SITUATIONS = {
+  clear: { sessions:[['hello','Ready']], say:'All clear.', sub:'Nothing needs you right now.', chips:['Start an agent','What did I do yesterday?'] },
+  busy: { sessions:[['pocketrocket','Working'],['notes','Done']], say:'Pocketrocket is working.', sub:'Notes finished a few minutes ago.', chips:["What's happening?",'Show what changed'] },
+  need: { sessions:[['api-server','Needs you'],['pocketrocket','Working'],['notes','Done']], say:'api-server needs you.', sub:'It wants to run npm run migrate.', chips:["What's happening?",'Show what changed'], need:true },
+};
+let sit = 'need', rec = null, timer = null;
+const now = () => SITUATIONS[sit];
+const speak = text => { if (!('speechSynthesis' in window)) return; speechSynthesis.cancel(); speechSynthesis.speak(new SpeechSynthesisUtterance(text)); };
+const hush = () => { clearTimeout(timer); if ('speechSynthesis' in window) speechSynthesis.cancel(); if (rec) { rec.onresult = rec.onend = rec.onerror = null; try { rec.stop(); } catch (e) {} rec = null; } };
+const askBar = () => `<div class="ask"><label style="flex:1;display:flex;min-width:0"><span style="position:absolute;left:-9999px">Ask Rocket</span><input id="box" placeholder="Ask Rocket" autocomplete="off"></label><button class="mic" data-listen aria-label="Talk to Rocket">${MIC}</button></div>`;
+const nav = () => `<div class="nav"><span class="on">Rocket</span><span>Sessions</span><span>Workspaces</span><span>Settings</span></div>`;
+const render = html => { phone.innerHTML = html; document.querySelectorAll('[data-set]').forEach(b => b.setAttribute('aria-pressed', b.dataset.set === sit)); };
+
+function home() {
+  hush();
+  const s = now();
+  const others = s.sessions.filter(x => x[1] !== 'Needs you');
+  const summary = others.length === 1 ? `1 other session` : `${others.length} other sessions`;
+  render(`<div class="screen">
+    <button class="tune" aria-label="Quick controls">${TUNE}</button>
+    <div class="home-main">
+      <button class="orb-btn" data-listen aria-label="Talk to Rocket"><div class="orb breathe ${s.need ? 'amber' : ''}" style="width:150px;height:150px"></div></button>
+      <p class="sub" style="margin-top:12px;font-size:14px;color:var(--muted)">${hello}, Shankar</p>
+      <h1 class="say" style="margin-top:4px">${s.say}</h1>
+      <p class="sub">${s.sub}</p>
+      ${s.need ? `<div class="need"><button class="btn" data-go="denied">Deny</button><button class="btn warn" data-go="approve">Review</button></div>` : ''}
+      <button class="status-link" data-ask="What's happening?">${s.need ? summary : s.sessions.length + (s.sessions.length === 1 ? ' session' : ' sessions')} ›</button>
+    </div>
+    <div class="chips">${s.chips.map(c => `<button class="chip" data-ask="${c}">${c}</button>`).join('')}</div>
+    ${askBar()}
+  </div>${nav()}`);
+}
+
+function listening() {
+  hush();
+  render(`<div class="screen"><div class="label" id="st">Listening</div>
+    <div class="voice-main"><div class="orb pulse" style="width:190px;height:190px"></div><p class="heard" id="heard" aria-live="polite"></p></div>
+    <div class="voice-foot"><button class="close" data-home aria-label="Cancel">✕</button><span class="foot-note" id="note">Say what you need</span><button class="mic live" data-stop aria-label="Stop listening">${MIC}</button></div></div>`);
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { fallback(); return; }
+  rec = new SR(); rec.interimResults = true; rec.lang = 'en-IN';
+  let said = '';
+  rec.onresult = e => { said = [...e.results].map(r => r[0].transcript).join(''); $('#heard').textContent = said; };
+  rec.onerror = () => fallback();
+  rec.onend = () => { rec = null; said ? think(said) : fallback(); };
+  try { rec.start(); } catch (e) { fallback(); }
+}
+
+function fallback() {
+  rec = null;
+  const n = $('#note'); if (n) n.textContent = 'No mic here, using a sample';
+  const h = $('#heard'); if (h) h.textContent = "What's happening?";
+  timer = setTimeout(() => think("What's happening?"), 1500);
+}
+
+function think(q) {
+  hush();
+  render(`<div class="screen"><div class="label">Thinking</div><div class="voice-main"><div class="orb spin" style="width:190px;height:190px"></div><p class="heard">${esc(q)}</p></div><div class="voice-foot"><button class="close" data-home aria-label="Cancel">✕</button><span class="foot-note"></span><span style="width:56px"></span></div></div>`);
+  timer = setTimeout(() => answer(q), 750);
+}
+
+function answer(q) {
+  const t = q.toLowerCase();
+  const s = now();
+  if (/allow|review|wants|migrate/.test(t) && s.need) return approve();
+  if (/chang|diff/.test(t)) return showChanged();
+  if (/start|agent/.test(t)) return reply('Started an agent in notes, in Manual mode.', `<div class="card"><button class="row"><span>notes</span><span style="color:var(--blue)">Working</span></button></div>`);
+  if (/yesterday/.test(t)) return reply('You merged the login fix and left the notes readme open.');
+  const line = sit === 'need' ? 'api-server needs you. Pocketrocket is working. Notes is done.' : sit === 'busy' ? 'Pocketrocket is working. Notes is done.' : 'Nothing is running. Hello is ready when you are.';
+  reply(line, `<div class="card">${s.sessions.map(([n, st]) => `<button class="row" ${st === 'Needs you' ? 'data-go="approve"' : ''}><span>${n}</span><span style="color:var(${COLOR[st]})">${st}</span></button>`).join('')}</div>`);
+}
+
+function reply(text, card = '') {
+  render(`<div class="screen"><button class="tune" aria-label="Quick controls">${TUNE}</button>
+    <div class="answer-head"><div class="orb breathe" style="width:44px;height:44px"></div><p class="answer-text">${text}</p></div>${card}<div class="grow"></div>
+    <div class="chips" style="padding-top:12px"><button class="chip" data-home>Back to start</button>${sit === 'clear' ? '' : '<button class="chip" data-ask="Show what changed">Show what changed</button>'}</div>${askBar()}</div>${nav()}`);
+  speak(text);
+}
+
+function showChanged() {
+  const text = 'Two files changed, mostly the token refresh.';
+  render(`<div class="screen"><div class="answer-head"><div class="orb breathe" style="width:44px;height:44px"></div><p class="answer-text">${text}</p></div>
+    <div class="card diff"><div class="file"><span>src/auth/session.ts</span><span><span style="color:var(--green)">+12</span> <span style="color:#FF8A8A">−3</span></span></div>
+    <div>  async function refresh() {</div><div class="del">-   return retry(oldToken)</div><div class="add">+   const token = await renew()</div><div class="add">+   store.save(token)</div><div class="add">+   return retry(token)</div><div>  }</div>
+    <div class="file" style="padding-top:12px"><span>session.test.ts</span><span><span style="color:var(--green)">+31</span> <span style="color:#FF8A8A">−0</span></span></div></div>
+    <div class="grow"></div><div class="pair"><button class="btn" data-home>Later</button><button class="btn go" data-home>Open full</button></div></div>`);
+  speak(text);
+}
+
+function approve() {
+  hush();
+  render(`<div class="screen"><div style="display:flex;align-items:center;gap:12px;padding-top:20px"><div class="orb breathe amber" style="width:44px;height:44px"></div><span style="font-size:14px;font-weight:500;color:var(--muted)">Waiting for your answer</span></div>
+    <div class="approve-main"><p class="approve-who">api-server wants to run</p><p class="approve-cmd">npm run migrate</p><p class="approve-where">In work/api-server, on the main branch.</p></div>
+    <p class="foot-note" style="margin:0 0 12px">Say "allow" or "deny"</p>
+    <div class="pair"><button class="btn" data-go="denied">Deny</button><button class="btn go" data-go="allowed">Allow</button></div></div>`);
+  speak('api-server wants to run npm run migrate. Allow or deny?');
+}
+
+function settle(word) {
+  sit = 'busy';
+  SITUATIONS.busy.say = word === 'allowed' ? 'Allowed. api-server is running.' : 'Denied. api-server has stopped asking.';
+  home();
+  speak(word === 'allowed' ? 'Allowed.' : 'Denied.');
+  SITUATIONS.busy.say = 'Pocketrocket is working.';
+}
+
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.set) { sit = b.dataset.set; home(); }
+  else if ('listen' in b.dataset) listening();
+  else if ('stop' in b.dataset) { const said = $('#heard').textContent; hush(); said ? think(said) : home(); }
+  else if ('home' in b.dataset) home();
+  else if (b.dataset.ask) think(b.dataset.ask);
+  else if (b.dataset.go === 'approve') approve();
+  else if (b.dataset.go) settle(b.dataset.go);
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.id === 'box' && e.target.value.trim()) think(e.target.value.trim());
+});
+home();
+</script>
+</body>
+</html>

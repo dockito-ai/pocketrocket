@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rocket quick controls</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #07090E; color: #E8EAF0; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden">
+  <div style="padding: 28px 20px; font-size: 22px; font-weight: 700; color: #5A6270; flex: 1">Rocket</div>
+  <div style="display: flex; flex-direction: column; gap: 10px; padding: 12px 16px 24px; border-radius: 24px 24px 0 0; background: #181C24">
+    <div style="align-self: center; width: 36px; height: 4px; border-radius: 2px; background: #3A4150; margin-bottom: 6px"></div>
+    <div style="font-size: 12px; font-weight: 600; color: #AEB6C4; letter-spacing: 0.5px">LISTENING AND SPEAKING</div>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+      <button aria-pressed="true" style="display: flex; flex-direction: column; gap: 3px; min-height: 76px; text-align: left; padding: 11px 12px; border-radius: 14px; border: 1.5px solid #FF8A3D; background: #33261E; color: #E8EAF0; font: inherit"><span style="font-size: 15px; font-weight: 600">Hey Rocket</span><span style="font-size: 12px; line-height: 1.35; color: #C9CFDA">On, wakes when you say it</span></button>
+      <button aria-pressed="true" style="display: flex; flex-direction: column; gap: 3px; min-height: 76px; text-align: left; padding: 11px 12px; border-radius: 14px; border: 1.5px solid #FF8A3D; background: #33261E; color: #E8EAF0; font: inherit"><span style="font-size: 15px; font-weight: 600">Announcements</span><span style="font-size: 12px; line-height: 1.35; color: #C9CFDA">On, tells you what changes</span></button>
+      <button aria-pressed="false" style="display: flex; flex-direction: column; gap: 3px; min-height: 76px; text-align: left; padding: 11px 12px; border-radius: 14px; border: 1px solid #2A303C; background: #10131A; color: #E8EAF0; font: inherit"><span style="font-size: 15px; font-weight: 600">Speaker</span><span style="font-size: 12px; line-height: 1.35; color: #C9CFDA">Off, headphones only</span></button>
+      <button aria-pressed="false" style="display: flex; flex-direction: column; gap: 3px; min-height: 76px; text-align: left; padding: 11px 12px; border-radius: 14px; border: 1px solid #2A303C; background: #10131A; color: #E8EAF0; font: inherit"><span style="font-size: 15px; font-weight: 600">Quiet for 1 hour</span><span style="font-size: 12px; line-height: 1.35; color: #C9CFDA">No listening or speaking</span></button>
+    </div>
+    <div style="font-size: 12px; font-weight: 600; color: #AEB6C4; letter-spacing: 0.5px; padding-top: 6px">CLAUDE LOGIN</div>
+    <button style="display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 58px; text-align: left; padding: 9px 14px; border-radius: 14px; border: 1px solid #2A303C; background: #10131A; color: #E8EAF0; font: inherit"><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 600">Default (personal)</span><span style="font-size: 12px; color: #C9CFDA">Rocket's questions count against this login</span></span><span aria-hidden="true" style="font-size: 11px; color: #AEB6C4">▾</span></button>
+    <div style="display: flex; justify-content: space-between; align-items: baseline; padding-top: 6px"><span style="font-size: 12px; font-weight: 600; color: #AEB6C4; letter-spacing: 0.5px">ROCKET'S MEMORY</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #AEB6C4">[USED] of [LIMIT]</span></div>
+    <div style="height: 8px; border-radius: 4px; background: #2A303C; overflow: hidden"><div style="width: 8%; height: 8px; background: #7AB4FF"></div></div>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding-top: 2px">
+      <button style="height: 46px; border-radius: 12px; border: 1px solid #2A303C; background: none; color: #E8EAF0; font: inherit; font-size: 14px">Compact</button>
+      <button style="height: 46px; border-radius: 12px; border: 1px solid #2A303C; background: none; color: #E8EAF0; font: inherit; font-size: 14px">Start fresh</button>
+    </div>
+    <a href="In-Activity.dc.html" style="display: flex; align-items: center; justify-content: center; height: 46px; border-radius: 12px; border: 1px solid #2A303C; font-size: 14px">Activity…</a>
+    <a href="In-Assistant.dc.html" style="display: flex; align-items: center; justify-content: center; height: 46px; border-radius: 12px; border: 1px solid #2A303C; font-size: 14px">All assistant settings…</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+# Shared by ci.yml and release.yml: JDK 17, the Android SDK's NDK, Gradle with its cache, and Termux's bootstrap zips.
+#
+# Nothing here is committed binaries. The bootstraps are fetched by the Gradle build itself (downloadBootstraps in
+# app/build.gradle, from termux/termux-packages releases, each checked against its pinned SHA-256); this only caches
+# them between runs, keyed on those pins, and Gradle re-checks every cached zip and re-downloads one that doesn't match.
+# The runner's preinstalled SDK (ANDROID_HOME) stands in for local.properties.
+name: Android setup
+description: JDK, NDK, Gradle cache and bootstrap cache for PocketRocket builds
+inputs:
+  cache-read-only:
+    description: Don't write the Gradle cache (PRs, releases)
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      with:
+        distribution: temurin
+        java-version: "17"
+
+    - name: Install the NDK from gradle.properties
+      shell: bash
+      run: |
+        ndk="$(sed -n 's/^ndkVersion=//p' gradle.properties)"
+        if [ -d "$ANDROID_HOME/ndk/$ndk" ]; then
+          echo "NDK $ndk already installed"
+        else
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$ndk" > /dev/null
+          echo "Installed NDK $ndk"
+        fi
+
+    - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      with:
+        cache-read-only: ${{ inputs.cache-read-only }}
+
+    - name: Bootstrap cache key
+      id: boot
+      shell: bash
+      run: echo "key=bootstraps-$(grep -E 'downloadBootstrap\(|def version = ' app/build.gradle | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: app/src/main/cpp/bootstrap-*.zip
+        key: ${{ steps.boot.outputs.key }}

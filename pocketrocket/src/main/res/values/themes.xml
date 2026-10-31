@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Window theme only; everything on screen is drawn by Compose (ui/theme). -->
+    <style name="Theme.PocketRocket" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/pocketrocket_window</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <!-- Share to PocketRocket: a sheet over the app that shared, so the window itself is see-through. -->
+    <style name="Theme.PocketRocket.Share" parent="Theme.PocketRocket">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
+
+    <!-- Rocket's popup: a capsule over whatever is showing, dimming it a little. -->
+    <style name="Theme.PocketRocket.Popup" parent="Theme.PocketRocket.Share">
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:backgroundDimAmount">0.35</item>
+    </style>
+</resources>
