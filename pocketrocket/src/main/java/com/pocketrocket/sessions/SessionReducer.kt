@@ -33,9 +33,10 @@ object SessionReducer {
         is StreamEvent.AssistantText -> onAssistantText(state, event).working()
         is StreamEvent.ToolUse -> state.append(
             ChatItem.Tool(
-                event.id, event.name, ToolSummary.of(event.name, event.input), event.input.toString(2).replace("\\/", "/"),
+                event.id, event.name, ToolSummary.of(event.name, event.input), ToolSummary.inputJson(event.input),
                 agent = if (event.name in AGENT_TOOLS) AgentRun(
                     event.input.optString("description").ifBlank { "Subagent" }, event.input.optString("subagent_type").ifBlank { null },
+                    prompt = event.input.optString("prompt").ifBlank { null },
                     background = event.input.optBoolean("run_in_background"),
                 ) else null,
             ),
@@ -66,18 +67,8 @@ object SessionReducer {
             ChatItem.Notice(state.nextId(), "Compacted · ${tokens(event.preTokens)} → ${tokens(event.postTokens)} tokens"),
         ).copy(compacting = false, context = ContextUsage(event.postTokens, state.context?.window, afterCompact = true))
         is StreamEvent.CommandOutput -> onCommandOutput(state, event.text)
-        is StreamEvent.SubagentToolUse -> state.updateAgent(event.parentToolUseId) {
-            it.copy(steps = it.steps + AgentStep(event.id, event.name, ToolSummary.of(event.name, event.input)))
-        }
-        is StreamEvent.SubagentToolResult -> state.updateAgent(event.parentToolUseId) { run ->
-            run.copy(steps = run.steps.map { if (it.id == event.toolUseId) it.copy(done = true, isError = event.isError) else it })
-        }
-        is StreamEvent.SubagentUpdate -> state.updateAgent(event.toolUseId) {
-            it.copy(
-                activity = event.activity ?: it.activity, status = event.status ?: it.status, summary = event.summary ?: it.summary,
-                tokens = event.tokens ?: it.tokens, toolUses = event.toolUses ?: it.toolUses, durationMs = event.durationMs ?: it.durationMs,
-            )
-        }
+        is StreamEvent.SubagentToolUse, is StreamEvent.SubagentToolResult, is StreamEvent.SubagentText, is StreamEvent.SubagentUpdate ->
+            Subagents.onEvent(state, event)
         is StreamEvent.ShellStarted, is StreamEvent.TaskBackgrounded, is StreamEvent.ShellEnded -> ShellTasks.onEvent(state, event)
         is StreamEvent.PromptSuggestion -> state.copy(suggestion = event.text)
         is StreamEvent.ControlResponse -> onControlResponse(state, event)
@@ -123,10 +114,6 @@ object SessionReducer {
     /** The CLI may send an agent to the background on its own; its result then only says it was launched (2.1.312). */
     private fun AgentRun.launched(result: String): AgentRun =
         if (result.startsWith("Async agent launched")) copy(background = true) else this
-
-    private fun SessionState.updateAgent(toolUseId: String, change: (AgentRun) -> AgentRun): SessionState = copy(
-        items = items.map { if (it is ChatItem.Tool && it.id == toolUseId && it.agent != null) it.copy(agent = change(it.agent)) else it },
-    )
 
     /** A local command's output (/cost, /context...): one line as a notice, more as a reply. /compact's "Compacted" is said by its boundary. */
     private fun onCommandOutput(state: SessionState, text: String): SessionState = when {

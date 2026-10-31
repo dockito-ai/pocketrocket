@@ -53,15 +53,15 @@ object StreamJsonParser {
             return listOfNotNull(if (toolUseId != null && taskId != null) StreamEvent.ShellStarted(toolUseId, taskId, json.optBoolean("is_backgrounded")) else null)
         }
         return when (subtype) {
-            "task_started", "task_progress" ->listOfNotNull(toolUseId?.let {
-                StreamEvent.SubagentUpdate(it, activity = json.optStringOrNull("description"), tokens = json.taskNumber("total_tokens") ?: json.taskNumber("subagent_tokens"), toolUses = json.taskNumber("tool_uses")?.toInt())
+            "task_started", "task_progress" -> listOfNotNull(toolUseId?.let {
+                StreamEvent.SubagentUpdate(it, taskId = taskId, activity = json.optStringOrNull("description"), tokens = json.taskNumber("total_tokens") ?: json.taskNumber("subagent_tokens"), toolUses = json.taskNumber("tool_uses")?.toInt())
             })
             "task_updated" -> listOfNotNull(
                 taskId?.takeIf { json.optJSONObject("patch")?.optBoolean("is_backgrounded") == true }?.let { StreamEvent.TaskBackgrounded(it) },
             )
             "task_notification" -> if (toolUseId == null) emptyList() else listOf(
                 StreamEvent.SubagentUpdate(
-                    toolUseId, status = json.optStringOrNull("status"), summary = json.optStringOrNull("summary"),
+                    toolUseId, taskId = taskId, status = json.optStringOrNull("status"), summary = json.optStringOrNull("summary"),
                     tokens = json.taskNumber("total_tokens") ?: json.taskNumber("subagent_tokens"), toolUses = json.taskNumber("tool_uses")?.toInt(), durationMs = json.taskNumber("duration_ms"),
                 ),
                 StreamEvent.ShellEnded(
@@ -79,10 +79,14 @@ object StreamJsonParser {
     private fun assistant(json: JSONObject): List<StreamEvent> {
         val message = json.optJSONObject("message") ?: return emptyList()
         val content = message.optJSONArray("content") ?: return emptyList()
-        // Subagent output carries a parent tool id: only its tool calls are shown, nested in the Task card.
+        // Subagent output carries a parent tool id: its tool calls and its text go to its own record, not the chat.
         json.optStringOrNull("parent_tool_use_id")?.let { parent ->
-            return content.objects().filter { it.optString("type") == "tool_use" }.map {
-                StreamEvent.SubagentToolUse(parent, it.optString("id"), it.optString("name"), it.optJSONObject("input") ?: JSONObject())
+            return content.objects().mapNotNull {
+                when (it.optString("type")) {
+                    "tool_use" -> StreamEvent.SubagentToolUse(parent, it.optString("id"), it.optString("name"), it.optJSONObject("input") ?: JSONObject())
+                    "text" -> it.optString("text").takeIf(String::isNotBlank)?.let { text -> StreamEvent.SubagentText(parent, text) }
+                    else -> null
+                }
             }
         }
         val error = json.optStringOrNull("error")
@@ -128,12 +132,10 @@ object StreamJsonParser {
         if (content !is JSONArray) return emptyList()
         val results = content.objects().filter { it.optString("type") == "tool_result" }
         json.optStringOrNull("parent_tool_use_id")?.let { parent ->
-            return results.map { StreamEvent.SubagentToolResult(parent, it.optString("tool_use_id"), it.optBoolean("is_error")) }
+            return results.map { StreamEvent.SubagentToolResult(parent, it.optString("tool_use_id"), it.optBoolean("is_error"), resultText(it)) }
         }
         return results.map {
-            val body = it.opt("content")
-            val text = if (body is JSONArray) textOf(body) else body?.toString().orEmpty()
-            StreamEvent.ToolResult(it.optString("tool_use_id"), text, it.optBoolean("is_error"))
+            StreamEvent.ToolResult(it.optString("tool_use_id"), resultText(it), it.optBoolean("is_error"))
         } + listOfNotNull(results.singleOrNull()?.let { agentTotals(json, it.optString("tool_use_id")) })
     }
 
@@ -198,6 +200,12 @@ object StreamJsonParser {
         } else {
             StreamEvent.ControlResponse(id, null, response.optStringOrNull("error") ?: "failed")
         }
+    }
+
+    /** A `tool_result` block's content: a string, or the text of its blocks. */
+    private fun resultText(block: JSONObject): String {
+        val body = block.opt("content")
+        return if (body is JSONArray) textOf(body) else body?.toString().orEmpty()
     }
 
     private fun textOf(blocks: JSONArray): String =

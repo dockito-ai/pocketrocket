@@ -76,6 +76,8 @@ class ClaudeProcessTransport(
         "--replay-user-messages",
         // After each turn Claude Code predicts the next message ("go ahead"); the chat offers it above the box.
         "--prompt-suggestions",
+        // Subagents' own messages come too (marked with parent_tool_use_id), for an agent's full screen (decision 78).
+        "--forward-subagent-text",
         if (resume) "--resume" else "--session-id", conversationId,
         *extraArguments.toTypedArray(),
     )
