@@ -99,7 +99,7 @@ GitScreens.startSession(context, folder, title, prompt)   // a Claude session in
   (dot folder). When the workspace is the repo itself, `/.worktrees/` goes into `.git/info/exclude`. The session is
   `SessionManager.startClaude` in that folder, renamed to the branch.
 
-### Worktrees (decision 71)
+### Worktrees (decision 73)
 
 - `git worktree list --porcelain -z` (`GitParsers.worktrees`): path, HEAD, branch (none when detached), `locked [reason]`
   (Claude Code's agents lock theirs: `claude agent agent-…`), `prunable [reason]`. The first entry is the main checkout.
