@@ -4,7 +4,7 @@
 
 ## 1. Why
 
-A workstation in your pocket: keep working without always depending on the laptop, for comfort and convenience. Stop somewhere, give Claude Code a task on the phone, let it run for hours, check back at intervals and continue. Claude Code in the Claude mobile app runs in Anthropic's cloud and cannot do enough. A modern phone (the reference one: Android 16, 24 GB RAM, 512 GB) can be the machine itself.
+A workstation in your pocket: keep working without always depending on the laptop, for comfort and convenience. Stop somewhere, give Claude Code a task on the phone, let it run for hours, check back at intervals and continue. Claude Code in the Claude mobile app runs in Anthropic's cloud and cannot do enough. A modern phone (the reference one: Android 16, 16 GB RAM, 512 GB) can be the machine itself.
 
 Claude Code stopped working in plain Termux at v2.1.113, when it became a glibc-only native binary. The community workaround (ferrumclaudepilgrim/claude-code-android, MIT) patches the official binary to use Termux's glibc loader and works on current phones. PocketRocket packages that, plus everything around it, into one APK that behaves like a laptop with Claude on it.
 
