@@ -32,17 +32,6 @@ object Unseen {
 
     fun forget(sessionId: String) = _ids.update { it - sessionId }
 
-    /** The same moments that post a session notification: a question, the end of a turn, an error. */
-    private fun isNews(previous: SessionState, current: SessionState): Boolean {
-        val was = previous.status
-        val now = current.status
-        val running = was == SessionStatus.Working || was == SessionStatus.WaitingForPermission || was == SessionStatus.Starting
-        return when (now) {
-            SessionStatus.WaitingForPermission ->
-                was != SessionStatus.WaitingForPermission || previous.permission?.requestId != current.permission?.requestId
-            SessionStatus.WaitingForInput -> was == SessionStatus.Working
-            SessionStatus.Done, SessionStatus.Error -> running
-            else -> false
-        }
-    }
+    /** The same moments that post a session notification: a question, the work done, an error. */
+    private fun isNews(previous: SessionState, current: SessionState): Boolean = SessionNews.of(previous, current) != null
 }

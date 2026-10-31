@@ -165,7 +165,7 @@ object Router {
     private fun overall(sessions: List<SessionState>): Reply {
         if (sessions.isEmpty()) return Reply("No sessions yet. Start one from the Sessions tab.")
         val ordered = sessions.sortedBy { it.permission == null }
-        val card = RocketCard.Status(ordered.map { RocketCard.Status.Row(it.title, it.status, it.id) })
+        val card = RocketCard.Status(ordered.map { RocketCard.Status.Row(it.title, it.shownStatus, it.id) })
         if (ordered.size <= MAX_SPOKEN_LIST) return Reply(ordered.joinToString(" ") { line(it) + "." }, card = card)
         val headline = Briefing.headline(sessions)
         val waiting = ordered.filter { it.permission != null }.take(MAX_SPOKEN_WAITING).joinToString(" ") { line(it) + "." }

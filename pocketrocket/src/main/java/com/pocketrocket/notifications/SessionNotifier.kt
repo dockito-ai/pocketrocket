@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import com.pocketrocket.R
+import com.pocketrocket.sessions.SessionNews
 import com.pocketrocket.sessions.SessionState
 import com.pocketrocket.sessions.SessionStatus
 import com.pocketrocket.ui.chat.SessionActivity
@@ -15,7 +16,7 @@ import java.util.Collections
 
 /**
  * Session notifications (BRD R11): "Needs you" (high importance) when Claude asks for a permission, and
- * "Finished" (default importance) when a turn ends Done or Error. Only for sessions not on screen; one
+ * "Finished" (default importance) when a turn ends Done (once its subagents and background shells have finished too) or Error. Only for sessions not on screen; one
  * notification per session, replaced as it moves on, grouped under a summary. Tapping opens that session.
  * A permission notification also carries Deny, and Allow where [NotificationRules] says it can show what's being allowed, or
  * Review where it can't. Private on the lock screen: the title stays, and what a session asked or printed doesn't.
@@ -46,17 +47,26 @@ object SessionNotifier {
 
     /** Called with every state change of a session. */
     fun onChange(context: Context, previous: SessionState, current: SessionState) {
-        val was = previous.status
-        val now = current.status
-        val asked = now == SessionStatus.WaitingForPermission &&
-            (was != SessionStatus.WaitingForPermission || previous.permission?.requestId != current.permission?.requestId)
-        val running = was == SessionStatus.Working || was == SessionStatus.WaitingForPermission || was == SessionStatus.Starting
-        when {
-            asked -> post(context, current, needsYou = true)
-            now == SessionStatus.WaitingForInput && was == SessionStatus.Working -> post(context, current, needsYou = true)
-            (now == SessionStatus.Done || now == SessionStatus.Error) && running -> post(context, current, needsYou = false)
-            // Answered elsewhere (in the app or another device): the question is gone.
-            was == SessionStatus.WaitingForPermission && now != SessionStatus.WaitingForPermission -> cancel(context, current.id)
+        when (reaction(previous, current)) {
+            Reaction.NeedsYou -> post(context, current, needsYou = true)
+            Reaction.Finished -> post(context, current, needsYou = false)
+            Reaction.Cancel -> cancel(context, current.id)
+            null -> Unit
+        }
+    }
+
+    /** What a state change does here: post "needs you", post "is done" or "hit an error", take the question away, or nothing. */
+    internal enum class Reaction { NeedsYou, Finished, Cancel }
+
+    /**
+     * [SessionNews] decides: "is done" waits until the last subagent and background shell have finished (decision 79);
+     * an error is told at once. A question answered elsewhere (in the app or another device) goes away.
+     */
+    internal fun reaction(previous: SessionState, current: SessionState): Reaction? = when (SessionNews.of(previous, current)) {
+        SessionNews.Asked, SessionNews.Ready -> Reaction.NeedsYou
+        SessionNews.Done, SessionNews.Error -> Reaction.Finished
+        null -> Reaction.Cancel.takeIf {
+            previous.status == SessionStatus.WaitingForPermission && current.status != SessionStatus.WaitingForPermission
         }
     }
 
