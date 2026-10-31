@@ -79,6 +79,7 @@ object SessionReducer {
             )
         }
         is StreamEvent.ShellStarted, is StreamEvent.TaskBackgrounded, is StreamEvent.ShellEnded -> ShellTasks.onEvent(state, event)
+        is StreamEvent.PromptSuggestion -> state.copy(suggestion = event.text)
         is StreamEvent.ControlResponse -> onControlResponse(state, event)
     }
 
@@ -300,6 +301,7 @@ object SessionReducer {
     fun onUserMessage(
         state: SessionState, text: String, uuid: String? = null, attachments: List<Attachment> = emptyList(), queue: Boolean = true,
     ): SessionState {
+        if (state.suggestion != null) return onUserMessage(state.copy(suggestion = null), text, uuid, attachments, queue)
         if (queue && state.busy && uuid != null) {
             return state.copy(queued = state.queued + ChatItem.User("${state.id}-queued-$uuid", text, uuid, attachments))
         }
@@ -354,8 +356,9 @@ object SessionReducer {
     private fun trim(v: Double): String =
         if (v >= 10 || v == Math.floor(v)) Math.round(v).toString() else String.format(Locale.US, "%.1f", v).removeSuffix(".0")
 
+    /** Claude is at it again: a suggestion from the last turn no longer fits. */
     private fun SessionState.working() =
-        if (status == SessionStatus.WaitingForPermission) this else copy(status = SessionStatus.Working)
+        if (status == SessionStatus.WaitingForPermission) copy(suggestion = null) else copy(status = SessionStatus.Working, suggestion = null)
 
     private fun SessionState.append(item: ChatItem) = copy(items = items + item, seq = maxOf(seq, items.size) + 1)
 

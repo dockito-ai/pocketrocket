@@ -108,6 +108,9 @@ sealed interface StreamEvent {
         val suggestions: JSONArray = JSONArray(),
     ) : StreamEvent
 
+    /** `prompt_suggestion`, after a turn's `result` (`--prompt-suggestions`): the message Claude Code predicts the user sends next. */
+    data class PromptSuggestion(val text: String) : StreamEvent
+
     /** `control_cancel_request`: an earlier control request no longer needs an answer. */
     data class PermissionCancelled(val requestId: String) : StreamEvent
 

@@ -51,6 +51,7 @@ CLI to host (stdout):
 | `user` | `tool_result` blocks (`tool_use_id`, `content`, `is_error`); with `parent_tool_use_id` they finish a subagent step. String content `<local-command-stdout>…` is a local command's output, shown as a notice. |
 | `control_request` / `subtype:can_use_tool` | `request_id`, `tool_name`, `input`, `tool_use_id`, `description`, `permission_suggestions` (`blocked_path` unused). The session goes to Needs you until answered. |
 | `control_cancel_request` | Drop the pending permission. |
+| `prompt_suggestion` | After a turn's `result`, with `--prompt-suggestions` (decision 70): `suggestion`, the message Claude Code predicts next. Shown as a pill above the chat box until anything is sent or Claude works again. |
 | `result` | End of turn: `is_error`, `result` text, `session_id`, `modelUsage.<model>.contextWindow`. `terminal_reason` `aborted_*` (with `is_error:true`, `error_during_execution`) is a stopped turn: Done with "Interrupted", not Error. |
 
 `rate_limit_event` is read by the transport for the account's plan usage (`docs/accounts.md`), not by the chat. Ignored: `system/status`, hook events, `command_lifecycle`, `control_response` to our own requests, cost fields.

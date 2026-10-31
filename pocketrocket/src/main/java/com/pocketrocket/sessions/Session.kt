@@ -142,6 +142,9 @@ class Session(
     fun noteFromRocket(line: String) = _state.update { SessionReducer.onRocketNote(it, line) }
 
     /** Gives the session a name of the user's choosing; blank keeps the current one. */
+    /** The suggestion went into the chat box to be edited: it leaves the chips. */
+    fun dropSuggestion() = _state.update { it.copy(suggestion = null) }
+
     fun rename(title: String) {
         val name = title.trim().take(40).ifEmpty { return }
         _state.update { it.copy(title = name) }
