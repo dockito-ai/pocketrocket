@@ -1,0 +1,59 @@
+# Desk evaluation: JS tooling and cloud CLIs (no installs)
+
+Date 31 Oct 2026. Method: `apt-cache` (after `apt-get update`), `npm view` metadata, web search. Nothing installed or run.
+Confidence: **M** = checked metadata (apt/npm), **D** = upstream docs / web, **I** = inferred (not checked).
+Causes: A env shebang (solved), B hardcoded /tmp, C glibc-only binary, D installer rejects "android", E no Android build.
+
+Key finding: for the JS toolchain, npm now publishes `*-android-arm64` native packages for most hot-path deps. Because Node reports `android`, npm picks them up by itself. The remaining holes are Next's SWC, sharp, TypeScript 7, Prisma's schema engine, and Playwright's browsers.
+
+## Tools
+
+| Tool | Verdict | Best source | Problem piece / fallback | Size | Cause | Caveats | Conf |
+|---|---|---|---|---|---|---|---|
+| pnpm | works (measured) | Termux `pnpm` 12.17.0 (46 MB installed, 14 MB dl) | none | 46 MB | A | npm `pnpm` also fine (pure JS) | M |
+| yarn | works | Termux `yarn` 1.22.22 (5 MB); Berry via `corepack` or `npm i -g @yarnpkg/cli-dist` | pure JS | 5 MB | A | Berry downloads its own JS release, no native piece | M/I |
+| tsc | works with TS 5.x; TS 7 doesn't | `npm i -g typescript@5` (5.9.3, pure JS). TS 7.0.2 lists 20+ platform pkgs (linux-arm64, etc.), no android | TS 7 native `tsc`: no android package (D). Fallback: `@typescript/typescript-linux-arm64` through the glibc loader is possible but unverified; npm `os` check rejects it, so needs `--force`/`--os=linux` | TS5 ~23 MB unpacked | A, D (TS7), C | Pin `typescript@5` in recipe. TS 7 on linux-arm64 via loader: inferred, worth a probe | M (TS7 pkg list), I (loader) |
+| vite (8.x) | works with fix | npm | vite 8 uses `rolldown` + `lightningcss`. Both publish `*-android-arm64` (rolldown binding 19 MB, lightningcss 9 MB). Fallback: `@rolldown/binding-wasm32-wasi` (12 MB) | ~30 MB | A | Vite 5/6/7 use rollup + esbuild: both have android-arm64 pkgs. `fsevents` is optional, skipped | M |
+| next (16.x) | works with fix (slow) | npm | `@next/swc-*`: only darwin/linux/win32; **no android** for v16 (`@next/swc-android-arm64` stuck at 13.2.4). Fallback: `@next/swc-wasm-nodejs` 16.4.3 (31 MB), Next auto-falls back to wasm swc when native is missing; or `NEXT_TEST_WASM=1`. Alternatively load `@next/swc-linux-arm64-gnu` (93 MB) via glibc loader (unlikely, N-API addon is a `.node` dlopen into bionic node: **fails**, glibc .node can't load in bionic Node) | next 192 MB unpacked + wasm 31 MB | D, E | Wasm swc: no turbopack (webpack only), slower builds, higher RAM. Turbopack native: doesn't work. `sharp` for image optimisation: see sharp row. Use `next dev --webpack` | M (pkg list), D (wasm fallback), I (turbopack) |
+| esbuild | works | Termux `esbuild` 0.28.2 (11 MB) or npm: `@esbuild/android-arm64` 0.28.2 (11.5 MB) exists | none. Fallback `esbuild-wasm` 14.5 MB | 11 MB | A | Termux pkg version may lag npm; set `ESBUILD_BINARY_PATH=$PREFIX/bin/esbuild` for tools pinning a different version (version mismatch check) | M |
+| prisma (7.x/8 rc) | partly works | npm `prisma` | Prisma 7 client is engine-less (query compiler wasm + driver adapters, `@prisma/query-compiler-wasm` exists), so `generate` and runtime need no Rust engine. **Schema engine** (migrate/db push) is a native binary fetched by `@prisma/fetch-engine` for detected platform; Android isn't a known target (issue prisma/prisma#24123 tagged topic:android, D). Workaround: `PRISMA_SCHEMA_ENGINE_BINARY` to a linux-arm64-openssl binary run via glibc loader (wrapper script). `@prisma/schema-engine-wasm` exists for some commands | engines ~15-30 MB | C, D | Platform detection uses `getos`/ldd, may print "unknown binaryTarget". Needs openssl 3 for the glibc engine (glibc env lacks it, inferred). Prisma 6 and earlier need the query engine .node/.so (glibc, unlikely) | M (pkg), D (issue), I (wrapper) |
+| eslint | works (measured) | npm | pure JS | 3 MB | A | none | M |
+| prettier | works | npm (pure JS) | none | 10 MB | A | none | M |
+| playwright | partly: library works, bundled browsers don't | Termux `playwright` 1.64.1 (depends on Termux `chromium`, already installed 156) | Playwright's own browser download has no android build, and Chromium from `cdn.playwright.dev` is glibc linux-arm64. Use Termux chromium via `executablePath`/`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`; `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` | pkg 19 MB + chromium (already) | D (downloads), C | Termux chromium is headless-capable? unverified; sandbox flags `--no-sandbox` needed (inferred). Firefox/WebKit: not available. `playwright install` fails (don't run). Use `/tmp`-free config: set `TMPDIR` | M (apt), I (flags) |
+| vercel CLI | works with fix | npm `vercel` 65.9.0 | Bundled `esbuild` 0.27.0 pins a version: has `@esbuild/android-arm64` so install picks it. Everything else JS. `vercel dev` runtimes (go/ruby/python) need those toolchains | 13 MB + deps | A | Login: device-code flow (`vercel login`, prints URL; works without local browser). Uses `os.tmpdir()` fine | M (deps), I (login) |
+| netlify | works | npm `netlify-cli` 27.16 | Deps are JS plus optional `@parcel/watcher` (has `-android-arm64`), `esbuild` (android ok). No other native in dep list I checked | ~1.2 MB + large tree | A | Login opens browser with ticket URL; prints URL when no browser, completes via polling (D-ish, inferred). `netlify dev` fine | M/I |
+| supabase | uncertain | npm `supabase` 2.122: a bun-built JS shim (`dist/supabase.js`, deps only `jose`, `eciesjs`) | The real CLI is a Go binary (releases have linux_arm64). The shim probably downloads/launches it (not verified: not in metadata). Go binary on loader or static: DNS caveat below. Local stack (`supabase start`) needs Docker: **E, unsupported** | CLI ~20-30 MB (inferred) | C, E | Remote use (`link`, `db push`, `functions deploy`, `login` via browser token) plausible; local dev stack impossible. Go DNS/`resolv.conf` issue | I |
+| firebase | works | npm `firebase-tools` 15.34 | JS. Deps checked: superstatic, @google-cloud/*: pure JS. Emulators download Java jars (Java needed: `openjdk-21` in Termux) | ~6 MB + large tree (200+ MB installed, inferred) | A | `firebase login` has `--no-localhost` (prints code URL) which suits phone; emulators need JDK + ports | M, I |
+| aws CLI | works | Termux `awscli` 2.39.3 (208 MB installed, 38 MB dl) | none (python-based package, Termux build) | 208 MB | none | AWS official v2 installer is glibc linux-arm64 with bundled python: unnecessary. `aws sso login --use-device-code` for no-browser. Cert bundle in $PREFIX handled by Termux build | M, I |
+| gcloud | likely works via official tarball, no Termux pkg | Official `google-cloud-cli-linux-arm.tar.gz` with `CLOUDSDK_PYTHON=$PREFIX/bin/python` (Termux python, installed) | No Termux pkg (apt: none). Bundled python in tarball is glibc, so use Termux python instead (set env). Some components (kubectl, gke-gcloud-auth-plugin) are Go binaries | ~500 MB unpacked (core ~150-200 MB, D/inferred) | C | `gcloud auth login --no-browser`/`--no-launch-browser` for phone. Python version compat: new gcloud wants 3.9-3.13, Termux python may be newer (check) | I |
+| flyctl | works | Termux `flyctl` 0.5.1 (79 MB installed, 17 MB dl) | none (Go built with Termux toolchain: uses bionic DNS) | 79 MB | none | Version lags fly.io releases (0.5.1 vs upstream). `fly auth login` opens browser; use `fly auth token` / web flow prints URL | M, I |
+| terraform | works with caveats / needs probe | No Termux pkg (apt: none; opentofu none). HashiCorp `terraform_*_linux_arm64.zip` (static Go) | Go static `linux_arm64`: DNS reads `/etc/resolv.conf` and CA from `/etc/ssl`, neither exists on Android (D, termux-packages#15869). Android-built Terraform reports OS=android and `init` fails: no `android_arm64` provider packages (HashiCorp forum, D). So use the linux build, providers (also static Go) have the same DNS/cert issue. Android also blocks some syscalls (`faccessat2`) for glibc-less Go (D, antigravity-cli-termux write-up) | ~25 MB zip / ~90 MB | C, B | Needs `/etc/resolv.conf` and certs redirect: could use glibc loader's path remap if any, or env `SSL_CERT_FILE`, plus a DNS fix. Go resolver ignores env, so **DNS is the blocker**. Plugin cache dir under `$TMPDIR`. Probably "works with fix" only if resolv.conf redirect solved; mark as risky | D, I |
+| wrangler | works (decisions 49/82) | PocketRocket tool, patched workerd | workerd: patched port | n/a | E (solved) | Already handled | decisions |
+
+## Native deps
+
+| Dep | Android native pkg | wasm / other fallback | Verdict | Conf |
+|---|---|---|---|---|
+| rollup 4.67 | `@rollup/rollup-android-arm64` (2 MB) | `@rollup/wasm-node` 3.5 MB | works, auto-picked | M |
+| esbuild 0.28 | `@esbuild/android-arm64` (11.5 MB) | `esbuild-wasm` 14.5 MB; Termux `esbuild` | works | M |
+| rolldown 1.2 (vite 8) | `@rolldown/binding-android-arm64` (19 MB) | `@rolldown/binding-wasm32-wasi` 12 MB | works | M |
+| lightningcss 1.33 | `lightningcss-android-arm64` (9 MB) | none | works | M |
+| @tailwindcss/oxide 4.3 | `-android-arm64` (2.7 MB) | `-wasm32-wasi` 11.6 MB | works | M |
+| @parcel/watcher 2.6 | `-android-arm64` (0.4 MB) | chokidar fallback in most callers | works | M |
+| @swc/core | `@swc/core-android-arm64` stuck at 1.3.11 (old, 70 MB) | `@swc/wasm` 18 MB | **doesn't** for current versions; use wasm | M |
+| @next/swc (16.4) | none (android stuck at 13.2.4) | `@next/swc-wasm-nodejs` 31 MB (auto fallback) | wasm only | M, D |
+| sharp 0.35 | none for android (only linux/darwin/win32/freebsd-wasm/webcontainers) | `@img/sharp-wasm32` 9.3 MB (install with `--cpu=wasm32`, per sharp docs, D); Termux `libvips` + build from source needs node-gyp/NDK: heavy | works with wasm install; slower, fewer formats | M, D |
+| prisma engines | none (schema engine binary, linux-arm64-openssl, glibc) | Prisma 7 query compiler wasm for client; schema-engine-wasm partial | client OK, migrate needs glibc wrapper | M, I |
+| typescript 7 (tsgo) | none | TS 5.9.3 pure JS | use TS 5 | M |
+| fsevents | n/a | optional, skipped | n/a | M |
+
+## Notes
+
+- A solved (npx, `.bin/*`). Not re-listed per row except where relevant.
+- Cause B (/tmp): none of the JS tools hard-code /tmp as far as checked; Node tools use `os.tmpdir()` which follows `$TMPDIR`. Playwright, Terraform and gcloud are the likelier offenders (inferred).
+- Glibc `.node` addons cannot be loaded by bionic Node (and Node is bionic here), so "install linux-arm64 npm package" (cause D fix) only works for standalone executables, not N-API addons. This kills `@next/swc-linux-arm64-gnu`, sharp-linux-arm64 and the Prisma library engine; use wasm for those.
+- npm `os`/`cpu` checks: `--os=linux --cpu=arm64` (or `--force`) is needed to install linux packages; not recommended for addons as above.
+- Go CLIs not packaged by Termux (terraform, supabase, gcloud components) share one blocker: DNS and CA file locations. A single fix (redirect or env-based resolver/CA setup) would unlock all of them: worth deciding once. Termux-packaged Go tools (flyctl) avoid it because they are built against Android.
+- Login flows: prefer device-code / `--no-browser` variants (gcloud, firebase `--no-localhost`, aws sso `--use-device-code`, vercel device flow). Items marked I should be confirmed on the phone.
+- Suggested install order by value/cost: pnpm, yarn, esbuild, tsc@5, prettier (all tiny), then vercel/netlify/firebase (npm), awscli/flyctl (Termux), then Next (wasm swc probe), prisma (probe migrate), playwright (probe with Termux chromium), then terraform/gcloud/supabase (need DNS decision).
+- Unverified items to probe on the phone: Next wasm swc `next build`, Prisma schema engine wrapper, TS 7 via glibc loader, Playwright with Termux chromium, supabase shim behaviour, terraform DNS, gcloud with Termux python version.

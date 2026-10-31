@@ -5,7 +5,7 @@ import android.os.FileObserver
 import android.util.Log
 import com.pocketrocket.profiles.AccountPaths
 import com.pocketrocket.profiles.writeAtomically
-import com.termux.shared.termux.TermuxConstants
+import com.pocketrocket.setup.Launchers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -39,7 +39,7 @@ object WorkspaceRequests {
     fun start(context: Context) {
         app = context.applicationContext
         if (!AccountPaths.home.isDirectory) return // before the first-run setup
-        installLauncher(app)
+        Launchers.install(app, LAUNCHER)
         dir.mkdirs()
         val dayAgo = System.currentTimeMillis() - 24 * 3600_000L
         dir.listFiles()?.filter { !it.name.endsWith(".req") && it.lastModified() < dayAgo }?.forEach { it.delete() }
@@ -86,19 +86,4 @@ object WorkspaceRequests {
     private fun append(out: File, text: String) {
         runCatching { FileOutputStream(out, true).use { it.write((text.trimEnd('\n') + "\n").toByteArray()) } }
     }
-
-    /** Copies the script from the app's assets (setup/, built from the repo's setup folder) when it differs. */
-    private fun installLauncher(context: Context) = runCatching {
-        val bin = File(TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH)
-        if (!bin.isDirectory) return@runCatching
-        val text = context.assets.open("setup/$LAUNCHER").use { it.readBytes() }
-        val target = File(bin, LAUNCHER)
-        if (!target.exists() || !target.readBytes().contentEquals(text)) {
-            val tmp = File(bin, ".$LAUNCHER.tmp")
-            tmp.writeBytes(text)
-            tmp.setExecutable(true, false)
-            if (!tmp.renameTo(target)) tmp.delete()
-        }
-        target.setExecutable(true, false)
-    }.onFailure { Log.w(TAG, "could not install $LAUNCHER", it) }
 }

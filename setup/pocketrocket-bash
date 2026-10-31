@@ -1,0 +1,18 @@
+#!/data/data/app.pocket/files/usr/bin/bash
+# PocketRocket's shell for Claude Code's Bash tool, installed as $PREFIX/bin/pocketrocket-bash. The `claude`
+# launcher points CLAUDE_CODE_SHELL here (docs/tool-sweep.md, Phase 0).
+#
+# The launcher unsets LD_PRELOAD, because Termux's exec helper (libtermux-exec) is a bionic library and crashes
+# the glibc Claude Code binary. Every shell Claude starts would then run without it, and Android has no
+# /usr/bin/env, so `#!/usr/bin/env node` scripts (npx, node_modules/.bin, most scripts) fail with "bad
+# interpreter". The helper has to be there when bash starts, since bash itself runs the commands; setting it
+# inside the shell is too late. So this puts it back and runs Termux's bash, as a Termux terminal does.
+# glibc programs started from the shell drop it themselves: the claude and dockito launchers, and the
+# wrappers the flutter launcher puts around Dart and Flutter's engine tools.
+#
+# Claude Code only takes a CLAUDE_CODE_SHELL whose path contains "bash" or "zsh", hence the name.
+
+PREFIX="${PREFIX:-/data/data/app.pocket/files/usr}"
+helper="$PREFIX/lib/libtermux-exec.so"
+if [ -z "${LD_PRELOAD:-}" ] && [ -f "$helper" ]; then export LD_PRELOAD="$helper"; fi
+exec "$PREFIX/bin/bash" "$@"
