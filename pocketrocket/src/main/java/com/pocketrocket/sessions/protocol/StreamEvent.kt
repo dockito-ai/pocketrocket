@@ -40,16 +40,21 @@ sealed interface StreamEvent {
     /** A subagent (Task/Agent tool [parentToolUseId]) used a tool. */
     data class SubagentToolUse(val parentToolUseId: String, val id: String, val name: String, val input: JSONObject) : StreamEvent
 
-    /** A subagent's tool finished. */
-    data class SubagentToolResult(val parentToolUseId: String, val toolUseId: String, val isError: Boolean) : StreamEvent
+    /** A subagent's tool finished, with what it gave back ([content]). */
+    data class SubagentToolResult(val parentToolUseId: String, val toolUseId: String, val isError: Boolean, val content: String = "") : StreamEvent
+
+    /** A text block the subagent wrote (its own messages; the main chat never shows them). */
+    data class SubagentText(val parentToolUseId: String, val text: String) : StreamEvent
 
     /**
-     * `system/task_progress` and `task_notification` for the subagent started by tool use [toolUseId]: what it is
-     * doing now ([activity]), and at the end its [status] (`completed`, `failed`, `killed`) and [summary]. Its numbers
-     * so far when the line has them: [tokens], [toolUses] and, at the end, [durationMs].
+     * `system/task_started`, `task_progress` and `task_notification` for the subagent started by tool use [toolUseId]:
+     * its task [taskId] (what `stop_task` takes), what it is doing now ([activity]), and at the end its [status]
+     * (`completed`, `failed`, `stopped`, `killed`) and [summary]. Its numbers so far when the line has them: [tokens],
+     * [toolUses] and, at the end, [durationMs].
      */
     data class SubagentUpdate(
         val toolUseId: String,
+        val taskId: String? = null,
         val activity: String? = null,
         val status: String? = null,
         val summary: String? = null,
