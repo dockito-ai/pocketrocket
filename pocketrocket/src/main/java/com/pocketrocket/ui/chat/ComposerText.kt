@@ -21,7 +21,7 @@ fun insertAtCursor(text: String, selStart: Int, selEnd: Int, words: String): Ins
 }
 
 /**
- * The model chip under the box: "Opus 5.5 · medium", the effort only when the model has levels and one is known.
+ * The model at the start of the status line under the box: "Opus 5.5 · medium", the effort only when the model has levels and one is known.
  * Before Claude Code says which model it runs, "Model".
  */
 fun modelChipText(modelName: String?, effort: String?, effortLevels: List<String>): String {
