@@ -16,7 +16,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -53,7 +52,9 @@ import com.pocketrocket.ui.components.mockText
 import com.pocketrocket.ui.setup.StepList
 import com.pocketrocket.ui.setup.StepListStyle
 import com.pocketrocket.ui.tools.BusyButton
+import com.pocketrocket.ui.tools.ToolIcon
 import com.pocketrocket.ui.tools.ToolLog
+import com.pocketrocket.ui.tools.icon
 import com.pocketrocket.ui.theme.PrTheme
 import com.pocketrocket.updates.UpdateComponent
 import com.pocketrocket.updates.UpdateRow
@@ -215,7 +216,7 @@ private fun UpdateTile(row: UpdateRow, queued: Boolean, blocked: Boolean, checke
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            UpdateIcon(row.component, busy = row.running)
+            ToolIcon(row.component.icon)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(row.component.label, style = mockText(14.sp, FontWeight.SemiBold), color = c.text)
                 SubLine(row, checkedOnce)
@@ -267,34 +268,6 @@ private fun SubLine(row: UpdateRow, checkedOnce: Boolean) {
             style = mockText(12.sp), color = c.textMuted, maxLines = 2,
         )
         else -> Text(row.installed, style = mockText(12.sp, mono = true), color = c.textMuted, maxLines = 1)
-    }
-}
-
-@Composable
-private fun UpdateIcon(component: UpdateComponent, busy: Boolean) {
-    val c = PrTheme.colors
-    val orange = component == UpdateComponent.PocketRocket || component == UpdateComponent.ClaudeCode
-    val tint = when {
-        busy -> c.blue
-        orange -> c.accent
-        else -> c.text
-    }
-    Box(
-        Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(if (busy || orange) tint.copy(alpha = 0.14f) else c.iconTile),
-        contentAlignment = Alignment.Center,
-    ) {
-        when (component) {
-            UpdateComponent.ClaudeCode -> Text("C", style = mockText(15.sp, FontWeight.Bold), color = tint)
-            else -> Icon(
-                when (component) {
-                    UpdateComponent.PocketRocket -> MockIcons.Rocket
-                    UpdateComponent.Git -> MockIcons.Branch
-                    UpdateComponent.Flutter, UpdateComponent.Rust -> MockIcons.Code
-                    else -> MockIcons.Doc
-                },
-                contentDescription = null, tint = tint, modifier = Modifier.size(18.dp),
-            )
-        }
     }
 }
 

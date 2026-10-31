@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.unit.Dp
+import com.pocketrocket.ui.components.MockIcons
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pocketrocket.ui.components.Caps
@@ -98,20 +99,34 @@ fun ToolIcon(icon: ToolGlyph, tile: Dp, glyph: Dp, corner: Dp) {
     }
 }
 
-/** One tile on the Tools list: icon, name, status line, chevron. */
+/**
+ * One tile on the Tools list: icon, name, status line, chevron. An [installed] add-on gets a green tick just left of
+ * the chevron, a green status line and a slightly stronger card, so it stands apart from the muted ones that aren't installed.
+ */
 @Composable
-fun ToolTile(name: String, icon: ToolGlyph, status: ToolStatus, onClick: () -> Unit) {
+fun ToolTile(name: String, icon: ToolGlyph, status: ToolStatus, installed: Boolean = false, onClick: () -> Unit) {
     val c = PrTheme.colors
+    val shape = RoundedCornerShape(14.dp)
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.surface)
-            .border(1.dp, c.iconTile, RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(14.dp),
+        Modifier.fillMaxWidth().clip(shape).background(if (installed) lerp(c.surface, c.green, 0.06f) else c.surface)
+            .border(1.dp, if (installed) c.green.copy(alpha = 0.45f) else c.iconTile, shape).clickable(onClick = onClick).padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         ToolIcon(icon)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(name, style = mockText(14.sp, FontWeight.SemiBold), color = c.text)
-            Text(status.line, style = mockText(12.sp), color = if (status.tone == ToolTone.Idle || status.tone == ToolTone.Installed) c.textMuted else c.tone(status.tone))
+            val tone = when {
+                installed && status.tone == ToolTone.Installed -> c.green
+                status.tone == ToolTone.Idle || status.tone == ToolTone.Installed -> c.textMuted
+                else -> c.tone(status.tone)
+            }
+            Text(status.line, style = mockText(12.sp), color = tone)
+        }
+        if (installed) {
+            Box(Modifier.size(18.dp).clip(CircleShape).background(c.green), contentAlignment = Alignment.Center) {
+                Icon(MockIcons.Check, contentDescription = "Installed", tint = Color.White, modifier = Modifier.size(12.dp))
+            }
         }
         Text("›", style = mockText(14.sp), color = c.textMuted)
     }
