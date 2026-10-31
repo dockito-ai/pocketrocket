@@ -1,0 +1,180 @@
+#!/data/data/app.pocket/files/usr/bin/bash
+# PocketRocket launcher for Flutter and Dart (decision 70, docs/flutter-tool.md), installed as
+# $PREFIX/bin/flutter, with $PREFIX/bin/dart a link to it.
+#
+# Which Flutter: the nearest .fvmrc up from the current folder (FVM's project pin; FVM 2's
+# .fvm/fvm_config.json too), else FVM's global default, the link ~/fvm/default. Versions are official
+# Flutter clones in ~/fvm/versions/<version>, FVM's own layout, so `fvm` and this launcher agree.
+#
+# Official Flutter's Dart SDK and engine tools are glibc programs. Before running, this prepares any that
+# are not ready yet (a new Dart SDK after `fvm install` or `flutter upgrade`, engine tools Flutter just
+# downloaded): their ELF interpreter goes to Termux's glibc loader, as for Claude Code, and each becomes
+# <name>.glibc behind a small wrapper that drops Termux's bionic exec helper (LD_PRELOAD), which a glibc
+# program can't load. Flutter's own scripts need that helper (#!/usr/bin/env bash), so it is set before
+# running them, also from Claude sessions, where LD_PRELOAD is empty.
+#
+# The check is cheap: the stamps Flutter writes in bin/cache when it downloads something are compared with
+# what they were when this launcher last prepared that version.
+#
+# Internal modes for the setup script: POCKETROCKET_FLUTTER_PREPARE=<folder> prepares that folder and exits;
+# POCKETROCKET_FLUTTER_ROOT=<flutter folder> runs that Flutter whatever the pin.
+
+PREFIX="${PREFIX:-/data/data/app.pocket/files/usr}"
+PR_BASH="$PREFIX/bin/bash"
+PR_PATCHELF="$PREFIX/glibc/bin/patchelf"
+PR_GLIBC_LD="$PREFIX/glibc/lib/ld-linux-aarch64.so.1"
+PR_FVM_HOME="$HOME/fvm"
+PR_STAMP=.pocketrocket-prepared   # in bin/cache, which git ignores
+PR_NAME="${0##*/}"
+case "$PR_NAME" in dart*) PR_NAME=dart ;; *) PR_NAME=flutter ;; esac
+
+pr_say() { printf '[%s] %s\n' "$PR_NAME" "$*" >&2; }
+
+# pr_pin_from <text>: the Flutter version in an .fvmrc ("flutter") or FVM 2 config ("flutterSdkVersion"), in PR_PIN.
+pr_pin_from() {
+  local re='"(flutter|flutterSdkVersion)"[[:space:]]*:[[:space:]]*"([^"]+)"'
+  PR_PIN=""
+  [[ $1 =~ $re ]] || return 1
+  PR_PIN="${BASH_REMATCH[2]}"
+}
+
+# pr_find_pin [folder]: walks up from the folder (default: the current one) to the nearest pin. Sets PR_PIN and
+# PR_PIN_FILE; 1 when no folder up the tree pins a version.
+pr_find_pin() {
+  local d="${1:-$PWD}" f text
+  PR_PIN=""; PR_PIN_FILE=""
+  while :; do
+    for f in "$d/.fvmrc" "$d/.fvm/fvm_config.json"; do
+      [ -f "$f" ] || continue
+      text="$(<"$f")" || continue
+      if pr_pin_from "$text"; then PR_PIN_FILE="$f"; return 0; fi
+    done
+    [ -n "$d" ] && [ "$d" != / ] || return 1
+    d="${d%/*}"
+  done
+}
+
+# pr_signature <flutter root>: the names and first lines of bin/cache/*.stamp, in PR_SIG.
+pr_signature() {
+  local f line
+  PR_SIG=""
+  for f in "$1"/bin/cache/*.stamp; do
+    [ -f "$f" ] || continue
+    line=""; read -r line <"$f" || true
+    PR_SIG+="${f##*/}=$line;"
+  done
+}
+
+# pr_needs_prepare <flutter root>: 0 when something in bin/cache may not be ready.
+pr_needs_prepare() {
+  local cache="$1/bin/cache" saved=""
+  [ -e "$cache/dart-sdk/bin/dart" ] && [ ! -e "$cache/dart-sdk/bin/dart.glibc" ] && return 0
+  [ -f "$cache/$PR_STAMP" ] || return 0
+  read -r saved <"$cache/$PR_STAMP" || true
+  pr_signature "$1"
+  [ "$saved" != "$PR_SIG" ]
+}
+
+# pr_prepare <folder>: every glibc program under it gets Termux's glibc loader and a wrapper without the bionic
+# preload. A program already done is a wrapper script, not an ELF file, so running this again changes nothing.
+pr_prepare() {
+  local f magic interp
+  [ -x "$PR_PATCHELF" ] && [ -f "$PR_GLIBC_LD" ] || { pr_say "Termux's glibc is missing. Run PocketRocket setup again."; return 1; }
+  while IFS= read -r -d '' f; do
+    case "$f" in *.glibc) continue ;; esac
+    magic=""
+    LC_ALL=C read -r -n 4 magic <"$f" 2>/dev/null || true
+    [ "$magic" = $'\x7fELF' ] || continue
+    interp="$(LD_PRELOAD='' "$PR_PATCHELF" --print-interpreter "$f" 2>/dev/null)" || continue
+    case "$interp" in
+      /lib/ld-linux-aarch64.so.1)
+        LD_PRELOAD='' "$PR_PATCHELF" --set-interpreter "$PR_GLIBC_LD" "$f" || { pr_say "could not patch $f"; return 1; } ;;
+      "$PR_GLIBC_LD") ;;
+      *) continue ;;
+    esac
+    mv -f "$f" "$f.glibc" || return 1
+    printf '#!%s\n# Written by PocketRocket: runs the glibc program without the bionic exec helper.\nunset LD_PRELOAD\nexec %q "$@"\n' \
+      "$PR_BASH" "$f.glibc" >"$f" || return 1
+    chmod 755 "$f"
+  done < <(find "$1" -type f -perm -u+x -print0 2>/dev/null)
+}
+
+# pr_prepare_root <flutter root>: prepares bin/cache and records the stamps it saw. One at a time per version.
+pr_prepare_root() {
+  local cache="$1/bin/cache" lock="$1/bin/cache/.pocketrocket-lock" i=0 rc=0
+  mkdir -p "$cache"
+  until mkdir "$lock" 2>/dev/null; do
+    i=$((i + 1)); [ "$i" -lt 600 ] || rm -rf "$lock"
+    sleep 0.1
+  done
+  pr_prepare "$cache" || rc=1
+  if [ "$rc" = 0 ]; then
+    pr_signature "$1"
+    printf '%s\n' "$PR_SIG" >"$cache/$PR_STAMP"
+  fi
+  rmdir "$lock" 2>/dev/null
+  return "$rc"
+}
+
+# pr_dart_sdk <flutter root>: fetches the Dart SDK when Flutter's own check says it is missing or old, the way
+# bin/flutter would, but before it runs so the new SDK is prepared before its first use.
+pr_dart_sdk() {
+  local internal="$1/bin/internal" want="" have=""
+  if [ -f "$internal/engine.version" ]; then
+    read -r want <"$internal/engine.version" || true
+    [ -f "$1/bin/cache/engine-dart-sdk.stamp" ] && read -r have <"$1/bin/cache/engine-dart-sdk.stamp"
+    [ -n "$want" ] && [ "$want" = "$have" ] && [ -e "$1/bin/cache/dart-sdk/bin/dart" ] && return 0
+  fi
+  "$PR_BASH" "$internal/update_engine_version.sh" >&2 && "$PR_BASH" "$internal/update_dart_sdk.sh" >&2
+}
+
+pr_bionic_preload() {
+  local lib
+  [ -n "${LD_PRELOAD:-}" ] && return 0
+  for lib in "$PREFIX/lib/libtermux-exec-ld-preload.so" "$PREFIX/lib/libtermux-exec.so"; do
+    if [ -f "$lib" ]; then export LD_PRELOAD="$lib"; return 0; fi
+  done
+}
+
+pr_main() {
+  local root rc=0
+  if [ -n "${POCKETROCKET_FLUTTER_PREPARE:-}" ]; then
+    if [ -d "$POCKETROCKET_FLUTTER_PREPARE/bin/cache" ]; then pr_prepare_root "$POCKETROCKET_FLUTTER_PREPARE"
+    else pr_prepare "$POCKETROCKET_FLUTTER_PREPARE"; fi
+    return
+  fi
+  if [ -n "${POCKETROCKET_FLUTTER_ROOT:-}" ]; then
+    root="$POCKETROCKET_FLUTTER_ROOT"
+  elif pr_find_pin; then
+    root="$PR_FVM_HOME/versions/$PR_PIN"
+    if [ ! -f "$root/bin/flutter" ]; then
+      pr_say "Flutter $PR_PIN isn't installed ($PR_PIN_FILE pins it): Settings → Tools → Flutter & Rust, or \`fvm install $PR_PIN\`."
+      return 127
+    fi
+  else
+    root="$PR_FVM_HOME/default"
+    if [ ! -f "$root/bin/flutter" ]; then
+      pr_say "No default Flutter version: Settings → Tools → Flutter & Rust, or \`fvm global <version>\`."
+      return 127
+    fi
+    root="$(cd -P "$root" && pwd)"
+  fi
+
+  pr_bionic_preload
+  pr_dart_sdk "$root" || { pr_say "Could not download the Dart SDK for $root. Check the connection and try again."; return 1; }
+  if pr_needs_prepare "$root"; then pr_prepare_root "$root" || return 1; fi
+
+  # Not exec: Flutter may download engine tools during this run and start them at once, before they are
+  # prepared. Afterwards they are, and the next run works.
+  "$PR_BASH" "$root/bin/$PR_NAME" "$@" || rc=$?
+  if pr_needs_prepare "$root"; then
+    pr_prepare_root "$root" || return "$rc"
+    [ "$rc" = 0 ] || pr_say "Flutter downloaded tools during this run and they are now set up for this phone. Run the command again."
+  fi
+  return "$rc"
+}
+
+if [ "${POCKETROCKET_FLUTTER_SOURCE_ONLY:-0}" != 1 ]; then
+  pr_main "$@"
+  exit
+fi

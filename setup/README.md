@@ -14,6 +14,7 @@ The shell side of PocketRocket's first run (BRD R2, R10; decisions 3 and 5). Our
   7. Runs `claude --version` through the launcher.
   8. Installs Dockito's CLI (decision 40) as `--only dockito` does, from the release the app read from Dockito's Homebrew formula (`POCKETROCKET_DOCKITO_*`). Without that release (offline) an installed Dockito is kept; otherwise the step fails and Retry tries again.
 - `claude`: the launcher. Runs `~/.pocketrocket/claude/current/claude` with `LD_PRELOAD` unset (Termux's bionic preload crashes a glibc binary), `DISABLE_AUTOUPDATER=1`, `USE_BUILTIN_RIPGREP=0`, and the DNS preload through `BUN_OPTIONS` when it is on. It never updates anything.
+- `flutter`: the Flutter and Dart launcher (decision 70, `docs/flutter-tool.md`), installed as `$PREFIX/bin/flutter` with `dart` a link to it. Picks the version in the nearest `.fvmrc` (else FVM's default, `~/fvm/default`), fetches a missing or old Dart SDK the way Flutter would, prepares any glibc program in that version's `bin/cache` that isn't yet (Termux's glibc loader, and a wrapper that drops the bionic preload), sets the bionic preload for Flutter's own scripts and runs `bin/flutter` or `bin/dart`. Works from Claude sessions, where `LD_PRELOAD` is empty.
 - `NOTICE`: the MIT license of the code we ported.
 
 ## Updating Claude Code alone (R9)
@@ -34,6 +35,14 @@ The app's Settings › Claude Code screen runs the script with an option instead
 | `bash pocketrocket-setup.sh --only android-build-remove` | 3 | Removes the SDK, the wiring, Gradle's downloads and the packages the install brought in. |
 | `bash pocketrocket-setup.sh --only wrangler` | 3 | Optional Wrangler tool (Settings › Tools only, decision 49): pinned npm package with install scripts off, workerd's loader pointed at a stub because it has no Android build, then `wrangler --version` and a `deploy --dry-run` as the check. Needs Node, which the base set has. |
 | `bash pocketrocket-setup.sh --only wrangler-remove` | 2 | Signs out, removes the package and Wrangler's folder (`~/.config/.wrangler`). Installs no packages, so removes none. |
+| `bash pocketrocket-setup.sh --only flutter-rust` | 6 | Optional Flutter & Rust tool (Settings › Tools only, decision 70; `docs/flutter-tool.md`): `which` and `unzip`, FVM 4.3.2 (official linux-arm64 release, checked against its published SHA-256), the newest stable Flutter cloned at its release tag into `~/fvm/versions/<version>` and checked against the commit in Flutter's release list, its Dart SDK, the tool built and the engine tools fetched and prepared, the default set, then Rust (Termux's `rust`). Records the packages each part added. |
+| `bash pocketrocket-setup.sh --only flutter [version]` | 5 | The Flutter part alone: adds that version (or the newest stable). `POCKETROCKET_FLUTTER_VERSION` works too; `POCKETROCKET_FLUTTER_DEFAULT=1` makes it the default, otherwise it becomes the default only when there is none. |
+| `bash pocketrocket-setup.sh --only flutter-default <version>` | 2 | Points FVM's `~/fvm/default` at an installed version. |
+| `bash pocketrocket-setup.sh --only flutter-remove-version <version>` | 2 | Removes one version; if it was the default, the newest other one becomes the default. |
+| `bash pocketrocket-setup.sh --only flutter-remove` | 2 | Removes `~/fvm`, FVM, the launchers, `~/.pub-cache`, Dart's and Flutter's own folders and config, and the packages the install added. |
+| `bash pocketrocket-setup.sh --only rust` / `rust-remove` | 2 | Rust alone: installs `rust` (which brings `rust-std-aarch64-linux-android`) and records what it added; removing takes only that, and `~/.cargo`. |
+| `bash pocketrocket-setup.sh --only flutter-rust-remove` | 3 | Both removals. |
+| `bash pocketrocket-setup.sh --only rust-check` / `rust-update` | 0 / 2 | As `git-check` and `git-update`, for Rust; the update moves `rust-std-aarch64-linux-android` with it. |
 | `bash pocketrocket-setup.sh --only git-check` | 0 | Settings › Updates: `apt-get update`, then prints `apt-cache policy git` (the app reads `Installed:` and `Candidate:`). No steps, no lock, no `[done]`; logs to `~/.pocketrocket/git.log`. |
 | `bash pocketrocket-setup.sh --only git-update` | 2 | Settings › Updates (decision 41): upgrades git alone (`apt-get install --only-upgrade git`, plus only what the new git needs) with the same three-phase progress as `apt_install_progress`, then checks the installed version is the candidate and runs `git --version`. |
 

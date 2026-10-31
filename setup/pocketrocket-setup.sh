@@ -36,10 +36,15 @@
 #   --only android-build / android-build-remove  the optional Android build tool, Settings > Tools (decision 45)
 #   --only android-ndk / android-ndk-remove  the optional Android NDK tool, on top of it (decision 50)
 #   --only wrangler / wrangler-remove  the optional Wrangler tool, Settings > Tools (decision 49)
-#   --only git-check  refresh the package index and print `apt-cache policy git` (its Installed and
-#                     Candidate lines) for the Updates screen; no steps, no lock, no [done]
-#   --only git-update upgrade git alone (and only what the new git needs) with the apt progress
-#                     phases; 2 steps (the Updates screen, decision 41)
+#   --only flutter-rust / flutter-rust-remove  the optional Flutter & Rust tool, all of it (decision 70)
+#   --only flutter [version]  add a Flutter version (newest stable by default; POCKETROCKET_FLUTTER_VERSION
+#                     also works, POCKETROCKET_FLUTTER_DEFAULT=1 makes it the default)
+#   --only flutter-default <version> / flutter-remove-version <version> / flutter-remove
+#   --only rust / rust-remove  Rust alone, Termux's package
+#   --only git-check / rust-check  refresh the package index and print `apt-cache policy <package>` (its
+#                     Installed and Candidate lines) for the Updates screen; no steps, no lock, no [done]
+#   --only git-update / rust-update  upgrade the package alone (and only what the new version needs) with
+#                     the apt progress phases; 2 steps (the Updates screen, decision 41)
 # A version that fails the smoke test during --only claude is not made current: the script warns,
 # keeps the old one, and still ends with [done]; the caller compares `current` with what it asked for.
 #
@@ -1321,34 +1326,36 @@ android_ndk_remove() {
   rm -f "$ANDROID_NDK_ADDED_FILE" "$ANDROID_NDK_BASELINE_FILE"
 }
 
-# Git on the Updates screen (decision 41). apt-cache policy prints "Installed: X" and "Candidate: Y".
-git_policy() { apt-cache policy git 2>/dev/null; }
-git_policy_field() { git_policy | awk -v k="$1:" '$1 == k { print $2; exit }'; }
+# Packages on the Updates screen (decision 41): Git, and Rust once the Flutter & Rust tool has it (decision 70).
+# apt-cache policy prints "Installed: X" and "Candidate: Y".
+apt_policy_field() { apt-cache policy "$1" 2>/dev/null | awk -v k="$2:" '$1 == k { print $2; exit }'; }
 
-git_check() {
-  PR_LOG="$PR_HOME/git.log"; mkdir -p "$PR_HOME"; : >"$PR_LOG"
+# apt_check <package>: refreshes the index and prints the package's policy. Its own log; no lock, no steps.
+apt_check() {
+  PR_LOG="$PR_HOME/$1.log"; mkdir -p "$PR_HOME"; : >"$PR_LOG"
   export DEBIAN_FRONTEND=noninteractive
   apt_refresh
-  git_policy
+  apt-cache policy "$1" 2>/dev/null
 }
 
-step_git_update() {
-  step "Updating Git"
+# step_apt_update <name> <package> [packages that move with it]: upgrades them alone, plus only what the new
+# versions need, then checks the package is at its candidate.
+step_apt_update() {
+  local name="$1" pkg="$2" have want
+  shift
+  step "Updating $name"
   apt_refresh
-  local have want
-  have="$(git_policy_field Installed)"; want="$(git_policy_field Candidate)"
-  [ -n "$have" ] && [ "$have" != "(none)" ] || fail "git is not installed (run the full setup first)"
+  have="$(apt_policy_field "$pkg" Installed)"; want="$(apt_policy_field "$pkg" Candidate)"
+  [ -n "$have" ] && [ "$have" != "(none)" ] || fail "$pkg is not installed (run the setup or install it first)"
   if [ -z "$want" ] || [ "$want" = "(none)" ] || [ "$have" = "$want" ]; then
-    ok "git $have is the newest"
+    ok "$pkg $have is the newest"
   else
-    info "git $have -> $want"
-    apt_package_upgrade_progress git
-    have="$(git_policy_field Installed)"
-    [ "$have" = "$want" ] || fail "git is still $have after the upgrade, expected $want"
+    info "$pkg $have -> $want"
+    apt_package_upgrade_progress "$@"
+    have="$(apt_policy_field "$pkg" Installed)"
+    [ "$have" = "$want" ] || fail "$pkg is still $have after the upgrade, expected $want"
   fi
   hash -r 2>/dev/null || true
-  ok "$(git --version 2>&1)"
-  printf '[done]\n'
 }
 
 dockito_check() {
@@ -1437,21 +1444,335 @@ step_wrangler_remove() {
   printf '[done]\n'
 }
 
+# Flutter and Rust, an optional tool for checking code on the phone (decision 70, docs/flutter-tool.md): pub get,
+# build_runner, analyze, test, cargo check and clippy. No APKs. Flutter is official: the release tag cloned from
+# github.com/flutter/flutter into FVM's layout (~/fvm/versions/<version>); its own script downloads the Dart SDK, and
+# the `flutter` launcher (setup/flutter) points the glibc programs at Termux's glibc loader and wraps them so they run
+# without the bionic exec helper. FVM is its official linux-arm64 release, pinned and checked, prepared the same way.
+# Rust is Termux's `rust` package: Rust publishes no compiler that runs on Android, and rustup panics there.
+# docs/flutter-spike.md has the why.
+FLUTTER_REPO="https://github.com/flutter/flutter.git"
+FLUTTER_RELEASES="https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json"
+FLUTTER_HOME="$HOME/fvm"                                # FVM's cache folder; FlutterTool.FVM_RELATIVE
+FLUTTER_VERSIONS="$FLUTTER_HOME/versions"
+FLUTTER_DEFAULT="$FLUTTER_HOME/default"                 # FVM's global version: a link to versions/<version>
+FLUTTER_MARKER="$FLUTTER_HOME/.pocketrocket-installed"  # FlutterTool.INSTALLED_MARKER
+FLUTTER_PACKAGES="which unzip"                          # flutter doctor needs which; the Dart SDK download needs unzip
+FLUTTER_ADDED_FILE="$PR_HOME/flutter.packages"
+FLUTTER_BASELINE_FILE="$PR_HOME/flutter.baseline"
+FVM_VERSION=4.3.2
+FVM_SHA256=df05c7682eeac21b08939e7be131687dc3d54fd5575b5e4bca931717ddeb0a01   # GitHub's published digest of the asset
+FVM_URL="https://github.com/leoafarias/fvm/releases/download/$FVM_VERSION/fvm-$FVM_VERSION-linux-arm64.tar.gz"
+FVM_DIR="${PREFIX:-}/opt/fvm"
+RUST_PACKAGES="rust"                                    # brings rust-std-aarch64-linux-android with it
+RUST_ADDED_FILE="$PR_HOME/rust.packages"                # FlutterTool.RUST_MARKER: what the install added; means installed
+RUST_BASELINE_FILE="$PR_HOME/rust.baseline"
+
+# flutter_release <releases_linux.json> [version|stable]: "<version> <commit>" of the newest stable, or of that version
+# (the commit is empty when Flutter's list doesn't have it; the tag is still cloned, without that check).
+flutter_release() {
+  local json="$1" want="${2:-stable}"
+  if [ "$want" = stable ] || [ "$want" = latest ]; then
+    jq -er '.current_release.stable as $h | first(.releases[] | select(.hash == $h and .channel == "stable")) | "\(.version) \(.hash)"' "$json"
+  else
+    is_version "$want" || return 1
+    printf '%s %s\n' "$want" "$(jq -r --arg v "$want" 'first(.releases[] | select(.version == $v) | .hash) // ""' "$json")"
+  fi
+}
+
+# flutter_clone <version> <folder>: a shallow clone of the release tag, with the download on the bar (0-95).
+flutter_clone() {
+  local version="$1" dest="$2" line pct last=-1 size=""
+  rm -rf "$dest"
+  git clone --progress --depth 1 --single-branch --no-tags -b "$version" "$FLUTTER_REPO" "$dest" 2>&1 \
+    | tr '\r' '\n' | while IFS= read -r line; do
+      case "$line" in
+        *"Receiving objects:"*%*)
+          pct="${line#*Receiving objects:}"; pct="${pct%%%*}"; pct="${pct//[^0-9]/}"
+          case "$line" in *"), "*" | "*) size="${line#*), }"; size="${size%% |*}" ;; esac
+          [ -n "$pct" ] || continue
+          pct=$(( pct * 90 / 100 ))
+          if [ "$pct" != "$last" ]; then
+            last="$pct"; progress "$pct" "Downloading Flutter $version${size:+ · $size}"
+          fi ;;
+        *"Resolving deltas:"*100%*|*"Updating files:"*100%*) progress 95 "Unpacking Flutter $version" ;;
+        *) [ -z "$line" ] || printf '%s\n' "$line" >>"$PR_LOG" ;;
+      esac
+    done
+}
+
+# watch_file <pid> <file> <total bytes> <label>: the file's size on the bar while the process runs.
+watch_file() {
+  local pid="$1" file="$2" total="$3" label="$4" have pct last=-1
+  case "$total" in ''|*[!0-9]*) total=0 ;; esac
+  while kill -0 "$pid" 2>/dev/null; do
+    have=0; [ -f "$file" ] && have="$(stat -c %s "$file" 2>/dev/null || echo 0)"
+    if [ "$total" -gt 0 ] && [ "$have" -gt 0 ]; then
+      pct=$(( have * 100 / total )); [ "$pct" -gt 99 ] && pct=99
+      [ "$pct" = "$last" ] || { last="$pct"; progress "$pct" "$label · $(mb "$have") of $(mb "$total") MB"; }
+    fi
+    sleep 1
+  done
+}
+
+# packages_baseline <file> / packages_record <baseline> <added>: what an install brings in, so its uninstall removes
+# only that. Same helpers as the Android tools.
+packages_baseline() { [ -f "$1" ] || android_installed_packages >"$1"; }
+packages_record() {
+  local now="$TMPDIR/pocketrocket-packages.now"
+  android_installed_packages >"$now"
+  android_new_packages "$1" "$now" >"$2"
+  rm -f "$now"
+}
+
+# The launchers: flutter (and dart, a link to it) from setup/flutter, and fvm, whose Dart is prepared like Flutter's.
+flutter_launchers() {
+  install_launcher flutter
+  ln -sf flutter "$PREFIX/bin/dart"
+  printf '#!%s\n# PocketRocket launcher for FVM %s (decision 70).\nexec %s %s "$@"\n' \
+    "$PREFIX/bin/bash" "$FVM_VERSION" "$FVM_DIR/src/dart" "$FVM_DIR/src/fvm.snapshot" >"$PREFIX/bin/fvm"
+  chmod 755 "$PREFIX/bin/fvm"
+}
+
+step_flutter_helpers() {
+  step "Installing FVM and helpers"
+  local out tgz="$TMPDIR/fvm-$FVM_VERSION.tar.gz" d="$TMPDIR/fvm-unpack"
+  # shellcheck disable=SC2086
+  [ -z "$(missing_packages $FLUTTER_PACKAGES)" ] || apt_refresh
+  packages_baseline "$FLUTTER_BASELINE_FILE"
+  # shellcheck disable=SC2086
+  apt_install_progress $FLUTTER_PACKAGES
+  packages_record "$FLUTTER_BASELINE_FILE" "$FLUTTER_ADDED_FILE"
+  if [ "$(cat "$FVM_DIR/.version" 2>/dev/null)" != "$FVM_VERSION" ]; then
+    if ! verify_sha256 "$tgz" "$FVM_SHA256" >/dev/null 2>&1; then
+      download_with_progress "$FVM_URL" "$tgz" || { rm -f "$tgz"; fail "The download of FVM stopped. Check the connection and try again."; }
+      verify_sha256 "$tgz" "$FVM_SHA256" >>"$PR_LOG" 2>&1 || { rm -f "$tgz"; fail "FVM $FVM_VERSION does not match its published checksum. Try again."; }
+    fi
+    rm -rf "$d" "$FVM_DIR"; mkdir -p "$d" "$(dirname "$FVM_DIR")"
+    log_run tar -xzf "$tgz" -C "$d" || fail "could not unpack FVM"
+    [ -f "$d/fvm/src/dart" ] && [ -f "$d/fvm/src/fvm.snapshot" ] || fail "FVM $FVM_VERSION is not laid out as expected"
+    mv "$d/fvm" "$FVM_DIR"; rm -rf "$d" "$tgz"
+    printf '%s\n' "$FVM_VERSION" >"$FVM_DIR/.version"
+  fi
+  flutter_launchers
+  POCKETROCKET_FLUTTER_PREPARE="$FVM_DIR/src" "$PREFIX/bin/flutter" >>"$PR_LOG" 2>&1 || fail "could not prepare FVM for this phone"
+  out="$(fvm --version 2>&1)" || fail "fvm --version failed: $out"
+  # Versions come from the tool page; FVM's mirror of the whole Flutter history would add gigabytes.
+  log_run fvm config --no-use-git-cache --no-update-check || warn "could not turn off FVM's git cache"
+  ok "FVM $out"
+}
+
+# step_flutter_download [version]: sets FLUTTER_VERSION and FLUTTER_ROOT.
+step_flutter_download() {
+  local want="${1:-${POCKETROCKET_FLUTTER_VERSION:-stable}}" json="$TMPDIR/flutter-releases.json" release commit stage
+  curl -fsSL --retry 3 --max-time 60 "$FLUTTER_RELEASES" -o "$json" || fail "could not read Flutter's release list (check the network)"
+  release="$(flutter_release "$json" "$want")" || { rm -f "$json"; fail "Flutter '$want' is not a release version"; }
+  rm -f "$json"
+  FLUTTER_VERSION="${release%% *}"; commit="${release#* }"
+  FLUTTER_ROOT="$FLUTTER_VERSIONS/$FLUTTER_VERSION"
+  step "Downloading Flutter $FLUTTER_VERSION"
+  if [ -f "$FLUTTER_ROOT/bin/flutter" ] && [ -e "$FLUTTER_ROOT/.git" ]; then ok "Flutter $FLUTTER_VERSION is already here"; return 0; fi
+  stage="$FLUTTER_VERSIONS/.staging-$FLUTTER_VERSION"
+  mkdir -p "$FLUTTER_VERSIONS"
+  # A clone that finished before a later step failed is kept for Retry; one that stopped midway starts again.
+  if [ ! -f "$stage/.git/pocketrocket-cloned" ]; then
+    flutter_clone "$FLUTTER_VERSION" "$stage" || { rm -rf "$stage"; fail "The download of Flutter $FLUTTER_VERSION stopped. Check the connection and try again."; }
+    : >"$stage/.git/pocketrocket-cloned"
+  fi
+  # A git commit names its whole content, so this checks the tree against Flutter's own release list.
+  if [ -n "$commit" ] && [ "$(git -C "$stage" rev-parse HEAD 2>/dev/null)" != "$commit" ]; then
+    rm -rf "$stage"; fail "Flutter $FLUTTER_VERSION is not the commit Flutter's release list names. Nothing was installed."
+  fi
+  rm -rf "$FLUTTER_ROOT"; mv "$stage" "$FLUTTER_ROOT"
+  if [ -n "$commit" ]; then ok "Flutter $FLUTTER_VERSION, commit $commit, as in Flutter's release list"; else ok "Flutter $FLUTTER_VERSION"; fi
+}
+
+step_flutter_dart() {
+  step "Downloading the Dart SDK"
+  local internal="$FLUTTER_ROOT/bin/internal" cache="$FLUTTER_ROOT/bin/cache" engine="" realm="" url total pid rc=0
+  # Flutter's scripts start other scripts by their #!/usr/bin/env lines, which need Termux's exec helper.
+  export LD_PRELOAD="${LD_PRELOAD:-$PREFIX/lib/libtermux-exec-ld-preload.so}"
+  log_run bash "$internal/update_engine_version.sh" || fail "Flutter could not work out its engine version"
+  read -r engine <"$cache/engine.stamp" || true
+  if [ -f "$cache/engine.realm" ]; then read -r realm <"$cache/engine.realm" || true; fi
+  url="https://storage.googleapis.com${realm:+/$realm}/flutter_infra_release/flutter/$engine/dart-sdk-linux-arm64.zip"
+  total="$(curl -fsSLI --max-time 20 "$url" 2>/dev/null | tr -d '\r' | awk 'tolower($1)=="content-length:" {n=$2} END {print n+0}')"
+  bash "$internal/update_dart_sdk.sh" >>"$PR_LOG" 2>&1 &
+  pid=$!
+  watch_file "$pid" "$cache/dart-sdk-linux-arm64.zip" "${total:-0}" "Downloading the Dart SDK"
+  wait "$pid" || rc=$?
+  [ "$rc" -eq 0 ] && [ -e "$cache/dart-sdk/bin/dart" ] || fail "The Dart SDK download stopped. Check the connection and try again."
+  progress 100 "Dart SDK ready"
+  ok "Dart SDK for engine $engine"
+}
+
+step_flutter_setup() {
+  step "Setting up Flutter $FLUTTER_VERSION"
+  local out
+  POCKETROCKET_FLUTTER_PREPARE="$FLUTTER_ROOT" "$PREFIX/bin/flutter" >>"$PR_LOG" 2>&1 || fail "could not prepare Flutter's Dart SDK for this phone"
+  info "building the flutter tool (about a minute the first time)"
+  out="$(cd "$HOME" && POCKETROCKET_FLUTTER_ROOT="$FLUTTER_ROOT" "$PREFIX/bin/flutter" --version 2>&1)" \
+    || { printf '%s\n' "$out" >>"$PR_LOG"; fail "flutter --version failed: $(printf '%s' "$out" | tail -n 1)"; }
+  printf '%s\n' "$out" >>"$PR_LOG"
+  printf '%s' "$out" | grep -qF "Flutter $FLUTTER_VERSION" || fail "flutter --version did not say $FLUTTER_VERSION"
+  # The engine's tools for this phone (flutter_tester, for flutter test), fetched and prepared now, not on first use.
+  info "downloading Flutter's engine tools"
+  (cd "$HOME" && POCKETROCKET_FLUTTER_ROOT="$FLUTTER_ROOT" "$PREFIX/bin/flutter" precache --universal) >>"$PR_LOG" 2>&1 \
+    || warn "flutter precache failed; Flutter downloads what it needs on first use"
+  POCKETROCKET_FLUTTER_PREPARE="$FLUTTER_ROOT" "$PREFIX/bin/flutter" >>"$PR_LOG" 2>&1 || fail "could not prepare Flutter's engine tools for this phone"
+  if [ ! -e "$FLUTTER_DEFAULT/bin/flutter" ] || [ "${POCKETROCKET_FLUTTER_DEFAULT:-0}" = 1 ]; then
+    flutter_set_default "$FLUTTER_VERSION"
+  fi
+  : >"$FLUTTER_MARKER"
+  ok "$(printf '%s\n' "$out" | grep -m 1 '^Flutter ')"
+}
+
+# flutter_set_default <version>: FVM's global version, which the launcher uses outside pinned projects.
+flutter_set_default() {
+  [ -f "$FLUTTER_VERSIONS/$1/bin/flutter" ] || fail "Flutter $1 is not installed"
+  rm -f "$FLUTTER_DEFAULT"
+  ln -s "versions/$1" "$FLUTTER_DEFAULT"
+  ok "Flutter $1 is the default"
+}
+
+# flutter_newest_installed [except]: the newest installed version, the default when the default goes.
+flutter_newest_installed() {
+  local d
+  for d in "$FLUTTER_VERSIONS"/*/; do
+    d="${d%/}"; d="${d##*/}"
+    if [ "$d" != "${1:-}" ] && [ -f "$FLUTTER_VERSIONS/$d/bin/flutter" ]; then printf '%s\n' "$d"; fi
+  done | sort -V | tail -n 1
+}
+
+# flutter_version_name_ok <version>: a folder name under versions/, never a path.
+flutter_version_name_ok() { [ -n "$1" ] && [ "${1#*/}" = "$1" ] && [ "$1" != . ] && [ "$1" != .. ]; }
+
+step_flutter_remove_version() {
+  local v="$1" next
+  flutter_version_name_ok "$v" || fail "no such Flutter version: $v"
+  step "Removing Flutter $v"
+  rm -rf "${FLUTTER_VERSIONS:?}/$v" "$FLUTTER_VERSIONS/.staging-$v"
+  if [ ! -e "$FLUTTER_DEFAULT/bin/flutter" ]; then
+    rm -f "$FLUTTER_DEFAULT"
+    next="$(flutter_newest_installed)"
+    [ -z "$next" ] || flutter_set_default "$next"
+  fi
+  ok "Flutter $v removed"
+}
+
+# What uninstalling Flutter removes, besides the packages it added. The one list; the tests read it.
+flutter_remove_paths() {
+  printf '%s\n' "$FLUTTER_HOME" "$FVM_DIR" "$PREFIX/bin/flutter" "$PREFIX/bin/dart" "$PREFIX/bin/fvm" \
+    "$HOME/.pub-cache" "$HOME/.dart-tool" "$HOME/.dartServer" "$HOME/.dart" "$HOME/.flutter" "$HOME/.flutter-devtools" \
+    "$HOME/.config/flutter" "$HOME/.config/fvm" "$HOME/.fvm"
+}
+
+step_flutter_remove() {
+  step "Removing Flutter, Dart and FVM"
+  local p
+  pkill -f "$FLUTTER_VERSIONS/" 2>/dev/null || true   # an analysis server left running would keep writing
+  while IFS= read -r p; do rm -rf "${p:?}"; done < <(flutter_remove_paths)
+  rmdir "$PREFIX/opt" "$HOME/.config" 2>/dev/null || true
+  # An install that stopped inside apt left a baseline but no list yet.
+  if [ ! -f "$FLUTTER_ADDED_FILE" ] && [ -f "$FLUTTER_BASELINE_FILE" ]; then packages_record "$FLUTTER_BASELINE_FILE" "$FLUTTER_ADDED_FILE"; fi
+  android_purge_added "$FLUTTER_ADDED_FILE"
+  rm -f "$FLUTTER_ADDED_FILE" "$FLUTTER_BASELINE_FILE"
+  ok "Flutter removed"
+}
+
+step_rust_install() {
+  step "Installing Rust"
+  local out
+  apt_refresh
+  packages_baseline "$RUST_BASELINE_FILE"
+  # shellcheck disable=SC2086
+  apt_install_progress $RUST_PACKAGES
+  hash -r 2>/dev/null || true
+  out="$(cargo --version 2>&1)" || fail "cargo --version failed: $out"
+  out="$(rustc --version 2>&1)" || fail "rustc --version failed: $out"
+  # Written last: the app reads this file as "installed".
+  packages_record "$RUST_BASELINE_FILE" "$RUST_ADDED_FILE"
+  rm -f "$RUST_BASELINE_FILE"
+  ok "$out"
+}
+
+step_rust_remove() {
+  step "Removing Rust"
+  if [ ! -f "$RUST_ADDED_FILE" ] && [ -f "$RUST_BASELINE_FILE" ]; then packages_record "$RUST_BASELINE_FILE" "$RUST_ADDED_FILE"; fi
+  [ -s "$RUST_ADDED_FILE" ] || info "Rust was on the phone before this tool, so it stays"
+  android_purge_added "$RUST_ADDED_FILE"
+  rm -f "$RUST_ADDED_FILE" "$RUST_BASELINE_FILE"
+  rm -rf "$HOME/.cargo"
+  ok "Rust removed"
+}
+
+# The Flutter & Rust tool's options (decision 70). The version comes as the third argument or in
+# POCKETROCKET_FLUTTER_VERSION (the app's way); flutter with no version installs the newest stable.
+main_flutter_rust() {
+  local option="$1" version="${2:-${POCKETROCKET_FLUTTER_VERSION:-}}"
+  PR_LOG="$PR_HOME/flutter.log"
+  case "$option" in
+    flutter) TOTAL_STEPS=5 ;;
+    flutter-rust) TOTAL_STEPS=6 ;;
+    flutter-rust-remove) TOTAL_STEPS=3 ;;
+    rust|rust-remove) TOTAL_STEPS=2; PR_LOG="$PR_HOME/rust.log" ;;
+    *) TOTAL_STEPS=2 ;;
+  esac
+  step "Checking the device"; preflight_checks; ok "Termux on aarch64"
+  case "$option" in
+    flutter|flutter-rust)
+      locate_glibc_tools
+      step_flutter_helpers
+      step_flutter_download "$version"
+      step_flutter_dart
+      step_flutter_setup
+      [ "$option" = flutter ] || step_rust_install ;;
+    flutter-default)
+      flutter_version_name_ok "$version" || fail "no such Flutter version: $version"
+      step "Making Flutter $version the default"
+      flutter_set_default "$version" ;;
+    flutter-remove-version) step_flutter_remove_version "$version" ;;
+    flutter-remove) step_flutter_remove ;;
+    rust) step_rust_install ;;
+    rust-remove) step_rust_remove ;;
+    flutter-rust-remove) step_flutter_remove; step_rust_remove ;;
+  esac
+  printf '[done]\n'
+}
+
 main() {
   case "${1:-}" in
     "") main_full ;;
     --only)
       case "${2:-}" in
         claude|dockito|chromium|chromium-remove|android-build|android-build-remove|android-ndk|android-ndk-remove|wrangler|wrangler-remove|git-check|git-update) ;;
-        *) fail "--only takes: claude, dockito, chromium, chromium-remove, android-build, android-build-remove, android-ndk, android-ndk-remove, wrangler, wrangler-remove, git-check or git-update" ;;
+        flutter|flutter-default|flutter-remove-version|flutter-remove|rust|rust-remove|flutter-rust|flutter-rust-remove|rust-check|rust-update) ;;
+        *) fail "--only takes: claude, dockito, chromium, chromium-remove, android-build, android-build-remove, android-ndk, android-ndk-remove, wrangler, wrangler-remove, flutter [version], flutter-default <version>, flutter-remove-version <version>, flutter-remove, rust, rust-remove, flutter-rust, flutter-rust-remove, git-check, git-update, rust-check or rust-update" ;;
       esac
-      if [ "$2" = git-check ]; then git_check; return 0; fi
+      if [ "$2" = git-check ]; then apt_check git; return 0; fi
+      if [ "$2" = rust-check ]; then apt_check rust; return 0; fi
       if [ "$2" = git-update ]; then
         TOTAL_STEPS=2; PR_LOG="$PR_HOME/git.log"
         step "Checking the device"; preflight_checks; ok "Termux on aarch64"
-        step_git_update
+        step_apt_update Git git
+        ok "$(git --version 2>&1)"
+        printf '[done]\n'
         return 0
       fi
+      if [ "$2" = rust-update ]; then
+        TOTAL_STEPS=2; PR_LOG="$PR_HOME/rust.log"
+        step "Checking the device"; preflight_checks; ok "Termux on aarch64"
+        # The standard library has to stay at the compiler's version.
+        step_apt_update Rust rust rust rust-std-aarch64-linux-android
+        ok "$(rustc --version 2>&1)"
+        printf '[done]\n'
+        return 0
+      fi
+      case "$2" in
+        flutter*|rust*)
+          main_flutter_rust "$2" "${3:-}"
+          return 0 ;;
+      esac
       if [ "$2" = chromium ]; then
         TOTAL_STEPS=4; PR_LOG="$PR_HOME/chromium.log"
         step "Checking the device"; preflight_checks; ok "Termux on aarch64"

@@ -6,12 +6,17 @@ import com.pocketrocket.setup.SetupState
 import com.pocketrocket.updater.Outcome
 import kotlinx.coroutines.flow.Flow
 
-/** The four things the Updates screen keeps current (decision 41), in the screen's order. */
-enum class UpdateComponent(val label: String) {
+/**
+ * What the Updates screen keeps current (decision 41), in the screen's order. Optional ones come from an optional
+ * tool and show only while it's installed (Flutter and Rust, decision 70).
+ */
+enum class UpdateComponent(val label: String, val optional: Boolean = false) {
     PocketRocket("PocketRocket"),
     ClaudeCode("Claude Code"),
     Git("Git"),
     Dockito("Dockito"),
+    Flutter("Flutter", optional = true),
+    Rust("Rust", optional = true),
 }
 
 /** Screen order, except PocketRocket goes last: installing it restarts the app. */
@@ -38,6 +43,9 @@ data class UpdateRow(
     val running: Boolean get() = job?.phase == SetupPhase.Running
     /** The last update failed: the row keeps its steps, the log and Retry. */
     val failed: Boolean get() = !running && (job?.phase == SetupPhase.Failed || outcome?.failed == true)
+
+    /** On the screen: always, except an optional tool's row while that tool isn't installed. */
+    val shown: Boolean get() = !component.optional || installed != null || running
 }
 
 /**

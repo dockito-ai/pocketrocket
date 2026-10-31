@@ -14,6 +14,7 @@ object Routes {
     const val TOOL_ANDROID_BUILD = "tool-android-build"
     const val TOOL_ANDROID_NDK = "tool-android-ndk"
     const val TOOL_WRANGLER = "tool-wrangler"
+    const val TOOL_FLUTTER = "tool-flutter"
     /** Settings › Updates › Claude Code: versions, rollback, sessions on the old version (R9). */
     const val CLAUDE_CODE = "claude-code"
     /** Settings › Health: checks with Fix buttons and the last stop (R15). */
