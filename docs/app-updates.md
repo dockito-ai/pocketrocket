@@ -72,7 +72,7 @@ Inputs: `version` (X.Y.Z, newer than `app/build.gradle`), `notes` (Markdown; the
 6. Names it `pocketrocket-vX.Y.Z-arm64.apk`, computes its SHA-256 and writes the notes ending in ``SHA-256: `<hex>` ``, the line the updater reads.
 7. Prints the plan and the notes in the run summary, keeps APK and notes as the run's `release` artifact, and deletes the keystore.
 
-The **publish** job (the only one with `contents: write`, real runs from main only) checks main hasn't moved since the build and the APK's hash is unchanged, commits "Release vX.Y.Z" as `Shankar Kakumani <ShankarKakumani@users.noreply.github.com>`, tags `vX.Y.Z`, pushes main and the tag together, and creates the prerelease "PocketRocket X.Y.Z" in this repo with the APK and notes, checking GitHub's asset digest against the hash.
+The **publish** job (the only one with `contents: write`, real runs from main only) checks main hasn't moved since the build and the APK's hash is unchanged, commits "Release vX.Y.Z" as `Shankar Kakumani <ShankarKakumani@users.noreply.github.com>`, tags `vX.Y.Z`, pushes main and the tag together, and creates the release "PocketRocket X.Y.Z" in this repo, marked Latest (decision 90), with the APK and notes, checking GitHub's asset digest against the hash.
 
 **Dry run** (`dry_run=true`, any branch): the build job only. It signs with the real key when the secrets are there, else with a throwaway key made in the job (the signer is then checked against that key), runs every check and prints what would be published. It never commits, tags, pushes or releases.
 

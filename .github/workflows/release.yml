@@ -7,7 +7,7 @@
 #   pocketrocket-vX.Y.Z-arm64.apk, computes its SHA-256 and writes the notes with the SHA-256 line the updater reads.
 #   A dry run signs with the real key when the secrets exist, else with a throwaway key made in the job (then the
 #   signer is checked against that key instead of the pin), prints what would be published and stops.
-# publish (real runs from main only): commits the bump, tags vX.Y.Z, pushes both, creates the prerelease in this repo.
+# publish (real runs from main only): commits the bump, tags vX.Y.Z, pushes both, creates the release, marked Latest, in this repo.
 #
 # Secrets: RELEASE_KEYSTORE_BASE64 (the PKCS12 keystore, base64), RELEASE_KEYSTORE_PASSWORD (store and key share it).
 name: Release
@@ -188,7 +188,7 @@ jobs:
             echo "git commit -m 'Release $TAG' app/build.gradle"
             echo "git tag -a $TAG -m 'PocketRocket $VERSION'"
             echo "git push --atomic origin HEAD:main $TAG"
-            echo "gh release create $TAG $(basename "$APK") --repo $GITHUB_REPOSITORY --verify-tag --prerelease --title 'PocketRocket $VERSION' --notes-file notes-$TAG.md"
+            echo "gh release create $TAG $(basename "$APK") --repo $GITHUB_REPOSITORY --verify-tag --latest --title 'PocketRocket $VERSION' --notes-file notes-$TAG.md"
             echo '```'
             echo
             echo "Notes:"
@@ -256,12 +256,12 @@ jobs:
           git tag -a "$TAG" -m "PocketRocket $VERSION"
           git push --atomic origin HEAD:main "$TAG"
 
-      - name: Create the prerelease here
+      - name: Create the release here, marked Latest
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$TAG" "$RUNNER_TEMP/release/pocketrocket-$TAG-arm64.apk" --repo "$GITHUB_REPOSITORY" --verify-tag \
-            --prerelease --title "PocketRocket $VERSION" --notes-file "$RUNNER_TEMP/release/notes-$TAG.md"
+            --latest --title "PocketRocket $VERSION" --notes-file "$RUNNER_TEMP/release/notes-$TAG.md"
           DIGEST="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[0].digest // ""')"
           [ -z "$DIGEST" ] || [ "$DIGEST" = "sha256:$SHA" ] || { echo "::error::GitHub's digest $DIGEST isn't sha256:$SHA"; exit 1; }
           echo "Published https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" | tee -a "$GITHUB_STEP_SUMMARY"

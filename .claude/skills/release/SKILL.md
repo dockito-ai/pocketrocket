@@ -16,9 +16,9 @@ Shankar usually runs `scripts/ship.sh`, which pulls, asks the version, drafts no
 
 ## Where releases go
 
-- **`dockito-ai/pocketrocket`**: the code repo. The workflow publishes the prerelease here on tag `vX.Y.Z`. The updater reads it first (`ReleaseSource.REPO`) once it's public.
+- **`dockito-ai/pocketrocket`**: the code repo. The workflow publishes the release here on tag `vX.Y.Z`. The updater reads it first (`ReleaseSource.REPO`) once it's public.
 
-Both are prereleases with the title `PocketRocket X.Y.Z` and the asset `pocketrocket-vX.Y.Z-arm64.apk`.
+Releases are full releases marked Latest (decision 90), with the title `PocketRocket X.Y.Z` and the asset `pocketrocket-vX.Y.Z-arm64.apk`.
 
 ## Versioning
 
@@ -39,7 +39,7 @@ Both are prereleases with the title `PocketRocket X.Y.Z` and the asset `pocketro
 1. **Sync main.** `git pull --rebase` on main. CI (`.github/workflows/ci.yml`) runs the unit tests and a debug build on every push; it must be green on the commit you release.
 2. **Write the notes** in the scratchpad, not the repo. Write them for Shankar's phone: short, plain words, what's new since the last tag (`git log vPREV..HEAD --oneline`), grouped by what he will notice. Only add an uninstall warning if the signing key or package id changed. The workflow appends the code link and the `SHA-256:` line the updater checks, so don't add them.
 3. **Dry run:** the command above with `-f dry_run=true`. It builds and signs (with a throwaway key if the secrets aren't set), runs every check and prints the planned commands and notes in the run summary. It never commits, tags, pushes or releases. Dry runs may use any branch; real runs only main.
-4. **Real run:** the same without `dry_run`. The build job checks the version, sets it, builds and signs the arm64 APK, checks package, version and signer, hashes it and writes the notes. The publish job then checks main hasn't moved, commits `Release vX.Y.Z` as Shankar's noreply identity, tags, pushes main and the tag together, and creates the prerelease(s). Follow it with one `gh run watch <id> -R dockito-ai/pocketrocket --exit-status`, not a polling loop.
+4. **Real run:** the same without `dry_run`. The build job checks the version, sets it, builds and signs the arm64 APK, checks package, version and signer, hashes it and writes the notes. The publish job then checks main hasn't moved, commits `Release vX.Y.Z` as Shankar's noreply identity, tags, pushes main and the tag together, and creates the release, marked Latest. Follow it with one `gh run watch <id> -R dockito-ai/pocketrocket --exit-status`, not a polling loop.
 5. **Verify** with `GH_TOKEN=$(gh auth token -u ShankarKakumani) gh release view vX.Y.Z -R <repo>` on each repo it published to. The asset digest must match the SHA-256 in the run summary.
 6. **Log it.** Pull main (the workflow pushed the bump), add a line under today's date in `docs/PROGRESS.md` with the version, the versionCode and the link, then commit and push.
 7. **Tell Shankar** in a few lines: the link, what's in the release, and how to get it (Settings › PocketRocket › Update, or install from the link).
