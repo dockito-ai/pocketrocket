@@ -1,5 +1,6 @@
 package com.pocketrocket.ui.tools
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,7 +29,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -47,7 +51,7 @@ import com.pocketrocket.ui.theme.PrTheme
  * (a [ToolStatus]) plus its own page; these are shared by every tool.
  */
 
-/** What a tool's status line, icon tint and pill say: idle grey, busy blue, installed green, failed red, update orange. */
+/** What a tool's status line and pill say: idle grey, busy blue, installed green, failed red, update orange. */
 enum class ToolTone { Idle, Busy, Installed, Failed, Update }
 
 /** A tool's one-line status on its tile ("Installed · 840 MB") and the short form for its pill and Settings ("Installed"). */
@@ -61,23 +65,39 @@ private fun PrColors.tone(tone: ToolTone): Color = when (tone) {
     ToolTone.Update -> accent
 }
 
-/** The icon square: grey when idle, tinted with the status colour otherwise. */
+/** A tool's brand mark: its bundled vector and the brand's colour (ARGB). */
+data class ToolGlyph(@DrawableRes val res: Int, val brand: Long)
+
+/** The brand colour, made lighter or darker until it reads on [background] (contrast 3:1), keeping its hue. */
+internal fun legible(brand: Color, text: Color, background: Color): Color {
+    fun contrast(a: Color, b: Color): Float {
+        val (hi, lo) = listOf(a.luminance(), b.luminance()).sortedDescending()
+        return (hi + 0.05f) / (lo + 0.05f)
+    }
+    var step = 0
+    var color = brand
+    while (contrast(color, background) < 3f && step < 10) color = lerp(brand, text, ++step / 10f)
+    return color
+}
+
+/** A tool's brand mark on a rounded tile, in the brand's colour (legible on either theme). */
 @Composable
-fun ToolIcon(icon: ImageVector, tone: ToolTone, big: Boolean = false) {
+fun ToolIcon(icon: ToolGlyph, big: Boolean = false) {
     val c = PrTheme.colors
-    val idle = tone == ToolTone.Idle
     Box(
-        Modifier.size(if (big) 48.dp else 36.dp).clip(RoundedCornerShape(if (big) 14.dp else 10.dp))
-            .background(if (idle) c.iconTile else c.tone(tone).copy(alpha = 0.14f)),
+        Modifier.size(if (big) 48.dp else 36.dp).clip(RoundedCornerShape(if (big) 14.dp else 10.dp)).background(c.iconTile),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = if (idle) c.text else c.tone(tone), modifier = Modifier.size(if (big) 22.dp else 18.dp))
+        Icon(
+            ImageVector.vectorResource(icon.res), contentDescription = null,
+            tint = legible(Color(icon.brand), c.text, c.iconTile), modifier = Modifier.size(if (big) 24.dp else 20.dp),
+        )
     }
 }
 
 /** One tile on the Tools list: icon, name, status line, chevron. */
 @Composable
-fun ToolTile(name: String, icon: ImageVector, status: ToolStatus, onClick: () -> Unit) {
+fun ToolTile(name: String, icon: ToolGlyph, status: ToolStatus, onClick: () -> Unit) {
     val c = PrTheme.colors
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.surface)
@@ -85,7 +105,7 @@ fun ToolTile(name: String, icon: ImageVector, status: ToolStatus, onClick: () ->
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ToolIcon(icon, status.tone)
+        ToolIcon(icon)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(name, style = mockText(14.sp, FontWeight.SemiBold), color = c.text)
             Text(status.line, style = mockText(12.sp), color = if (status.tone == ToolTone.Idle || status.tone == ToolTone.Installed) c.textMuted else c.tone(status.tone))
@@ -96,10 +116,10 @@ fun ToolTile(name: String, icon: ImageVector, status: ToolStatus, onClick: () ->
 
 /** The top of a tool page: big icon, name, a sub line, and the status pill. */
 @Composable
-fun ToolHeader(name: String, icon: ImageVector, sub: String, status: ToolStatus) {
+fun ToolHeader(name: String, icon: ToolGlyph, sub: String, status: ToolStatus) {
     val c = PrTheme.colors
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        ToolIcon(icon, status.tone, big = true)
+        ToolIcon(icon, big = true)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(name, style = mockText(15.sp, FontWeight.SemiBold), color = c.text)
             Text(sub, style = mockText(12.sp), color = c.textMuted)

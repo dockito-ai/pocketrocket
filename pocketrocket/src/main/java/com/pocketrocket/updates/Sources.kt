@@ -81,7 +81,7 @@ object ClaudeSource : UpdateSource {
     }
 }
 
-/** A Termux package through apt, `--only <package>-update`: Git, and Rust from the Flutter & Rust tool. */
+/** A Termux package through apt, `--only <package>-update`: Git, and Rust from the Rust tool. */
 class AptSource(override val component: UpdateComponent, private val updater: AptUpdater) : UpdateSource {
     override val row = updater.state.map { s ->
         val latest = AptPolicy.display(s.policy?.candidate)

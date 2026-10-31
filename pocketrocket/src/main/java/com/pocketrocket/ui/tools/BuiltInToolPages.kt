@@ -66,14 +66,7 @@ fun DockitoToolPage(onBack: () -> Unit) {
         icon = Tool.Dockito.icon,
         purpose = "Publish and share docs from this phone.",
         onBack = onBack,
-        update = row?.let {
-            ToolUpdate(
-                it,
-                queued = UpdateComponent.Dockito in updates.queued,
-                blocked = updates.updating && updates.current != UpdateComponent.Dockito,
-                onUpdate = { Updates.update(context, UpdateComponent.Dockito) },
-            )
-        },
+        update = toolUpdate(context, updates, UpdateComponent.Dockito),
         accounts = { DockitoAccountsSection() },
     ) {
         if (s.loaded && s.installed == null) {
@@ -82,6 +75,29 @@ fun DockitoToolPage(onBack: () -> Unit) {
             ToolCard("WHAT IT DOES") {
                 ToolText("Dockito's command line tool. Claude publishes and shares docs with it, and every Claude account gets its skill. Sessions and terminals use the workspace's Dockito account, the default elsewhere.")
             }
+        }
+    }
+}
+
+/** Settings → Tools → Git: built in (first-run setup installs Termux's git); its version, and Update through Updates. */
+@Composable
+fun GitToolPage(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val updates by Updates.state.collectAsState()
+    LaunchedEffect(Unit) { Updates.onAppOpen(context, checkAfterMs = 10 * 60_000L) }
+    ToolPage(
+        spec = Tool.Git.spec,
+        state = ToolStates.fromRow(updates.rows.firstOrNull { it.component == UpdateComponent.Git }),
+        icon = Tool.Git.icon,
+        purpose = "Version control for every workspace.",
+        onBack = onBack,
+        update = toolUpdate(context, updates, UpdateComponent.Git),
+    ) {
+        ToolCard("WHAT IT DOES") {
+            ToolText("Clones, commits, branches and pushes, for you in terminals and for Claude in sessions. The Git screens and worktrees use it too. GitHub logins are under Settings › Accounts.")
+        }
+        ToolCard("WHAT IT IS") {
+            ToolText("Termux's git package, installed by first-run setup. Settings › Updates updates it on its own.")
         }
     }
 }

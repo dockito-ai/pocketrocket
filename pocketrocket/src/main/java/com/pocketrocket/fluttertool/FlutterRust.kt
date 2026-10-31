@@ -23,10 +23,21 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.net.HttpURLConnection
 import java.net.URL
 
-/** What the running (or last) job of the Flutter & Rust tool is doing. */
-enum class FlutterAction(val removes: Boolean) {
-    InstallAll(false), AddVersion(false), SetDefault(false), InstallRust(false),
-    RemoveVersion(true), RemoveRust(true), UninstallAll(true),
+/** Which tool a job belongs to: Flutter & Dart or Rust (decision 87). They share one job runner. */
+enum class FlutterPart { Flutter, Rust }
+
+/**
+ * What the running (or last) job is doing. [whole] jobs install or remove their tool and show on its page as the
+ * tool's own job; the others (a version added, the default set, a version removed) run inside the Flutter page's cards.
+ */
+enum class FlutterAction(val removes: Boolean, val part: FlutterPart, val whole: Boolean = false) {
+    InstallFlutter(false, FlutterPart.Flutter, whole = true),
+    AddVersion(false, FlutterPart.Flutter),
+    SetDefault(false, FlutterPart.Flutter),
+    RemoveVersion(true, FlutterPart.Flutter),
+    UninstallFlutter(true, FlutterPart.Flutter, whole = true),
+    InstallRust(false, FlutterPart.Rust, whole = true),
+    RemoveRust(true, FlutterPart.Rust, whole = true),
 }
 
 /** One installed Flutter version: its folder name, whether it's the default, and its size once measured. */
@@ -51,16 +62,18 @@ data class FlutterRustState(
     val failed: Boolean = false,
 ) {
     val running: Boolean get() = job?.phase == SetupPhase.Running
-    val installed: Boolean get() = flutterInstalled || rustInstalled
     val removing: Boolean get() = action?.removes == true
+    /** The running or last job belongs to [part]. */
+    fun isFor(part: FlutterPart): Boolean = action?.part == part
     val defaultVersion: String? get() = versions.firstOrNull { it.isDefault }?.version
     /** Every version measured: Flutter's part of the tool's size. */
     val flutterBytes: Long? get() = if (versions.isNotEmpty() && versions.all { it.bytes != null }) versions.sumOf { it.bytes ?: 0 } else null
 }
 
 /**
- * The optional Flutter & Rust tool (decision 75): Settings → Tools installs, adds and removes Flutter versions, sets
- * the default and installs or removes Rust, each through the setup script. Nothing is bundled; first-run setup never
+ * The optional Flutter & Dart and Rust tools (decisions 75 and 87): Settings → Tools installs, adds and removes Flutter
+ * versions and sets the default, and separately installs or removes Rust, each through the setup script. One job runs
+ * at a time across both. Nothing is bundled; first-run setup never
  * touches it. Sessions need nothing extra: `flutter`, `dart`, `fvm` and `cargo` are in $PREFIX/bin, and the launcher
  * finds the version itself.
  */
@@ -147,9 +160,9 @@ object FlutterRust {
         scope.launch { loadReleases() }
     }
 
-    /** Install: the newest stable Flutter (the default) and Rust. */
-    fun installAll(context: Context) =
-        run(context, "flutter-rust", FlutterAction.InstallAll, null, FlutterTool.installAllSteps(_state.value.latestStable))
+    /** Install Flutter & Dart: the newest stable Flutter (the default), its Dart SDK and FVM. */
+    fun installFlutter(context: Context) =
+        run(context, "flutter", FlutterAction.InstallFlutter, null, FlutterTool.flutterSteps(_state.value.latestStable))
 
     /** Adds a Flutter version. */
     fun addVersion(context: Context, version: String) =
@@ -175,11 +188,9 @@ object FlutterRust {
 
     fun removeRust(context: Context) = run(context, "rust-remove", FlutterAction.RemoveRust, null, FlutterTool.RUST_REMOVE_STEPS)
 
-    fun uninstallAll(context: Context) {
-        val s = _state.value
-        val option = FlutterTool.uninstallOption(s.flutterInstalled, s.rustInstalled) ?: return
-        run(context, option, FlutterAction.UninstallAll, null, FlutterTool.uninstallSteps(s.flutterInstalled, s.rustInstalled))
-    }
+    /** Uninstall Flutter & Dart: every version, FVM and the caches. Rust stays. */
+    fun uninstallFlutter(context: Context) =
+        run(context, "flutter-remove", FlutterAction.UninstallFlutter, null, FlutterTool.FLUTTER_REMOVE_STEPS)
 
     /** Retry: the last job again, the same way. */
     fun retry(context: Context) {

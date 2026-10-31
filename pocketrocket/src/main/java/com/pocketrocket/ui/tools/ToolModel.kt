@@ -6,8 +6,11 @@ package com.pocketrocket.ui.tools
  * line its tile shows. Plain data, no Compose, so it is tested on its own.
  */
 
-/** Built in tools come with PocketRocket (first-run setup installs them); optional ones are installed from Tools. */
-enum class ToolKind { BuiltIn, Optional }
+/**
+ * Built in tools come with PocketRocket (first-run setup installs them, they can't be removed) and show under
+ * Included; optional ones are installed from Tools and show under Add-ons (decision 87).
+ */
+enum class ToolKind(val tab: String) { BuiltIn("Included"), Optional("Add-ons") }
 
 /** The parts of a tool page, in page order. Each is shown only when it applies. */
 enum class ToolSection { Header, Version, Accounts, Storage, Install }
@@ -63,9 +66,9 @@ object ToolModel {
     /** The size on the phone: measured, else the spec's figure, only while installed. */
     fun sizeMb(spec: ToolSpec, state: ToolState): Int? = if (state.installed) state.sizeMb ?: spec.installedMb else null
 
-    /** "Built in", "Installed" or "Not installed". */
+    /** "Included", "Installed" or "Not installed". */
     fun label(spec: ToolSpec, state: ToolState): String = when {
-        spec.kind == ToolKind.BuiltIn -> "Built in"
+        spec.kind == ToolKind.BuiltIn -> "Included"
         state.installed -> "Installed"
         else -> "Not installed"
     }
@@ -102,10 +105,22 @@ object ToolModel {
         else -> ToolJob.None
     }
 
-    /** Settings' Tools row: "2 built in · 3 installed". */
+    /** Settings' Tools row: "4 included · 3 add-ons". */
     fun summary(tools: List<Pair<ToolSpec, ToolState>>): String {
         val builtIn = tools.count { (spec, _) -> spec.kind == ToolKind.BuiltIn }
         val installed = tools.count { (spec, state) -> spec.kind == ToolKind.Optional && state.installed }
-        return "$builtIn built in · ${if (installed == 0) "none" else "$installed"} installed"
+        val addOns = when (installed) {
+            0 -> "no add-ons"
+            1 -> "1 add-on"
+            else -> "$installed add-ons"
+        }
+        return "$builtIn included · $addOns"
     }
+
+    /** Whether [spec]'s name holds [query], ignoring case and spaces around it. A blank query matches every tool. */
+    fun matches(spec: ToolSpec, query: String): Boolean = spec.name.contains(query.trim(), ignoreCase = true)
+
+    /** One tab of the Tools screen: the [kind]'s tools whose name matches [query], A to Z by name. */
+    fun <T> tab(tools: List<T>, kind: ToolKind, query: String, spec: (T) -> ToolSpec): List<T> =
+        tools.filter { spec(it).kind == kind && matches(spec(it), query) }.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { spec(it).name })
 }

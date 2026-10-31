@@ -38,10 +38,10 @@ class ToolModelTest {
 
     @Test fun tileLinePutsUpdateFirstThenSignedInThenSize() {
         val all = installed.copy(latest = "0.0.2", updateAvailable = true, signedIn = "me@example.com", sizeMb = 30)
-        assertEquals("Built in · Update to 0.0.2", ToolModel.status(dockito, all).line)
+        assertEquals("Included · Update to 0.0.2", ToolModel.status(dockito, all).line)
         assertEquals(ToolTone.Update, ToolModel.status(dockito, all).tone)
-        assertEquals("Built in · me@example.com", ToolModel.status(dockito, all.copy(updateAvailable = false)).line)
-        assertEquals("Built in · 30 MB", ToolModel.status(dockito, all.copy(updateAvailable = false, signedIn = null)).line)
+        assertEquals("Included · me@example.com", ToolModel.status(dockito, all.copy(updateAvailable = false)).line)
+        assertEquals("Included · 30 MB", ToolModel.status(dockito, all.copy(updateAvailable = false, signedIn = null)).line)
         assertEquals(ToolTone.Installed, ToolModel.status(dockito, all.copy(updateAvailable = false)).tone)
     }
 
@@ -72,7 +72,7 @@ class ToolModelTest {
     }
 
     @Test fun pillSaysBuiltInInstalledOrNotInstalled() {
-        assertEquals("Built in", ToolModel.status(node, installed).short)
+        assertEquals("Included", ToolModel.status(node, installed).short)
         assertEquals("Installed", ToolModel.status(chrome, installed).short)
         assertEquals("Not installed", ToolModel.status(chrome, missing).short)
     }
@@ -84,10 +84,34 @@ class ToolModelTest {
         assertEquals(ToolJob.None, ToolModel.job(running = false, failed = false, removing = true))
     }
 
-    @Test fun summaryCountsBuiltInAndInstalledOptional() {
+    @Test fun summaryCountsIncludedAndInstalledAddOns() {
         val tools = listOf(node to installed, dockito to installed, chrome to installed, android to missing, wrangler to installed)
-        assertEquals("2 built in · 2 installed", ToolModel.summary(tools))
-        assertEquals("2 built in · none installed", ToolModel.summary(listOf(node to installed, dockito to missing, chrome to missing)))
+        assertEquals("2 included · 2 add-ons", ToolModel.summary(tools))
+        assertEquals("2 included · 1 add-on", ToolModel.summary(listOf(node to installed, dockito to missing, chrome to installed)))
+        assertEquals("2 included · no add-ons", ToolModel.summary(listOf(node to installed, dockito to missing, chrome to missing)))
+    }
+
+    @Test fun tabsSplitByKindAndSortByName() {
+        val git = ToolSpec("Git", ToolKind.BuiltIn)
+        val claude = ToolSpec("Claude Code", ToolKind.BuiltIn)
+        val flutter = ToolSpec("Flutter & Dart", ToolKind.Optional)
+        val rust = ToolSpec("Rust", ToolKind.Optional)
+        val all = listOf(wrangler, node, rust, git, chrome, flutter, dockito, android, claude)
+        assertEquals(listOf("Claude Code", "Dockito", "Git", "Node.js and npm"), ToolModel.tab(all, ToolKind.BuiltIn, "") { it }.map { it.name })
+        assertEquals(
+            listOf("Android", "Flutter & Dart", "Headless Chrome", "Rust", "Wrangler"),
+            ToolModel.tab(all, ToolKind.Optional, "  ") { it }.map { it.name },
+        )
+    }
+
+    @Test fun searchFiltersBothTabsByName() {
+        val flutter = ToolSpec("Flutter & Dart", ToolKind.Optional)
+        val rust = ToolSpec("Rust", ToolKind.Optional)
+        val all = listOf(node, dockito, flutter, rust, chrome)
+        assertEquals(listOf("Flutter & Dart"), ToolModel.tab(all, ToolKind.Optional, "dart") { it }.map { it.name })
+        assertEquals(emptyList<String>(), ToolModel.tab(all, ToolKind.BuiltIn, "dart") { it }.map { it.name })
+        assertEquals(listOf("Node.js and npm"), ToolModel.tab(all, ToolKind.BuiltIn, " NPM ") { it }.map { it.name })
+        assertEquals(listOf("Rust"), ToolModel.tab(all, ToolKind.Optional, "rUs") { it }.map { it.name })
     }
 
     @Test fun nodeSizeFromDpkgStatus() {

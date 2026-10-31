@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,6 +43,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -243,6 +245,28 @@ fun RadioRow(name: String, note: String?, selected: Boolean, onClick: () -> Unit
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(name, style = mockText(14.sp, FontWeight.SemiBold, c.text), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 note?.let { Text(it, style = mockText(11.sp, color = c.textMuted), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            }
+        }
+    }
+}
+
+/** Choices side by side in a rounded track; the chosen one filled with the text colour. */
+@Composable
+fun <T> Segmented(options: List<T>, current: T, label: (T) -> String, onPick: (T) -> Unit) {
+    val c = PrTheme.colors
+    val track = RoundedCornerShape(12.dp)
+    Row(
+        Modifier.fillMaxWidth().background(c.surface, track).border(1.dp, c.iconTile, track).padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        options.forEach { option ->
+            val on = option == current
+            Box(
+                Modifier.weight(1f).heightIn(min = 44.dp).clip(RoundedCornerShape(9.dp)).background(if (on) c.text else Color.Transparent)
+                    .clickable(role = Role.Button) { onPick(option) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(label(option), style = mockText(13.sp, if (on) FontWeight.SemiBold else FontWeight.Normal, if (on) c.background else c.textSoft))
             }
         }
     }
