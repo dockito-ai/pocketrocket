@@ -13,7 +13,7 @@ PocketRocket is a native Android app wrapped around Anthropic's own Claude Code 
 
 PocketRocket is a fork of [Termux](https://github.com/termux/termux-app), licensed under the GNU GPL v3 (see `LICENSE.md`). It is not affiliated with Anthropic or the Termux project.
 
-> **Early and experimental.** PocketRocket is a [Dockito Labs](https://dockito.ai) project, under active development, and we use it every day. Things move fast and can break between releases, so expect rough edges.
+> **Early and experimental.** PocketRocket is a Dockito Labs project, under active development, and we use it every day. Things move fast and can break between releases, so expect rough edges.
 
 ## Screenshots
 
@@ -111,4 +111,4 @@ Bug reports and ideas are welcome in [Issues](../../issues). It's an experimenta
 - **The glibc launcher.** The way Claude Code's glibc binary runs on Termux comes from [claude-code-android](https://github.com/ferrumclaudepilgrim/claude-code-android) (MIT); see `setup/NOTICE`.
 - **Claude Code** is Anthropic's software, downloaded from Anthropic at first run under their terms.
 
-PocketRocket is made by [Dockito Labs](https://dockito.ai). It is not affiliated with Anthropic, Google, Cloudflare or the Termux project.
+PocketRocket is made by Dockito Labs. It is not affiliated with Anthropic, Google, Cloudflare or the Termux project.
