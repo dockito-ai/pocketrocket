@@ -1,8 +1,8 @@
 # PocketRocket
 
-[![Latest release](https://img.shields.io/github/v/release/ShankarKakumani/pocketrocket?include_prereleases)](../../releases)
-[![Downloads](https://img.shields.io/github/downloads/ShankarKakumani/pocketrocket/total)](../../releases)
-[![Stars](https://img.shields.io/github/stars/ShankarKakumani/pocketrocket?style=flat)](../../stargazers)
+[![Latest release](https://img.shields.io/github/v/release/dockito-ai/pocketrocket?include_prereleases)](../../releases)
+[![Downloads](https://img.shields.io/github/downloads/dockito-ai/pocketrocket/total)](../../releases)
+[![Stars](https://img.shields.io/github/stars/dockito-ai/pocketrocket?style=flat)](../../stargazers)
 [![Licence: GPL-3.0](https://img.shields.io/badge/licence-GPL--3.0-blue)](LICENSE.md)
 ![Views](https://komarev.com/ghpvc/?username=ShankarKakumani-pocketrocket&label=Views&color=0e75b6&style=flat)
 <!-- The Views badge counts README loads, not unique visitors. -->

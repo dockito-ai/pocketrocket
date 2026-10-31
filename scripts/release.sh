@@ -31,7 +31,7 @@ done
 [ -n "$VERSION" ] || usage
 VERSION="${VERSION#v}"
 TAG="v$VERSION"
-CODE_REPO="ShankarKakumani/pocketrocket"
+CODE_REPO="dockito-ai/pocketrocket"
 RELEASES_REPO="ShankarKakumani/pocketrocket-releases"
 KEYSTORE="${POCKETROCKET_KEYSTORE:-$HOME/.pocketrocket-keys/pocketrocket-release.jks}"
 KEY_ALIAS="pocketrocket"

@@ -11,7 +11,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 LOCAL=0
 [ "${1:-}" = --local ] && LOCAL=1
-REPO="ShankarKakumani/pocketrocket"
+REPO="dockito-ai/pocketrocket"
 GH_TOKEN="$(gh auth token -u ShankarKakumani)" || { echo "error: gh has no login for ShankarKakumani" >&2; exit 1; }
 export GH_TOKEN
 say() { printf '\033[1m%s\033[0m\n' "$*"; }

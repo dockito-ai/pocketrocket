@@ -10,7 +10,7 @@ import java.net.URL
 
 /** Where releases come from: GitHub, or a local folder in debug testing. */
 interface ReleaseSource {
-    /** Shown on the screen under the versions, e.g. "github.com/ShankarKakumani/pocketrocket". */
+    /** Shown on the screen under the versions, e.g. "github.com/dockito-ai/pocketrocket". */
     val label: String
 
     /** The JSON of `GET /repos/{owner}/{repo}/releases`. Blocking. */
@@ -20,10 +20,10 @@ interface ReleaseSource {
     fun download(asset: ApkAsset, dest: File, onBytes: (Long) -> Unit)
 
     companion object {
-        /** Where releases come from (decision 66): the code repo once it's public. No login is needed. */
-        const val REPO = "ShankarKakumani/pocketrocket"
+        /** Where releases come from (decisions 66 and 68): the public code repo in Dockito's org. No login is needed. */
+        const val REPO = "dockito-ai/pocketrocket"
 
-        /** The old public releases repo (decision 30), read while [REPO] is private or has no release yet. To be removed. */
+        /** The old public releases repo (decision 30), read while [REPO] has no release yet. To be removed. */
         const val OLD_REPO = "ShankarKakumani/pocketrocket-releases"
         const val RELEASES_URL = "https://github.com/$REPO/releases"
 
@@ -31,8 +31,8 @@ interface ReleaseSource {
         fun pick(context: Context): ReleaseSource = LocalReleaseSource.ifPresent(context) ?: GitHubReleaseSource
 
         /**
-         * [REPO]'s releases when it answers with a usable one, else [OLD_REPO]'s. A private repo answers 404 to
-         * anyone without a login, so until it's public the old repo is what's read. Returns the repo used and its JSON.
+         * [REPO]'s releases when it answers with a usable one, else [OLD_REPO]'s. Until the first release there, the old
+         * repo is what's read. Returns the repo used and its JSON.
          */
         fun firstWithRelease(fetch: (String) -> String): Pair<String, String> {
             val json = runCatching { fetch(REPO) }.getOrNull()
