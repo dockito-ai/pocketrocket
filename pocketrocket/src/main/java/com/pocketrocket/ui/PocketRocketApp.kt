@@ -141,7 +141,8 @@ fun PocketRocketApp(startScreen: AppScreen, onOpenTerminal: () -> Unit, showSess
                 onRemoved = { pickedTab = HomeTab.Workspaces; setStack(stack.filterNot { it.endsWith("|" + args[1]) }) },
                 onMoved = { to -> setStack(stack.map { it.replace("|" + args[1], "|$to") }) },
             )
-            r == Routes.NEW_WORKSPACE -> NewWorkspaceScreen(
+            args[0] == Routes.NEW_WORKSPACE -> NewWorkspaceScreen(
+                initialFolder = args.getOrNull(1),
                 onClose = ::pop,
                 onCreated = { ws, clone -> setStack(stack.dropLast(1) + Routes.workspace(ws) + listOfNotNull(if (clone) Routes.clone(ws) else null)) },
             )

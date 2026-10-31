@@ -7,7 +7,7 @@ import java.util.Locale
 data class FlutterRelease(val version: String, val date: String)
 
 /**
- * The fixed facts of the Flutter & Rust tool (decision 70, docs/flutter-tool.md), and the pure parts: Flutter's release
+ * The fixed facts of the Flutter & Rust tool (decision 74, docs/flutter-tool.md), and the pure parts: Flutter's release
  * list, version order, sizes, and which script option each action runs. Sizes are from the spike (docs/flutter-spike.md).
  */
 object FlutterTool {

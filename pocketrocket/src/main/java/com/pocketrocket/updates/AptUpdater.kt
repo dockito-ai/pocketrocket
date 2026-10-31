@@ -53,7 +53,7 @@ data class AptUpdateState(
 /** Git on the Updates screen (decision 41). */
 val GitUpdater = AptUpdater("git", "Git")
 
-/** Rust on the Updates screen, once the Flutter & Rust tool has it (decision 70). */
+/** Rust on the Updates screen, once the Flutter & Rust tool has it (decision 74). */
 val RustUpdater = AptUpdater("rust", "Rust")
 
 /**

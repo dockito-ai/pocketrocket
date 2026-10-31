@@ -61,10 +61,10 @@
 <tr><td><code>auth</code></td><td>Claude sign-in through <code>claude auth login</code>, account status and plan usage</td><td>ClaudeLogin, ClaudeCli, ClaudeUsage</td></tr>
 <tr><td><code>profiles</code></td><td>Claude, GitHub and Dockito account lists and the per-folder bindings, plus the files generated from them</td><td>AccountRegistry, AccountWiring, AccountPaths</td></tr>
 <tr><td><code>github</code></td><td>Connecting a GitHub account: gh device login, SSH key, commit identity</td><td>GitHubConnect, GhCli, GitIdentity</td></tr>
-<tr><td><code>workspaces</code></td><td>The workspace list, clone, repo discovery, open PRs per repo</td><td>Workspaces, RepoClone, WorkspaceRepos, GhRepos</td></tr>
+<tr><td><code>workspaces</code></td><td>The workspace list, clone, repo discovery (also repos that aren't workspaces yet), open PRs per repo, and <code>pocketrocket-workspace</code> requests from a shell</td><td>Workspaces, RepoClone, WorkspaceRepos, RepoScan, GhRepos, WorkspaceRequests, WorkspaceCliRunner</td></tr>
 <tr><td><code>git</code></td><td>Reading and changing a repo through the git CLI; commit graph; pull requests via gh</td><td>GitRepo, GitParsers, GraphLayout, PullRequests</td></tr>
 <tr><td><code>keepalive</code></td><td>Keeping sessions running with the screen off through Termux's own service</td><td>SessionKeepAlive, ProcessMemory</td></tr>
-<tr><td><code>notifications</code></td><td>"Needs you" and "Finished" notifications, with Allow/Deny actions</td><td>SessionNotifier, NotificationActionReceiver</td></tr>
+<tr><td><code>notifications</code></td><td>"Needs you" and "Finished" notifications, with Allow/Deny actions; clone progress; "Claude added … as a workspace"</td><td>SessionNotifier, NotificationActionReceiver, CloneNotifier, WorkspaceNotifier</td></tr>
 <tr><td><code>health</code></td><td>Settings › Health checks with Fix buttons, and the last stop reason</td><td>Health, *Checks, LastStop</td></tr>
 <tr><td><code>usage</code></td><td>Settings › Usage: the app's storage, memory, CPU time and battery, read only while the screen is open</td><td>StorageUsage, RamUsage, BatteryUsage, ProcessTable</td></tr>
 <tr><td><code>backup</code></td><td>Settings › Backup and Restore: one passphrase-encrypted file of workspaces, repos, Claude/Git/Dockito config and logins; staged restore with identity-based account merge; foreground service with progress</td><td>BackupManager, BackupRunner, BackupAllowlist, BackupScanner, AccountMerge, RestoreInstaller</td></tr>
@@ -75,7 +75,7 @@
 <tr><td><code>browser</code></td><td>Optional headless Chromium and the Chrome DevTools MCP server for every Claude account</td><td>Chromium, ChromiumMcp</td></tr>
 <tr><td><code>androidbuild</code></td><td>Optional Android build tool: Java, Gradle and Google's SDK, installed from Settings → Tools once the SDK license is accepted</td><td>AndroidBuild, AndroidBuildTool, SdkLicense</td></tr>
 <tr><td><code>wrangler</code></td><td>Optional Wrangler tool: Cloudflare's CLI from npm at a pinned version, for deploying and managing Workers, with sign-in from its page. Local Workers aren't included</td><td>Wrangler, WranglerTool</td></tr>
-<tr><td><code>fluttertool</code></td><td>Optional Flutter &amp; Rust tool for checking code (decision 70): official Flutter versions in FVM's layout with FVM itself, a <code>flutter</code>/<code>dart</code> launcher that follows <code>.fvmrc</code> and prepares Flutter's glibc programs, and Termux's Rust. No APKs</td><td>FlutterTool, FlutterRust</td></tr>
+<tr><td><code>fluttertool</code></td><td>Optional Flutter &amp; Rust tool for checking code (decision 74): official Flutter versions in FVM's layout with FVM itself, a <code>flutter</code>/<code>dart</code> launcher that follows <code>.fvmrc</code> and prepares Flutter's glibc programs, and Termux's Rust. No APKs</td><td>FlutterTool, FlutterRust</td></tr>
 <tr><td><code>dictation</code></td><td>Mic button through Android's SpeechRecognizer</td><td>Dictation</td></tr>
 <tr><td><code>termux</code>, <code>storage</code></td><td>Thin adapters over Termux: bootstrap, running commands, ~/storage links</td><td>Termux, TermuxCommand, BootstrapInstaller</td></tr>
 </table>
@@ -85,7 +85,7 @@
 <ul>
   <li>One long-lived <code>claude -p --input-format stream-json --output-format stream-json --include-partial-messages --permission-prompt-tool stdio</code> per session. It starts with an SDK-style <code>initialize</code> handshake. Permission asks arrive as <code>can_use_tool</code> control requests.</li>
   <li>Model, mode, rewind (Edit/Retry) and interrupt are control requests on the same pipe. <code>SessionReducer</code> is pure: event plus state gives the next state. The fake transport replays recorded lines for tests and the demo.</li>
-  <li>The env comes from <code>AccountWiring.envFor(folder)</code>: <code>CLAUDE_CONFIG_DIR</code>, <code>GH_CONFIG_DIR</code>, <code>DOCKITO_ACCOUNT</code>.</li>
+  <li>The env comes from <code>AccountWiring.envFor(folder)</code>: <code>CLAUDE_CONFIG_DIR</code>, <code>GH_CONFIG_DIR</code>, <code>DOCKITO_ACCOUNT</code>, plus <code>POCKETROCKET_SESSION_FOLDER</code>. Ordinary sessions (not Rocket's) get a short note about <code>pocketrocket-workspace</code> through <code>--append-system-prompt</code>.</li>
   <li><code>SessionStore</code> writes <code>sessions.json</code> on every change (temp file and rename). After a restart, sessions come back Paused. Opening one resumes it with <code>--resume</code>, and the conversation itself is read from Claude Code's own transcript.</li>
   <li>Messages sent mid-turn wait in a Queued box until Claude reads them (decision 34). Attachments are copied to <code>~/.pocketrocket/attachments/</code>; images and PDFs go inline, other files by path.</li>
 </ul>
@@ -113,6 +113,10 @@
   <li>A memory save compares a hash of the file with what was opened and writes nothing if it moved. Skill on/off isn't offered: its only route is a hidden CLI command.</li>
 </ul>
 
+<h3>Workspaces from a shell</h3>
+<div class="flow"><span><code>pocketrocket-workspace</code></span><i>→ <code>&lt;id&gt;.req</code> →</i><span>WorkspaceRequests (FileObserver)</span><i>→</i><span>WorkspaceCliRunner</span><i>→</i><span>Workspaces.add, CloneManager</span><i>→ <code>&lt;id&gt;.out</code>, <code>&lt;id&gt;.exit</code> →</i><span>the script prints and exits</span></div>
+<p>Requests go through <code>~/.pocketrocket/requests/</code>, which only the app's uid can read. The app does the work with the same code as its screens, so the Workspaces list updates at once. Add, clone and list only (decision 73).</p>
+
 <h2>5. Staying alive and telling you</h2>
 <div class="flow"><span>SessionManager</span><i>status change →</i><span>SessionKeepAlive</span><i>→</i><span>TermuxService + wake lock</span></div>
 <div class="flow"><span>SessionManager</span><i>status change →</i><span>SessionNotifier</span><i>→</i><span>"Needs you" / "Finished"</span></div>
@@ -138,7 +142,7 @@
   <li><code>app.pocket</code> is exactly as long as <code>com.termux</code>, so paths are swapped byte for byte. This happens in the bootstrap as it is extracted, and in every <code>.deb</code> through an apt <code>DPkg::Pre-Install-Pkgs</code> hook, after the signature check and before dpkg unpacks. Termux's mirrors are used as they are (decision 36).</li>
   <li>Claude Code comes from <code>downloads.claude.ai</code>, checked against <code>manifest.json</code> (SHA-256). Its ELF interpreter is patched to glibc-runner, it is smoke tested, and it runs with <code>autoUpdates: false</code>. It is never bundled.</li>
   <li>Dockito comes from its Homebrew tap release, checked against the formula's sha256, and goes through the same glibc launcher.</li>
-  <li>Optional tools install from Settings → Tools through the same script, never in the first run. Flutter &amp; Rust (decision 70):</li>
+  <li>Optional tools install from Settings → Tools through the same script, never in the first run. Flutter &amp; Rust (decision 74):</li>
 </ul>
 <div class="flow"><span>FlutterToolPage</span><i>→</i><span>FlutterRust</span><i>ToolScript →</i><span><code>--only flutter-rust</code></span><i>→</i><span>FVM 4.3.2 (SHA-256)</span><i>→</i><span>tag clone, commit checked</span><i>→</i><span>Dart SDK</span><i>→</i><span>prepare glibc programs</span><i>→</i><span><code>rust</code> from apt</span></div>
 <div class="flow"><span><code>flutter</code> in a session</span><i>→</i><span>launcher: nearest <code>.fvmrc</code> or default</span><i>→</i><span>new Dart SDK? new engine tools?</span><i>prepare →</i><span><code>bash &lt;version&gt;/bin/flutter</code></span></div>

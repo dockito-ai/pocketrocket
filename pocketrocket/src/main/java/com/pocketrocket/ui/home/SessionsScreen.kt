@@ -64,7 +64,7 @@ import com.pocketrocket.ui.components.AccentButton
 import com.pocketrocket.ui.components.EmptyState
 import com.pocketrocket.ui.components.MockIcons
 import com.pocketrocket.ui.components.RocketMark
-import com.pocketrocket.ui.sessions.label
+import com.pocketrocket.ui.sessions.statusLabel
 import com.pocketrocket.ui.components.mockText
 import com.pocketrocket.workspaces.GitHead
 import com.pocketrocket.workspaces.Workspace
@@ -250,9 +250,9 @@ private fun where(state: SessionState, ws: Workspace?): String {
 @Composable
 private fun HomeSessionCard(state: SessionState, ws: Workspace?, unseen: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
     val c = PrTheme.colors
-    val fg = c.status(state.status)
-    val chip = c.statusFill(state.status)
-    val edge = c.statusEdge(state.status)
+    val fg = c.status(state.shownStatus)
+    val chip = c.statusFill(state.shownStatus)
+    val edge = c.statusEdge(state.shownStatus)
     val shape = RoundedCornerShape(14.dp)
     Column(
         Modifier.fillMaxWidth().clip(shape).background(c.surface).border(BorderStroke(1.dp, edge), shape)
@@ -268,7 +268,7 @@ private fun HomeSessionCard(state: SessionState, ws: Workspace?, unseen: Boolean
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
             ) {
                 Box(Modifier.size(6.dp).background(fg, CircleShape))
-                Text(state.status.label, style = mockText(10.5.sp, FontWeight.SemiBold, fg))
+                Text(state.statusLabel, style = mockText(10.5.sp, FontWeight.SemiBold, fg))
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -1,5 +1,5 @@
 #!/data/data/app.pocket/files/usr/bin/bash
-# PocketRocket launcher for Flutter and Dart (decision 70, docs/flutter-tool.md), installed as
+# PocketRocket launcher for Flutter and Dart (decision 74, docs/flutter-tool.md), installed as
 # $PREFIX/bin/flutter, with $PREFIX/bin/dart a link to it.
 #
 # Which Flutter: the nearest .fvmrc up from the current folder (FVM's project pin; FVM 2's

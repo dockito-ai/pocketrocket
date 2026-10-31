@@ -12,7 +12,7 @@ object StreamJsonParser {
         if (!trimmed.startsWith("{")) return emptyList()
         val json = try { JSONObject(trimmed) } catch (_: JSONException) { return emptyList() }
         return when (json.optString("type")) {
-            "system" -> listOfNotNull(system(json))
+            "system" -> task(json) ?: listOfNotNull(system(json))
             "assistant" -> assistant(json)
             "stream_event" -> listOfNotNull(streamEvent(json))
             "user" -> user(json)
@@ -20,6 +20,7 @@ object StreamJsonParser {
             "control_request" -> listOfNotNull(controlRequest(json))
             "control_response" -> listOfNotNull(controlResponse(json))
             "control_cancel_request" -> listOf(StreamEvent.PermissionCancelled(json.optString("request_id")))
+            "prompt_suggestion" -> listOfNotNull(json.optStringOrNull("suggestion")?.trim()?.takeIf { it.isNotEmpty() }?.let { StreamEvent.PromptSuggestion(it) })
             else -> emptyList()
         }
     }
@@ -34,17 +35,46 @@ object StreamJsonParser {
         "compact_boundary" -> json.optJSONObject("compact_metadata").let {
             StreamEvent.Compacted(it?.optStringOrNull("trigger"), it?.optLong("pre_tokens") ?: 0, it?.optLong("post_tokens") ?: 0)
         }
-        "task_started", "task_progress" -> json.optStringOrNull("tool_use_id")?.let {
-            StreamEvent.SubagentUpdate(it, activity = json.optStringOrNull("description"), tokens = json.taskNumber("total_tokens") ?: json.taskNumber("subagent_tokens"), toolUses = json.taskNumber("tool_uses")?.toInt())
-        }
-        "task_notification" -> json.optStringOrNull("tool_use_id")?.let {
-            StreamEvent.SubagentUpdate(
-                it, status = json.optStringOrNull("status"), summary = json.optStringOrNull("summary"),
-                tokens = json.taskNumber("total_tokens") ?: json.taskNumber("subagent_tokens"), toolUses = json.taskNumber("tool_uses")?.toInt(), durationMs = json.taskNumber("duration_ms"),
-            )
-        }
         else -> null
     }
+
+    /**
+     * The `system/task_*` lines, or null for any other line. Subagents and shells both run as tasks: a shell's lines say
+     * `task_type` `local_bash`, except `task_notification`, which gives both events; each only touches its own kind of
+     * tool call.
+     */
+    private fun task(json: JSONObject): List<StreamEvent>? {
+        val subtype = json.optString("subtype")
+        if (!subtype.startsWith("task_")) return null
+        val toolUseId = json.optStringOrNull("tool_use_id")
+        val taskId = json.optStringOrNull("task_id")
+        val shell = json.optString("task_type") == "local_bash"
+        if (subtype == "task_started" && shell) {
+            return listOfNotNull(if (toolUseId != null && taskId != null) StreamEvent.ShellStarted(toolUseId, taskId, json.optBoolean("is_backgrounded")) else null)
+        }
+        return when (subtype) {
+            "task_started", "task_progress" ->listOfNotNull(toolUseId?.let {
+                StreamEvent.SubagentUpdate(it, activity = json.optStringOrNull("description"), tokens = json.taskNumber("total_tokens") ?: json.taskNumber("subagent_tokens"), toolUses = json.taskNumber("tool_uses")?.toInt())
+            })
+            "task_updated" -> listOfNotNull(
+                taskId?.takeIf { json.optJSONObject("patch")?.optBoolean("is_backgrounded") == true }?.let { StreamEvent.TaskBackgrounded(it) },
+            )
+            "task_notification" -> if (toolUseId == null) emptyList() else listOf(
+                StreamEvent.SubagentUpdate(
+                    toolUseId, status = json.optStringOrNull("status"), summary = json.optStringOrNull("summary"),
+                    tokens = json.taskNumber("total_tokens") ?: json.taskNumber("subagent_tokens"), toolUses = json.taskNumber("tool_uses")?.toInt(), durationMs = json.taskNumber("duration_ms"),
+                ),
+                StreamEvent.ShellEnded(
+                    toolUseId, json.optStringOrNull("status"),
+                    json.optStringOrNull("summary")?.let { exitCode.find(it) }?.groupValues?.get(1)?.toIntOrNull(),
+                    json.optStringOrNull("output_file"),
+                ),
+            )
+            else -> emptyList()
+        }
+    }
+
+    private val exitCode = Regex("""\(exit code (-?\d+)\)""")
 
     private fun assistant(json: JSONObject): List<StreamEvent> {
         val message = json.optJSONObject("message") ?: return emptyList()

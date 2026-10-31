@@ -37,13 +37,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * The terminal-style line under the chat box: `folder │ branch │ model │ 160k/1M`, then `│ 2 agents` while subagents
- * run, and the permission mode below. Tapping the mode cycles it (shift+tab); tapping the branch opens the repo's
- * branches; tapping the agent count shows the first running agent; tapping the rest of the first line, or long-pressing either, opens the controls.
+ * The terminal-style lines under the chat box: `folder │ branch │ model │ 160k/1M`, then the permission mode with
+ * `│ 2 agents │ 1 shell` beside it while subagents or background shells run. Tapping the branch opens the repo's
+ * branches; tapping a count opens the Background sheet; tapping anywhere else, or long-pressing, opens the controls,
+ * where the mode is changed.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun StatusLine(state: SessionState, onOpenControls: () -> Unit, onCycleMode: () -> Unit, onShowAgents: () -> Unit, onOpenBranches: () -> Unit, modifier: Modifier = Modifier) {
+fun StatusLine(state: SessionState, onOpenControls: () -> Unit, onShowBackground: () -> Unit, onOpenBranches: () -> Unit, modifier: Modifier = Modifier) {
     var branch by remember(state.folder) { mutableStateOf<String?>(null) }
     // Re-read after each turn: Claude may have switched branches.
     LaunchedEffect(state.folder, state.status == SessionStatus.Done) {
@@ -74,41 +75,38 @@ fun StatusLine(state: SessionState, onOpenControls: () -> Unit, onCycleMode: () 
     }
     // Session.dc.html: two lines of 11.5px JetBrains Mono, 3px apart, 4px in from the chat row.
     val style = TextStyle(fontFamily = JetBrainsMono, fontSize = 11.5.sp, lineHeight = 15.sp)
-    val agents = state.runningAgents
+    val counts = backgroundCounts(state.runningAgents, state.runningShells)
     Column(modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        // The count takes its own taps; the rest of the line opens the controls.
+        // As before: the branch link takes its own taps, the row around it opens the controls.
         Row(Modifier.fillMaxWidth().combinedClickable(onClick = onOpenControls, onLongClick = onOpenControls)) {
-            Text(
-                line,
-                style = style,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            if (agents > 0) {
+            Text(line, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        // The counts take their own taps; the mode opens the controls.
+        Row(Modifier.fillMaxWidth().combinedClickable(onClick = onOpenControls, onLongClick = onOpenControls)) {
+            Text(modeLine(state.mode), style = style, color = modeColor(state.mode), maxLines = 1, softWrap = false)
+            if (counts.isNotEmpty()) {
                 Text(
                     buildAnnotatedString {
-                        withStyle(SpanStyle(color = bar)) { append(" │ ") }
-                        withStyle(SpanStyle(color = c.lilac)) { append(if (agents == 1) "1 agent" else "$agents agents") }
+                        counts.forEach { (text, shell) ->
+                            withStyle(SpanStyle(color = bar)) { append(" │ ") }
+                            withStyle(SpanStyle(color = if (shell) c.teal else c.lilac)) { append(text) }
+                        }
                     },
                     style = style,
                     maxLines = 1,
-                    softWrap = false,
-                    modifier = Modifier.combinedClickable(onClick = onShowAgents, onLongClick = onOpenControls),
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.combinedClickable(onClick = onShowBackground, onLongClick = onOpenControls),
                 )
             }
         }
-        Text(
-            buildAnnotatedString {
-                withStyle(SpanStyle(color = modeColor(state.mode))) { append(modeLine(state.mode)) }
-                withStyle(SpanStyle(color = c.textMuted)) { append(" (tap to change)") }
-            },
-            style = style,
-            maxLines = 1,
-            modifier = Modifier.fillMaxWidth().combinedClickable(onClick = onCycleMode, onLongClick = onOpenControls),
-        )
     }
 }
+
+/** "1 agent", "2 shells": what runs beside the conversation, each paired with whether it is a shell. */
+internal fun backgroundCounts(agents: Int, shells: Int): List<Pair<String, Boolean>> = listOfNotNull(
+    agents.takeIf { it > 0 }?.let { (if (it == 1) "1 agent" else "$it agents") to false },
+    shells.takeIf { it > 0 }?.let { (if (it == 1) "1 shell" else "$it shells") to true },
+)
 
 /** How the terminal shows each mode under its prompt. */
 fun modeLine(mode: PermissionMode): String = when (mode) {

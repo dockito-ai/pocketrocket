@@ -12,7 +12,9 @@ import kotlinx.coroutines.launch
 
 /**
  * One clone as asked for: [url] into [parent]/[name] as GitHub account [accountId] (null: the folder's),
- * on [branch] (null: the remote's default). [label] is what people read, "owner/repo".
+ * on [branch] (null: the remote's default). [label] is what people read, "owner/repo". When the repo
+ * becomes a workspace of its own, it is called [workspaceName] (null: the folder's name) and uses Claude
+ * account [claude] and Dockito account [dockito] (null: the default); `pocketrocket-workspace clone` sets them.
  */
 data class CloneRequest(
     val url: String,
@@ -21,6 +23,9 @@ data class CloneRequest(
     val accountId: String?,
     val branch: String?,
     val label: String,
+    val workspaceName: String? = null,
+    val claude: String? = null,
+    val dockito: String? = null,
 )
 
 /** A clone the queue knows about: running, or finished and not yet seen ([CloneProgress.Done] / [CloneProgress.Failed]). */

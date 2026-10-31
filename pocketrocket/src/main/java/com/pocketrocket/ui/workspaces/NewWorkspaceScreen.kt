@@ -55,23 +55,26 @@ private enum class StartWith { Clone, Init, Folder }
  * New workspace (mockup NewWorkspace): a name, a folder under ~/projects that Shankar picks, the Claude
  * and GitHub accounts (defaults preselected) and how to start. Creating it binds the folder to the
  * accounts (AccountWiring.bind). [onCreated] gets the folder and whether to go on to Clone.
+ * With [initialFolder] (a repo the Workspaces list found outside any workspace, decision 72) it makes that
+ * folder a workspace: name and location are filled in and there is nothing to start with.
  */
 @Composable
-fun NewWorkspaceScreen(onClose: () -> Unit, onCreated: (path: String, clone: Boolean) -> Unit) {
+fun NewWorkspaceScreen(onClose: () -> Unit, onCreated: (path: String, clone: Boolean) -> Unit, initialFolder: String? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val c = PrTheme.colors
     val claude by ClaudeAccounts.state.collectAsState()
     val github by GitHubAccounts.state.collectAsState()
-    var name by rememberSaveable { mutableStateOf("") }
+    val existing = initialFolder != null && File(initialFolder).isDirectory
+    var name by rememberSaveable { mutableStateOf(initialFolder?.let { File(it).name }.orEmpty()) }
     /** A folder Shankar typed with Change; until then it follows the name. */
-    var customPath by rememberSaveable { mutableStateOf<String?>(null) }
+    var customPath by rememberSaveable { mutableStateOf(initialFolder) }
     val dockito by DockitoAccounts.state.collectAsState()
     /** Picked accounts; null is "Default", which follows the default. */
     var claudeId by rememberSaveable { mutableStateOf<String?>(null) }
     var githubId by rememberSaveable { mutableStateOf<String?>(null) }
     var dockitoId by rememberSaveable { mutableStateOf<String?>(null) }
-    var start by rememberSaveable { mutableStateOf(if (GitHubAccounts.default != null) StartWith.Clone else StartWith.Folder) }
+    var start by rememberSaveable { mutableStateOf(if (GitHubAccounts.default != null && !existing) StartWith.Clone else StartWith.Folder) }
     var changing by rememberSaveable { mutableStateOf(false) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -98,7 +101,7 @@ fun NewWorkspaceScreen(onClose: () -> Unit, onCreated: (path: String, clone: Boo
     }
 
     MockPage {
-        MockTopBar("New workspace", MockIcons.Close, onClose, titleSize = 17.sp)
+        MockTopBar(if (existing) "Make workspace" else "New workspace", MockIcons.Close, onClose, titleSize = 17.sp)
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -144,7 +147,7 @@ fun NewWorkspaceScreen(onClose: () -> Unit, onCreated: (path: String, clone: Boo
                     AccountDropdown(dockitoOptions(dockito.accounts), dockitoId, dockito.default?.id, { dockitoId = it })
                 }
             }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (!existing) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Caps("START WITH")
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     StartOption(if (ghAccount != null) "Clone repos from ${ghAccount.login}" else "Clone a repo by URL", start == StartWith.Clone) { start = StartWith.Clone }
@@ -157,7 +160,7 @@ fun NewWorkspaceScreen(onClose: () -> Unit, onCreated: (path: String, clone: Boo
         HorizontalDivider(thickness = 1.dp, color = c.border)
         Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 22.dp)) {
             AccentButton(
-                when (start) { StartWith.Clone -> "Create and pick repos"; StartWith.Init -> "Create and git init"; StartWith.Folder -> "Create workspace" },
+                if (existing) "Make workspace" else when (start) { StartWith.Clone -> "Create and pick repos"; StartWith.Init -> "Create and git init"; StartWith.Folder -> "Create workspace" },
                 ::create, height = 50.dp, radius = 14.dp, fontSize = 14.sp,
             )
         }

@@ -30,14 +30,12 @@ data class RepoSummary(
 
 /** Finds the repos in a workspace and reads their state through the git CLI. */
 object WorkspaceRepos {
-    private val skip = setOf("node_modules", "build", "dist", "target", "vendor")
-
     /** Repo folders: the workspace itself if it is one, else repos up to two levels down. Cheap, no git calls. */
     fun find(root: File): List<File> {
         if (isRepo(root)) return listOf(root)
         val found = mutableListOf<File>()
         fun walk(dir: File, depth: Int) {
-            dir.listFiles()?.filter { it.isDirectory && !it.name.startsWith(".") && it.name !in skip }?.sortedBy { it.name.lowercase() }?.forEach {
+            RepoScan.children(dir).forEach {
                 if (isRepo(it)) found += it else if (depth < 2) walk(it, depth + 1)
             }
         }
@@ -45,7 +43,7 @@ object WorkspaceRepos {
         return found
     }
 
-    fun isRepo(dir: File) = File(dir, ".git").exists()
+    fun isRepo(dir: File) = RepoScan.isRepo(dir)
 
     /** Every repo's summary, read in parallel. Repos git can't read are left out. */
     suspend fun summaries(context: Context, root: File): List<RepoSummary> = coroutineScope {

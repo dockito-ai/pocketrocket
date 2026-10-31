@@ -74,7 +74,7 @@ fun SessionSwitcher(
         itemsIndexed(sessions, key = { _, s -> s.id }) { index, session ->
             val state = session.state.collectAsState().value
             val selected = index == current
-            val dot = c.status(state.status)
+            val dot = c.status(state.shownStatus)
             Box {
                 Row(
                     Modifier.clip(shape)

@@ -74,6 +74,8 @@ class ClaudeProcessTransport(
         "--include-partial-messages",
         // Each message of ours comes back as Claude reads it, so one sent mid-turn joins the chat where it is answered.
         "--replay-user-messages",
+        // After each turn Claude Code predicts the next message ("go ahead"); the chat offers it above the box.
+        "--prompt-suggestions",
         if (resume) "--resume" else "--session-id", conversationId,
         *extraArguments.toTypedArray(),
     )

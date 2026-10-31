@@ -109,7 +109,7 @@ val GitSource = AptSource(UpdateComponent.Git, GitUpdater)
 val RustSource = AptSource(UpdateComponent.Rust, RustUpdater)
 
 /**
- * Flutter (decision 70): a newer stable for the default version only. Updating adds it as a new version and makes it
+ * Flutter (decision 74): a newer stable for the default version only. Updating adds it as a new version and makes it
  * the default; the old one stays for projects that pin it, and a project's pin is never changed.
  */
 object FlutterSource : UpdateSource {

@@ -1,6 +1,6 @@
 # Flutter, Dart and Rust spike
 
-Decision 70. 31 Oct 2026, on Shankar's phone (Xiaomi, arm64, Android 15), from a Claude session and its background shell. Can a Claude session check a Flutter or Rust project for compile errors on the phone? **Yes.** Building APKs was dropped as a goal partway (Shankar: compile checks are what matter).
+Decision 74. 31 Oct 2026, on Shankar's phone (Xiaomi, arm64, Android 15), from a Claude session and its background shell. Can a Claude session check a Flutter or Rust project for compile errors on the phone? **Yes.** Building APKs was dropped as a goal partway (Shankar: compile checks are what matter).
 
 ## Result
 

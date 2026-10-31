@@ -1,6 +1,6 @@
 # Flutter & Rust
 
-Decision 70. An optional tool for checking code on the phone, from a terminal or a Claude session: `flutter pub get`, `dart run build_runner build`, `flutter analyze`, `flutter test`, `cargo check` and `cargo clippy`. No APKs on the phone; release builds need a Mac or CI. How it was worked out: `docs/flutter-spike.md`.
+Decision 74. An optional tool for checking code on the phone, from a terminal or a Claude session: `flutter pub get`, `dart run build_runner build`, `flutter analyze`, `flutter test`, `cargo check` and `cargo clippy`. No APKs on the phone; release builds need a Mac or CI. How it was worked out: `docs/flutter-spike.md`.
 
 ## Install and remove
 

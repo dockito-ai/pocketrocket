@@ -63,6 +63,8 @@ data class SessionState(
     val rewind: PendingRewind? = null,
     /** Items appended so far; keeps item ids unique when a rewind drops some. */
     val seq: Int = 0,
+    /** Claude Code's guess at the next message, offered above the chat box until something else is said. */
+    val suggestion: String? = null,
     /** The saved last line, shown until a restored session's history is loaded. */
     val preview: String? = null,
 ) {
@@ -79,6 +81,17 @@ data class SessionState(
     /** Subagents at work now; the status line shows how many while any run. */
     val runningAgents: Int
         get() = items.count { it is ChatItem.Tool && it.agentRunning }
+
+    /** Shells running in the background; the status line shows how many while any run. */
+    val runningShells: Int
+        get() = items.count { it is ChatItem.Tool && it.backgroundShell && it.shellRunning }
+
+    /**
+     * The status cards and tab dots show: a session whose turn ended while shells still run in the background is
+     * still working, so it does not read Done while a build goes on.
+     */
+    val shownStatus: SessionStatus
+        get() = if (runningShells > 0 && (status == SessionStatus.Done || status == SessionStatus.WaitingForInput)) SessionStatus.Working else status
 
     /** The line a session card shows: the latest thing said or done. */
     val lastLine: String

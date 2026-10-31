@@ -92,7 +92,7 @@ if [ "${1:-}" = --only ] && [ "${2:-}" = git-update ]; then
   echo "$want" > "$HOME/.pocketrocket/stub-git-installed"
   echo "[ok] git version $want"; echo "[done]"; exit 0
 fi
-# Settings > Tools: the Flutter & Rust tool (decision 70), with fake version folders so the app sees them.
+# Settings > Tools: the Flutter & Rust tool (decision 74), with fake version folders so the app sees them.
 # The version comes as $3 or POCKETROCKET_FLUTTER_VERSION; without one, 3.47.9. echo 1.99.2 > ~/.pocketrocket/stub-rust-candidate
 # offers a Rust update (the stub's rust is 1.99.1). touch ~/.pocketrocket/stub-flutter-fail-once to fail the Dart SDK download once.
 if [ "${1:-}" = --only ]; then
