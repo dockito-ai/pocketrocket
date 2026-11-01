@@ -23,8 +23,6 @@ import com.pocketrocket.updates.Updates
 @Composable
 fun PythonToolPage(onBack: () -> Unit) = PackageToolPage(
     tool = Tool.Python,
-    pkg = PackageTool.Python,
-    component = UpdateComponent.Python,
     purpose = "Run Python, with pip and uv.",
     onBack = onBack,
     removeNote = "uv's PocketRocket settings go too. Your projects and their venvs stay.",
@@ -49,8 +47,6 @@ fun PythonToolPage(onBack: () -> Unit) = PackageToolPage(
 @Composable
 fun BunToolPage(onBack: () -> Unit) = PackageToolPage(
     tool = Tool.Bun,
-    pkg = PackageTool.Bun,
-    component = UpdateComponent.Bun,
     purpose = "Run JavaScript and TypeScript with Bun.",
     onBack = onBack,
     removeNote = "Your projects and their node_modules stay.",
@@ -66,18 +62,19 @@ fun BunToolPage(onBack: () -> Unit) = PackageToolPage(
 /**
  * A package tool's page (decision 92): the shared [ToolPage] with Install or Uninstall through [PackageTools], the
  * missing pieces when the main package came some other way (Python from Headless Chrome, without uv), and an
- * uninstall that says what stays because another tool needs it.
+ * uninstall that says what stays because another tool needs it. Its update comes from its Updates row; Repair shows when
+ * something it needs outside its packages is off ([PackageTool.problem]).
  */
 @Composable
-private fun PackageToolPage(
+internal fun PackageToolPage(
     tool: Tool,
-    pkg: PackageTool,
-    component: UpdateComponent,
     purpose: String,
     onBack: () -> Unit,
     removeNote: String,
     about: @Composable ColumnScope.() -> Unit,
 ) {
+    val pkg = requireNotNull(tool.pkg) { "${tool.name} isn't a package tool" }
+    val component = UpdateComponent.of(pkg)
     val context = LocalContext.current
     val s by PackageTools.state.collectAsState()
     val updates by Updates.state.collectAsState()
@@ -89,7 +86,7 @@ private fun PackageToolPage(
 
     ToolPage(
         spec = tool.spec,
-        state = ToolStates.packageTool(pkg, s, updates.rows.firstOrNull { it.component == component }),
+        state = ToolStates.packageTool(pkg, s, component?.let { c -> updates.rows.firstOrNull { it.component == c } }),
         icon = tool.icon,
         purpose = purpose,
         onBack = onBack,
@@ -109,7 +106,7 @@ private fun PackageToolPage(
                 else -> null
             },
         ),
-        update = toolUpdate(context, updates, component),
+        update = component?.let { toolUpdate(context, updates, it) },
     ) {
         if (missing.isNotEmpty() && !s.running) {
             ToolCard("NOT HERE YET") {

@@ -59,9 +59,11 @@ val GitUpdater = AptUpdater("git", "Git")
 /** Rust on the Updates screen, while `rust` is on the phone however it got there (decisions 75, 87 and 92). */
 val RustUpdater = AptUpdater("rust", "Rust") { FlutterRust.rustInstalled() }
 
-/** Python and Bun, while they're on the phone however they got there (decision 92). */
-val PythonUpdater = AptUpdater("python", "Python") { PackageTools.installedNow(PackageTool.Python) }
-val BunUpdater = AptUpdater("bun", "Bun") { PackageTools.installedNow(PackageTool.Bun) }
+/**
+ * A package tool's main package (Python, Bun, decision 92; the languages, decision 98), while it's on the phone however
+ * it got there. The script's `--only <package>-check` and `-update` go by package name.
+ */
+fun packageToolUpdater(t: PackageTool, name: String) = AptUpdater(t.main, name) { PackageTools.installedNow(t) }
 
 /**
  * One Termux package on the Updates screen: versions from apt, the update through the setup script's

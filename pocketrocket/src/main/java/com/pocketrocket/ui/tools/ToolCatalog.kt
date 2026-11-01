@@ -43,9 +43,10 @@ import java.io.File
 /**
  * Every tool in Settings → Tools (decisions 64 and 87): what it declares and how its module's state reads as a
  * [ToolState]. Included (built in): Claude Code, Dockito, Git, Node.js and npm. Add-ons (optional): Android,
- * Android NDK, Bun, Flutter & Dart, Headless Chrome, Python, Rust, Wrangler. The screen orders them by name.
+ * Android NDK, Bun, Deno, Flutter & Dart, Go, Headless Chrome, Java and Kotlin, PHP, Python, Ruby, Rust, Wrangler. The
+ * screen orders them by name. A tool with a [pkg] is a package tool (decisions 92 and 98), read from dpkg.
  */
-enum class Tool(val spec: ToolSpec, val route: String) {
+enum class Tool(val spec: ToolSpec, val route: String, val pkg: PackageTool? = null) {
     ClaudeCode(ToolSpec("Claude Code", ToolKind.BuiltIn, hasVersion = true, canUpdate = true), Routes.CLAUDE_CODE),
     Git(ToolSpec("Git", ToolKind.BuiltIn, hasVersion = true, canUpdate = true), Routes.TOOL_GIT),
     Node(ToolSpec("Node.js and npm", ToolKind.BuiltIn, hasVersion = true), Routes.TOOL_NODE),
@@ -74,8 +75,13 @@ enum class Tool(val spec: ToolSpec, val route: String) {
         ),
         Routes.TOOL_RUST,
     ),
-    Python(PackageTool.Python.spec("Python"), Routes.TOOL_PYTHON),
-    Bun(PackageTool.Bun.spec("Bun"), Routes.TOOL_BUN),
+    Python(PackageTool.Python.spec("Python"), Routes.TOOL_PYTHON, PackageTool.Python),
+    Bun(PackageTool.Bun.spec("Bun"), Routes.TOOL_BUN, PackageTool.Bun),
+    Go(PackageTool.Go.spec("Go"), Routes.TOOL_GO, PackageTool.Go),
+    Deno(PackageTool.Deno.spec("Deno"), Routes.TOOL_DENO, PackageTool.Deno),
+    Ruby(PackageTool.Ruby.spec("Ruby"), Routes.TOOL_RUBY, PackageTool.Ruby),
+    Php(PackageTool.Php.spec("PHP"), Routes.TOOL_PHP, PackageTool.Php),
+    Java(PackageTool.Java.spec("Java and Kotlin"), Routes.TOOL_JAVA, PackageTool.Java),
     ;
 
     /** Its brand mark (decision 87), bundled as a VectorDrawable; sources in docs/third-party-icons.md. */
@@ -91,6 +97,11 @@ enum class Tool(val spec: ToolSpec, val route: String) {
         Rust -> ToolGlyph(R.drawable.ic_tool_rust, 0xFF000000)
         Python -> ToolGlyph(R.drawable.ic_tool_python, 0xFF3776AB)
         Bun -> ToolGlyph(R.drawable.ic_tool_bun, 0xFF000000)
+        Go -> ToolGlyph(R.drawable.ic_tool_go, 0xFF00ADD8)
+        Deno -> ToolGlyph(R.drawable.ic_tool_deno, 0xFF000000)
+        Ruby -> ToolGlyph(R.drawable.ic_tool_ruby, 0xFFCC342D)
+        Php -> ToolGlyph(R.drawable.ic_tool_php, 0xFF777BB4)
+        Java -> ToolGlyph(R.drawable.ic_tool_openjdk, 0xFF000000)
     }
 }
 
@@ -105,8 +116,7 @@ val UpdateComponent.icon: ToolGlyph get() = when (this) {
     UpdateComponent.Dockito -> Tool.Dockito.icon
     UpdateComponent.Flutter -> Tool.Flutter.icon
     UpdateComponent.Rust -> Tool.Rust.icon
-    UpdateComponent.Python -> Tool.Python.icon
-    UpdateComponent.Bun -> Tool.Bun.icon
+    else -> Tool.entries.first { it.pkg != null && it.pkg == packageTool }.icon
 }
 
 /** A package tool's tile (decision 92): an add-on with its versions, updated from Updates. */
@@ -218,6 +228,7 @@ object ToolStates {
             updateAvailable = row?.available == true,
             updating = row?.running == true,
             sizeMb = t.sizeMb(s.packages),
+            problem = s.problem(t),
         )
     }
 
@@ -277,9 +288,9 @@ fun rememberTools(): List<Pair<Tool, ToolState>> {
         Tool.Wrangler to ToolStates.wrangler(wrangler),
         Tool.Flutter to ToolStates.flutter(flutter, row(UpdateComponent.Flutter)),
         Tool.Rust to ToolStates.rust(flutter, row(UpdateComponent.Rust), packages.running && packages.isFor(PackageTool.RustWasm)),
-        Tool.Python to ToolStates.packageTool(PackageTool.Python, packages, row(UpdateComponent.Python)),
-        Tool.Bun to ToolStates.packageTool(PackageTool.Bun, packages, row(UpdateComponent.Bun)),
-    )
+    ) + Tool.entries.mapNotNull { tool ->
+        tool.pkg?.let { tool to ToolStates.packageTool(it, packages, UpdateComponent.of(it)?.let(::row)) }
+    }
 }
 
 /** Cheap reads only: files on disk, Node's versions once per run, and the Updates cache (checked when it's old). */
