@@ -1,0 +1,114 @@
+// Written by PocketRocket while the Android add-on is installed (decision 97); the app refreshes it at every start and
+// the add-on's uninstall removes it.
+//
+// Every Gradle build, `./gradlew` or `gradle`, takes one of the phone's build slots for as long as it runs, so several
+// sessions building at once take turns instead of getting the app killed for memory. Gradle can't hold a shell flock,
+// and its daemon outlives the build, so the lock is held by a small helper process, `pocketrocket-build-slot hold`,
+// started from the daemon: it takes a slot (or waits, printing one line), says "PR_SLOT held", and keeps the slot until
+// its stdin closes. The build service below closes it when the build ends; if the daemon dies, the pipe closes and the
+// helper lets go by itself. Only the root build asks: buildSrc and included builds share its slot, and so does a Gradle
+// started under `flutter build` or another build that already has one.
+//
+// With the configuration cache, Gradle skips this script when it reuses a cached configuration; the service is then
+// started by the first task-completion event (the listener registration is cached), so the slot is taken from the
+// first finished task on. Nothing here ever fails a build: if the helper is missing or misbehaves, the build just runs.
+import org.gradle.api.provider.Property
+import org.gradle.api.provider.ProviderFactory
+import org.gradle.api.services.BuildService
+import org.gradle.api.services.BuildServiceParameters
+import org.gradle.build.event.BuildEventsListenerRegistry
+import org.gradle.tooling.events.FinishEvent
+import org.gradle.tooling.events.OperationCompletionListener
+
+import javax.inject.Inject
+import java.util.concurrent.TimeUnit
+
+interface PocketRocketBuildSlotParams extends BuildServiceParameters {
+    Property<String> getHelper()
+    Property<String> getLabel()
+    Property<String> getFolder()
+    // The client's POCKETROCKET_BUILD_SLOT: a Gradle started under `flutter build` runs in that build's slot. Passed on
+    // explicitly, since a daemon that can't take on the client's environment (no native integration) wouldn't see it.
+    Property<String> getOuterSlot()
+}
+
+abstract class PocketRocketBuildSlot implements BuildService<PocketRocketBuildSlotParams>, OperationCompletionListener, AutoCloseable {
+    // Process-wide, so a second instance in the same daemon (a cached configuration loaded again) reuses the slot. The
+    // lock is the interned key, the same object for every class loader; never the Properties themselves, which Gradle
+    // writes to from other threads while a build may be waiting here.
+    protected static final String KEY = "pocketrocket.buildSlot"
+    protected boolean mine = false
+
+    void take() {
+        Properties props = System.getProperties()
+        synchronized (KEY) {
+            if (props.get(KEY) != null) return
+            Object holder = "none"
+            try {
+                def pb = new ProcessBuilder(parameters.helper.get(), "hold", new File("/proc/self").canonicalFile.name, parameters.label.get())
+                def folder = new File(parameters.folder.get())
+                if (folder.isDirectory()) pb.directory(folder)
+                pb.redirectErrorStream(true)
+                def outer = parameters.outerSlot.getOrElse("")
+                if (outer.isEmpty()) pb.environment().remove("POCKETROCKET_BUILD_SLOT") else pb.environment().put("POCKETROCKET_BUILD_SLOT", outer)
+                Process p = pb.start()
+                def reader = new BufferedReader(new InputStreamReader(p.inputStream, "UTF-8"))
+                String line
+                while ((line = reader.readLine()) != null && !line.startsWith("PR_SLOT ")) System.err.println(line)
+                if (line != null && line.startsWith("PR_SLOT held")) holder = p else release(p)
+            } catch (Exception e) {
+                System.err.println("PocketRocket: build slots skipped (${e.message})")
+            }
+            props.put(KEY, holder)
+            mine = true
+        }
+    }
+
+    @Override
+    void onFinish(FinishEvent event) { take() }
+
+    @Override
+    void close() {
+        if (!mine) return
+        Properties props = System.getProperties()
+        synchronized (KEY) {
+            def holder = props.remove(KEY)
+            if (holder instanceof Process) release((Process) holder)
+            mine = false
+        }
+    }
+
+    protected static void release(Process p) {
+        try { p.outputStream.close() } catch (IOException ignored) {}
+        try { if (!p.waitFor(5, TimeUnit.SECONDS)) p.destroy() } catch (InterruptedException ignored) { p.destroy() }
+    }
+}
+
+abstract class PocketRocketBuildSlotPlugin implements Plugin<Gradle> {
+    @Inject
+    abstract BuildEventsListenerRegistry getEvents()
+
+    @Inject
+    abstract ProviderFactory getProviders()
+
+    void apply(Gradle gradle) {
+        if (gradle.parent != null) return
+        def helper = new File("@POCKETROCKET_BUILD_SLOT@")
+        if (!helper.canExecute()) return
+        def start = gradle.startParameter
+        def slot = gradle.sharedServices.registerIfAbsent("pocketrocketBuildSlot", PocketRocketBuildSlot) { spec ->
+            spec.parameters.helper.set(helper.path)
+            spec.parameters.label.set((["gradle"] + start.taskNames).join(" "))
+            spec.parameters.folder.set(start.currentDir.path)
+            spec.parameters.outerSlot.set(providers.environmentVariable("POCKETROCKET_BUILD_SLOT").orElse(""))
+        }
+        events.onTaskCompletion(slot)
+        slot.get().take()
+    }
+}
+
+try {
+    apply plugin: PocketRocketBuildSlotPlugin
+} catch (Throwable e) {
+    logger.warn("PocketRocket: build slots skipped (${e.message})")
+}

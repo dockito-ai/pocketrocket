@@ -998,11 +998,30 @@ android_gradle_props_remove() {
 
 # android_gradle_props_add <gradle.properties> <aapt2 path>: the plugin's own aapt2 is x86_64, so point it at Termux's.
 # A daemon idles for 3 hours by default, holding over 1 GB; on a phone it goes after 10 minutes.
+# Memory caps sized from the phone's RAM (decision 97): this file wins over a project's gradle.properties, so a project
+# asking for -Xmx4g gets a quarter of its build slot's share (1536 MB on a 12 GB phone), two workers, and Kotlin
+# compiled inside Gradle's own JVM instead of a second daemon.
 android_gradle_props_add() {
+  local heap
+  heap="$(bash "$(dirname "${BASH_SOURCE[0]}")/pocketrocket-build-slot" config 2>/dev/null | sed -n 's/^heap_mb=//p')"
+  case "$heap" in ''|*[!0-9]*) heap=1536 ;; esac
   android_gradle_props_remove "$1"
   mkdir -p "$(dirname "$1")"
   printf '%s\n' "$ANDROID_GRADLE_BEGIN" "android.aapt2FromMavenOverride=$2" \
-    "org.gradle.daemon.idletimeout=600000" "$ANDROID_GRADLE_END" >>"$1"
+    "org.gradle.daemon.idletimeout=600000" \
+    "org.gradle.jvmargs=-Xmx${heap}m -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8" \
+    "org.gradle.workers.max=2" \
+    "kotlin.compiler.execution.strategy=in-process" "$ANDROID_GRADLE_END" >>"$1"
+}
+
+# The build-slot Gradle hook (decision 97), from the template beside this script; the app refreshes the same file at
+# every start (BuildSlots.kt) and removes it once the Android tool is gone.
+ANDROID_SLOTS_INIT_SCRIPT="$HOME/.gradle/init.d/pocketrocket-build-slots.gradle"
+android_slots_write_hook() {
+  local tmp="$ANDROID_SLOTS_INIT_SCRIPT.tmp"
+  mkdir -p "$(dirname "$ANDROID_SLOTS_INIT_SCRIPT")"
+  sed -e "s|@POCKETROCKET_BUILD_SLOT@|$PREFIX/bin/pocketrocket-build-slot|g" \
+    "$(dirname "${BASH_SOURCE[0]}")/pocketrocket-build-slots.gradle" >"$tmp" && mv -f "$tmp" "$ANDROID_SLOTS_INIT_SCRIPT"
 }
 
 # android_installed_packages: packages really installed. `dpkg-query -W` alone also lists removed ones that kept their
@@ -1090,7 +1109,9 @@ step_android_wire() {
   # The Gradle hook ships with this tool too (decision 96): without the NDK, native tasks fail plainly instead of the
   # plugin downloading Google's x86_64 NDK, and Kotlin, Java and unit tests still run.
   android_ndk_write_hook
-  ok "ANDROID_HOME, JAVA_HOME and aapt2 set for every session"
+  # Builds take turns in the phone's build slots (decision 97); the app installs pocketrocket-build-slot itself.
+  android_slots_write_hook || fail "could not write $ANDROID_SLOTS_INIT_SCRIPT"
+  ok "ANDROID_HOME, JAVA_HOME and aapt2 set for every session, builds take turns"
   printf '[done]\n'
 }
 
@@ -1101,6 +1122,7 @@ step_android_remove_files() {
   pkill -f KotlinCompileDaemon 2>/dev/null || true
   # The NDK tool sits on top of this one, so it goes with it (decision 50), and so does the Gradle hook it owns.
   android_ndk_remove
+  rm -f "$ANDROID_SLOTS_INIT_SCRIPT"
   android_ndk_remove_hook
   rm -rf "$ANDROID_SDK_DIR"; rmdir "$PREFIX/opt" 2>/dev/null || true
   rm -f "$ANDROID_PROFILE"

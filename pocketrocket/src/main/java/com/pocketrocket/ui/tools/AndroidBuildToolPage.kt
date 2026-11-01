@@ -74,6 +74,9 @@ fun AndroidBuildToolPage(onBack: () -> Unit) {
             ToolCard("HOW TO BUILD") {
                 ToolText("In a terminal or a Claude session, run gradle assembleDebug or ./gradlew assembleDebug in your project. JAVA_HOME, ANDROID_HOME and the aapt2 setting are already there. New terminals and sessions pick them up.")
             }
+            ToolCard("BUILDS TAKE TURNS") {
+                ToolText("So the phone keeps enough memory, only a few builds run at once, from any session or terminal; the rest wait their turn. Gradle gets a heap sized for this phone and compiles Kotlin in its own process. The session's Background sheet shows what is building and waiting.")
+            }
             ToolDetails(label = "DETAILS", rows = listOf("SDK" to "Android 17 (API 37), build tools 36"))
             ToolCard("NOT INCLUDED") { ToolText(NO_NDK) }
         } else {

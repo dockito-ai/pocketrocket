@@ -261,6 +261,17 @@ pr_fvm() {
   return "$rc"
 }
 
+# pr_compiles <arguments>: the flutter or dart command builds or analyses code, so it waits for a build slot (decision
+# 97). pub, doctor, --version and the like never wait. Checks (analyze, test) take a slot only while they run.
+pr_compiles() {
+  local a sub=""
+  for a in "$@"; do case "$a" in -*) ;; *) sub="$a"; break ;; esac; done
+  case "$PR_NAME:$sub" in
+    flutter:build|flutter:run|flutter:test|flutter:drive|flutter:analyze|dart:compile|dart:test|dart:analyze) return 0 ;;
+  esac
+  return 1
+}
+
 # pr_flutter <arguments>: flutter or dart, from the pinned or default version.
 pr_flutter() {
   local root rc=0 head=""
@@ -298,8 +309,12 @@ pr_flutter() {
   fi
 
   # Not exec: Flutter may download engine tools during this run and start them at once, before they are
-  # prepared. Afterwards they are, and the next run works.
-  "$PR_BASH" "$root/bin/$PR_NAME" "$@" || rc=$?
+  # prepared. Afterwards they are, and the next run works. Commands that compile take a build slot (decision 97).
+  local slot=()
+  if pr_compiles "$@" && [ -x "$PREFIX/bin/pocketrocket-build-slot" ]; then
+    slot=("$PREFIX/bin/pocketrocket-build-slot" run "$PR_NAME $*" --)
+  fi
+  "${slot[@]}" "$PR_BASH" "$root/bin/$PR_NAME" "$@" || rc=$?
   if [ -n "$head" ] && [ "$rc" != 0 ] && [ "$(git -C "$root" rev-parse HEAD 2>/dev/null)" != "$head" ]; then
     # The checkout moved, then Flutter's second half (bin/flutter started from Dart) failed: finish it here.
     pr_say "Setting up the new Flutter for this phone"
