@@ -15,6 +15,7 @@ endorsement or affiliation.
 | Node.js and npm | `ic_tool_nodedotjs.xml` | Simple Icons 16.36.0, `nodedotjs` | `#5FA04E` | CC0 1.0 (Simple Icons) |
 | Dockito | `ic_tool_dockito.xml` | The "d" mark in the header of [dockito.ai](https://dockito.ai), redrawn as a vector | `#1A6DFF` | Dockito's own mark, used with Shankar's go-ahead |
 | Headless Chrome | `ic_tool_googlechrome.xml` | Simple Icons 16.36.0, `googlechrome` | `#4285F4` | CC0 1.0 (Simple Icons) |
+| C and C++ | `ic_tool_cplusplus.xml` | Simple Icons 16.36.0, `cplusplus` | `#00599C` | CC0 1.0 (Simple Icons); the C++ logo is the Standard C++ Foundation's |
 | Android, Android NDK | `ic_tool_android.xml` | Simple Icons 16.36.0, `android` | `#3DDC84` | CC BY 3.0 (Google, per Simple Icons) |
 | Wrangler | `ic_tool_cloudflareworkers.xml` | Simple Icons 16.36.0, `cloudflareworkers` | `#F38020` | CC0 1.0 (Simple Icons) |
 | Flutter & Dart | `ic_tool_flutter.xml` | Simple Icons 16.36.0, `flutter` | `#02569B` | CC0 1.0 (Simple Icons) |
