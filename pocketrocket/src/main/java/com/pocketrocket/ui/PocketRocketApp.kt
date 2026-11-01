@@ -43,6 +43,7 @@ import com.pocketrocket.ui.settings.UsageScreen
 import androidx.compose.runtime.CompositionLocalProvider
 import com.pocketrocket.ui.tools.AndroidBuildToolPage
 import com.pocketrocket.ui.tools.AndroidNdkToolPage
+import com.pocketrocket.ui.tools.CppToolPage
 import com.pocketrocket.ui.tools.FlutterToolPage
 import com.pocketrocket.ui.tools.GitToolPage
 import com.pocketrocket.ui.tools.RustToolPage
@@ -188,7 +189,8 @@ fun PocketRocketApp(startScreen: AppScreen, onOpenTerminal: () -> Unit, showSess
             r == Routes.TOOL_DOCKITO -> DockitoToolPage(onBack = ::pop)
             r == Routes.TOOL_CHROMIUM -> ChromiumToolPage(onBack = ::pop)
             r == Routes.TOOL_ANDROID_BUILD -> AndroidBuildToolPage(onBack = ::pop)
-            r == Routes.TOOL_ANDROID_NDK -> AndroidNdkToolPage(onBack = ::pop, onOpenAndroid = { push(Routes.TOOL_ANDROID_BUILD) })
+            r == Routes.TOOL_ANDROID_NDK -> AndroidNdkToolPage(onBack = ::pop, onOpenAndroid = { push(Routes.TOOL_ANDROID_BUILD) }, onOpenCpp = { push(Routes.TOOL_CPP) })
+            r == Routes.TOOL_CPP -> CppToolPage(onBack = ::pop, onOpenNdk = { push(Routes.TOOL_ANDROID_NDK) })
             r == Routes.TOOL_WRANGLER -> WranglerToolPage(onBack = ::pop)
             r == Routes.TOOL_FLUTTER -> FlutterToolPage(onBack = ::pop, onOpenRust = { push(Routes.TOOL_RUST) })
             r == Routes.TOOL_RUST -> RustToolPage(onBack = ::pop)
