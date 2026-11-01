@@ -57,13 +57,80 @@ Phones are powerful enough now: the one we build on has 16 GB of RAM and 512 GB 
 - Ask out loud what your sessions are doing, approve or deny a request, or start new work. Rocket answers from the app's real state and hands bigger jobs to Claude Code. Sensitive actions need your fingerprint every time. "Hey Rocket" is off unless you turn it on.
 
 ### Tools
-- **Included:** Claude Code, git, gh, Node.js and npm.
-- **Add-ons**, installed from Settings → Tools when you want them: Headless Chrome (so Claude can open and test the pages it builds), Android SDK builds, Android NDK, C and C++, Flutter & Dart (with FVM), Rust, and Cloudflare Wrangler with local dev. Nothing is bundled. Each add-on is downloaded when you install it, and you can remove it later.
-- **A raw terminal** whenever you want one. It's still Termux underneath, so `pkg install` works.
+
+Open Settings → Tools. Four are already there after first run. The rest install when you tap them, and you can remove them later. Nothing extra is inside the APK: each add-on is downloaded when you install it. A terminal and a Claude session can both use whatever is installed.
+
+First run also installs the GitHub CLI (`gh`), OpenSSH, ripgrep, jq, curl and Zellij. They have no tile of their own.
+
+Settings → Updates keeps the tools that can move current. Android, the Android NDK, and C and C++ move only when the app does. The logos are the same marks the app shows. They belong to their owners; see `docs/third-party-icons.md`.
+
+#### Comes with the app
+
+<table>
+  <tr>
+    <td align="center" width="25%"><img src="docs/tool-icons/claude.svg" width="48" height="48" alt="Claude Code"><br><b>Claude Code</b><br><sub>The real CLI. The chat drives it, and you can update it or roll a release back.</sub></td>
+    <td align="center" width="25%"><img src="docs/tool-icons/git.svg" width="48" height="48" alt="Git"><br><b>Git</b><br><sub>Clone, commit, branch and push. The Git screens and worktrees use it too.</sub></td>
+    <td align="center" width="25%"><img src="docs/tool-icons/node.svg" width="48" height="48" alt="Node.js and npm"><br><b>Node.js and npm</b><br><sub>Run JavaScript and install packages. Wrangler and Headless Chrome's server sit on it.</sub></td>
+    <td align="center" width="25%"><img src="docs/tool-icons/dockito.svg" width="48" height="48" alt="Dockito"><br><b>Dockito</b><br><sub>Publish and share docs from the phone. Each Claude account gets its skill.</sub></td>
+  </tr>
+</table>
+
+#### Languages and runtimes
+
+<table>
+  <tr>
+    <td align="center" width="25%"><img src="docs/tool-icons/python.svg" width="48" height="48" alt="Python"><br><b>Python</b><br><sub>python3, pip and uv. uv uses this Python and never downloads its own.</sub></td>
+    <td align="center" width="25%"><img src="docs/tool-icons/bun.svg" width="48" height="48" alt="Bun"><br><b>Bun</b><br><sub>bun run, bun install and bun test.</sub></td>
+    <td align="center" width="25%"><img src="docs/tool-icons/go.svg" width="48" height="48" alt="Go"><br><b>Go</b><br><sub>go build, go run, go test and go mod.</sub></td>
+    <td align="center" width="25%"><img src="docs/tool-icons/deno.svg" width="48" height="48" alt="Deno"><br><b>Deno</b><br><sub>deno run, deno test and deno fmt, including npm and jsr imports.</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/tool-icons/ruby.svg" width="48" height="48" alt="Ruby"><br><b>Ruby</b><br><sub>ruby, gem and bundle. Gems load with a plain require.</sub></td>
+    <td align="center"><img src="docs/tool-icons/php.svg" width="48" height="48" alt="PHP"><br><b>PHP</b><br><sub>Run scripts, or php -S to serve a folder on the phone.</sub></td>
+    <td align="center"><img src="docs/tool-icons/java.svg" width="48" height="48" alt="Java and Kotlin"><br><b>Java and Kotlin</b><br><sub>Java 17, 21 and 25 side by side, plus Kotlin. Java 17 stays the default.</sub></td>
+    <td align="center"><img src="docs/tool-icons/rust.svg" width="48" height="48" alt="Rust"><br><b>Rust</b><br><sub>cargo check and clippy, and a wasm target you can add. Release builds stay off the phone.</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/tool-icons/flutter.svg" width="48" height="48" alt="Flutter and Dart"><br><b>Flutter &amp; Dart</b><br><sub>Check Dart code, keep more than one Flutter version, and build a debug APK once Android and C and C++ are installed.</sub></td>
+    <td align="center"><img src="docs/tool-icons/cpp.svg" width="48" height="48" alt="C and C++"><br><b>C and C++</b><br><sub>Compile and run C and C++ with clang, CMake, Ninja, make and lldb.</sub></td>
+    <td></td>
+    <td></td>
+  </tr>
+</table>
+
+#### Android apps
+
+<table>
+  <tr>
+    <td align="center" width="25%"><img src="docs/tool-icons/android.svg" width="48" height="48" alt="Android"><br><b>Android</b><br><sub>Build Kotlin and Compose apps with Gradle. There is no emulator on the phone.</sub></td>
+    <td align="center" width="25%"><img src="docs/tool-icons/android.svg" width="48" height="48" alt="Android NDK"><br><b>Android NDK</b><br><sub>C and C++ inside Android apps, through CMake or ndk-build, for four ABIs. Only arm64 runs on the phone.</sub></td>
+    <td></td>
+    <td></td>
+  </tr>
+</table>
+
+#### Pages, deploy and the cloud
+
+<table>
+  <tr>
+    <td align="center" width="25%"><img src="docs/tool-icons/chrome.svg" width="48" height="48" alt="Headless Chrome"><br><b>Headless Chrome</b><br><sub>Claude opens the pages it builds, takes screenshots and reads console and network errors.</sub></td>
+    <td align="center" width="25%"><img src="docs/tool-icons/wrangler.svg" width="48" height="48" alt="Wrangler"><br><b>Wrangler</b><br><sub>wrangler dev on the phone, and wrangler deploy to Cloudflare. Its version moves only when the app does.</sub></td>
+    <td align="center" width="25%"><img src="docs/tool-icons/vercel.svg" width="48" height="48" alt="Vercel CLI"><br><b>Vercel CLI</b><br><sub>Preview and production deploys, and vercel dev on the phone. Log in opens Vercel.</sub></td>
+    <td align="center" width="25%"><img src="docs/tool-icons/netlify.svg" width="48" height="48" alt="Netlify CLI"><br><b>Netlify CLI</b><br><sub>A draft deploy, or netlify deploy --prod to publish. Log in opens Netlify.</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/tool-icons/firebase.svg" width="48" height="48" alt="Firebase CLI"><br><b>Firebase CLI</b><br><sub>firebase init, then firebase deploy. Log in opens Google and gives you a code to paste back.</sub></td>
+    <td align="center"><img src="docs/tool-icons/aws.svg" width="48" height="48" alt="AWS CLI"><br><b>AWS CLI</b><br><sub>The AWS CLI v2, including S3 and Lambda. Log in opens the AWS console.</sub></td>
+    <td align="center"><img src="docs/tool-icons/fly.svg" width="48" height="48" alt="flyctl"><br><b>flyctl</b><br><sub>Launch, deploy and read logs on Fly.io. Builds run on Fly's builders, not on the phone.</sub></td>
+    <td></td>
+  </tr>
+</table>
+
+A raw terminal is there whenever you want one. It's still Termux underneath, so `pkg install` works.
 
 ### Keeping it alive
 - **Health screen.** Android loves to kill background apps. Health checks every battery, autostart, permission and setup setting that can stop a session in your pocket, and each one has a Fix button. It also shows when and why Android last stopped the app.
-- **Usage, Updates, Backup.** See storage, RAM and battery use per session. Update Claude Code and the app from Settings, and roll Claude Code back if a release misbehaves. Back up your setup to one file and restore it after a reinstall.
+- **Usage, Updates, Backup.** See storage, RAM and battery use per session. Settings → Updates keeps the app, Claude Code and the tools that can move current, and you can roll Claude Code back if a release misbehaves. Back up your setup to one file and restore it after a reinstall.
 
 ## How it works
 
@@ -111,4 +178,4 @@ Bug reports and ideas are welcome in [Issues](../../issues). It's an experimenta
 - **The glibc launcher.** The way Claude Code's glibc binary runs on Termux comes from [claude-code-android](https://github.com/ferrumclaudepilgrim/claude-code-android) (MIT); see `setup/NOTICE`.
 - **Claude Code** is Anthropic's software, downloaded from Anthropic at first run under their terms.
 
-PocketRocket is made by Dockito Labs. It is not affiliated with Anthropic, Google, Cloudflare or the Termux project.
+PocketRocket is made by Dockito Labs. It is not affiliated with Anthropic, Google, Cloudflare or the Termux project. The tool logos are their owners' marks, used only to name the tool.

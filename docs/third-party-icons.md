@@ -6,7 +6,7 @@ single-colour mark, tinted with the brand's colour and lightened or darkened onl
 dark and light themes.
 
 The logos are trademarks of their owners. PocketRocket uses them only to name the tool they stand for; it implies no
-endorsement or affiliation.
+endorsement or affiliation. The README shows the same marks, on a light tile, from `docs/tool-icons/`.
 
 | Tool | File | Source | Brand colour | Licence of the icon |
 |---|---|---|---|---|
