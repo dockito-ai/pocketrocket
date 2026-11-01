@@ -54,6 +54,10 @@ class AndroidBuildTest {
         val added = file.readText()
         assertEquals(1, Regex("aapt2FromMavenOverride=/p/bin/aapt2").findAll(added).count())
         assertTrue(added.startsWith("org.gradle.parallel=true"))
+        // Memory caps from the phone's RAM (decision 97); this file wins over the project's own.
+        assertTrue(added, Regex("(?m)^org\\.gradle\\.jvmargs=-Xmx(1024|1280|1536|1792|2048)m -XX:MaxMetaspaceSize=512m").containsMatchIn(added))
+        assertTrue(added.contains("\n${AndroidBuildTool.LIMITS_SETTING}2\n"))
+        assertTrue(added.contains("\nkotlin.compiler.execution.strategy=in-process\n"))
         assertEquals(0, shell("android_gradle_props_remove \"$1\"", file.path).first)
         assertEquals("org.gradle.parallel=true\n", file.readText())
     }
@@ -113,86 +117,6 @@ class AndroidBuildTest {
         assertEquals(0, shell("verify_sha1 \"$1\" \"$2\"", file.path, right).first)
         assertNotEquals(0, shell("verify_sha1 \"$1\" \"$2\"", file.path, "0".repeat(40)).first)
         assertNotEquals(0, shell("verify_sha1 \"$1\" \"$2\"", "/no/such/file", right).first)
-    }
-
-    private val ndkVersions: List<String>
-        get() = shell("printf %s \"\$ANDROID_NDK_VERSIONS\"").second.trim().split(" ")
-
-    /** Runs [code] with the script's SDK folder pointed at a temp folder, then hands that folder to [check]. */
-    private fun withSdk(code: String, check: (File, Pair<Int, String>) -> Unit) {
-        val dir = File.createTempFile("sdk", "").apply { delete(); mkdirs() }
-        try {
-            val sdk = File(dir, "android-sdk")
-            val vars = "PREFIX=/tmp/pr-none; ANDROID_SDK_DIR=\"$1\"; ANDROID_NDK_DIR=\"$1/ndk\"; ANDROID_NDK_SHIM_DIR=\"$1/ndk-shim\"; ANDROID_CMAKE_DIR=\"$1/cmake\"; "
-            check(sdk, shell(vars + code, sdk.path))
-        } finally {
-            dir.deleteRecursively()
-        }
-    }
-
-    @Test fun eachNdkVersionFolderClaimsItsOwnRevisionOverOneShim() {
-        if (!script.exists()) return
-        val versions = ndkVersions
-        assertTrue(versions.toString(), "28.2.13676358" in versions && versions.size >= 2)
-        withSdk("android_ndk_make_shim") { sdk, (code, out) ->
-            assertEquals(out, 0, code)
-            versions.forEach { v ->
-                val folder = File(sdk, "ndk/$v")
-                assertTrue(File(folder, "source.properties").readText().contains("Pkg.Revision = $v\n"))
-                listOf("meta", "build", "toolchains").forEach { link ->
-                    assertEquals(File(sdk, "ndk-shim/$link").path, java.nio.file.Files.readSymbolicLink(File(folder, link).toPath()).toString())
-                }
-            }
-            assertTrue(File(sdk, "ndk-shim/build/cmake/android.toolchain.cmake").isFile)
-            assertTrue(File(sdk, "cmake/3.22.1/source.properties").readText().contains("Pkg.Revision = 3.22.1\n"))
-        }
-    }
-
-    @Test fun removingNdkFoldersLeavesTheRestOfTheSdk() {
-        if (!script.exists()) return
-        withSdk("mkdir -p \"$1/platforms\"; android_ndk_make_shim; android_ndk_remove_folders") { sdk, (code, out) ->
-            assertEquals(out, 0, code)
-            assertEquals(listOf("platforms"), sdk.list()!!.toList())
-        }
-    }
-
-    @Test fun toolchainDefaultsTheSharedStlAndRefusesStatic() {
-        if (!script.exists()) return
-        val file = File.createTempFile("toolchain", ".cmake").apply { deleteOnExit() }
-        assertEquals(0, shell("android_ndk_write_toolchain \"$1\"", file.path).first)
-        val text = file.readText()
-        assertTrue(Regex("if\\(NOT ANDROID_STL\\)\\s+set\\(ANDROID_STL c\\+\\+_shared\\)").containsMatchIn(text))
-        assertTrue(text.contains("Set -DANDROID_STL=c++_shared"))
-        assertTrue(text.contains("builds arm64-v8a only"))
-    }
-
-    @Test fun gradleInitScriptNamesEveryServedVersion() {
-        if (!script.exists()) return
-        val file = File.createTempFile("init", ".gradle").apply { deleteOnExit() }
-        assertEquals(0, shell("android_ndk_write_init_script \"$1\"", file.path).first)
-        val text = file.readText()
-        assertTrue(text.contains("def served = \"${ndkVersions.joinToString(" ")}\""))
-        // Gradle runs the plugin's hook even after a throw, so the version must move first or the plugin downloads Google's NDK.
-        assertTrue(text.indexOf("android.ndkVersion = served.last()") in 0 until text.indexOf("does not serve NDK"))
-        assertTrue(text.contains("arguments.add(\"-DANDROID_STL=c++_shared\")"))
-    }
-
-    @Test fun scriptRefusesTheNdkWithoutTheAndroidTool() {
-        if (!script.exists()) return
-        val (code, out) = shell("PR_LOG=/dev/null TOTAL_STEPS=3; step_android_ndk_packages")
-        assertNotEquals(0, code)
-        assertTrue(out, out.contains("Install the Android tool first"))
-    }
-
-    @Test fun uninstallingAndroidTakesTheNdkToolWithIt() {
-        if (!script.exists()) return
-        val body = script.readText().substringAfter("step_android_remove_files() {").substringBefore("\n}\n")
-        assertTrue(body, body.indexOf("android_ndk_remove") in 0 until body.indexOf("ANDROID_SDK_DIR"))
-    }
-
-    @Test fun pageListsVersionFoldersNewestFirstAndOnlyThose() {
-        assertEquals(listOf("28.2.13676358", "25.1.8937393"), AndroidNdkTool.servedVersions(listOf("25.1.8937393", ".hidden", "28.2.13676358")))
-        assertEquals(emptyList<String>(), AndroidNdkTool.servedVersions(emptyList()))
     }
 
     @Test fun scriptRefusesTheSdkWithoutAcceptance() {

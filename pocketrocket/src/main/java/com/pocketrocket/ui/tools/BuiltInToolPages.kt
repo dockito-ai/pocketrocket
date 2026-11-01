@@ -17,7 +17,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Settings → Tools → Node.js and npm: built in (first-run setup installs nodejs-lts); its versions and size, and Update
- * through Updates (decision 102).
+ * through Updates (decision 103).
  */
 @Composable
 fun NodeToolPage(onBack: () -> Unit) {

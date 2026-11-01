@@ -34,7 +34,8 @@
 #                     (0.0.1-beta.27 or newer),
 #                     POCKETROCKET_DOCKITO_URL and POCKETROCKET_DOCKITO_SHA256.
 #   --only android-build / android-build-remove  the optional Android build tool, Settings > Tools (decision 45)
-#   --only android-ndk / android-ndk-remove  the optional Android NDK tool, on top of it (decision 50)
+#   --only android-ndk / android-ndk-remove  the optional Android NDK tool, on top of it and C and C++ (decisions 50, 96)
+#   --only c-cpp / c-cpp-remove  the optional C and C++ tool: Termux's compilers and build tools (decision 96)
 #   --only wrangler / wrangler-remove  the optional Wrangler tool, Settings > Tools (decisions 49, 82)
 #   --only flutter-rust / flutter-rust-remove  the optional Flutter & Rust tool, all of it (decision 75)
 #   --only flutter [version]  add a Flutter version (newest stable by default; POCKETROCKET_FLUTTER_VERSION
@@ -49,12 +50,15 @@
 #                     uninstall signs out first and removes ~/.aws or ~/.fly; awscli-check/-update, flyctl-check/-update
 #   --only vercel, netlify, firebase (and -remove)  the npm deploy CLIs (decision 98): npm install -g, 2 steps; uninstall
 #                     signs out and removes their config
+#   --only java-17, java-21, java-25, kotlin (and <name>-remove; java-17-remove keeps Java 17)  one JDK or Kotlin on
+#                     its own, from the Java page; java-setup only does the setup (Repair). Every Java job leaves Gradle
+#                     a list of the JDKs on the phone (decision 101)
 #   --only vercel-check / netlify-check / firebase-check  print `npm view <package> version` for the Updates screen; no
-#                     steps, no lock, no [done] (decision 102)
+#                     steps, no lock, no [done] (decision 103)
 #   --only vercel-update / netlify-update / firebase-update  `npm install -g <package>@latest` with the install's
 #                     progress; 2 steps
 #   --only nodejs-lts-check / chromium-check, and the same with -update: Node.js and npm, and Headless Chrome's Chromium,
-#                     as below (decision 102)
+#                     as below (decision 103)
 #   --only golang-check / deno-check / ruby-check / php-check / openjdk-21-check, and the same with -update: as below
 #   --only git-check / rust-check / python-check / bun-check  refresh the package index and print `apt-cache policy <package>` (its
 #                     Installed and Candidate lines) for the Updates screen; no steps, no lock, no [done]
@@ -940,7 +944,7 @@ step_chromium_mcp_remove() {
 }
 
 # What Chromium and its MCP server leave in the home folder (profiles, caches, the server's state), removed with them
-# (decision 101). The one list; the tests read it.
+# (decision 102). The one list; the tests read it.
 chromium_leftovers() {
   local config="${XDG_CONFIG_HOME:-$HOME/.config}" cache="${XDG_CACHE_HOME:-$HOME/.cache}"
   printf '%s\n' "$config/chromium" "$cache/chromium" "$cache/chrome-devtools-mcp" "$config/configstore/update-notifier-chrome-devtools-mcp.json"
@@ -958,7 +962,7 @@ chromium_remove_leftovers() {
 # cmdline-tools 16111833 it hands off to an x86_64 binary that cannot run here. So the script writes the package.xml
 # sdkmanager would have, and the Android Gradle Plugin treats the packages as installed.
 ANDROID_BUILD_PACKAGES="openjdk-17 gradle aapt2 aapt aidl android-tools unzip"
-ANDROID_SDK_DIR="${PREFIX:-}/opt/android-sdk"
+ANDROID_SDK_DIR="${POCKETROCKET_ANDROID_SDK_DIR:-${PREFIX:-}/opt/android-sdk}" # the knob is for tests into a scratch folder
 ANDROID_JAVA_HOME="${PREFIX:-}/lib/jvm/java-17-openjdk"
 ANDROID_PLATFORM=android-37.0
 ANDROID_PLATFORM_ZIP=platform-37.0_r02.zip
@@ -1007,6 +1011,26 @@ android_package_xml() {
 EOF
 }
 
+# gradle_props_set <gradle.properties> <key> <value>: one key, replaced where it is (later copies go) or added at the
+# end; every other line stays as it was. For any tool that writes ~/.gradle/gradle.properties.
+gradle_props_set() {
+  mkdir -p "$(dirname "$1")"
+  [ -f "$1" ] || : >"$1"
+  awk -v k="$2" -v v="$3" '
+    { t = $0; sub(/^[ \t]+/, "", t) }
+    index(t, k) == 1 && substr(t, length(k) + 1) ~ /^[ \t]*[=:]/ { if (!done) print k "=" v; done = 1; next }
+    { print }
+    END { if (!done) print k "=" v }' "$1" >"$1.prtmp" && mv -f "$1.prtmp" "$1"
+}
+
+# gradle_props_unset <gradle.properties> <key>: takes the key out; deletes the file if nothing else is left.
+gradle_props_unset() {
+  [ -f "$1" ] || return 0
+  awk -v k="$2" '{ t = $0; sub(/^[ \t]+/, "", t) } index(t, k) == 1 && substr(t, length(k) + 1) ~ /^[ \t]*[=:]/ { next } { print }' \
+    "$1" >"$1.prtmp" && mv -f "$1.prtmp" "$1"
+  if ! grep -q '[^[:space:]]' "$1"; then rm -f "$1"; fi
+}
+
 # android_gradle_props_remove <gradle.properties>: takes out only our block; deletes the file if nothing else is left.
 android_gradle_props_remove() {
   [ -f "$1" ] || return 0
@@ -1017,11 +1041,30 @@ android_gradle_props_remove() {
 
 # android_gradle_props_add <gradle.properties> <aapt2 path>: the plugin's own aapt2 is x86_64, so point it at Termux's.
 # A daemon idles for 3 hours by default, holding over 1 GB; on a phone it goes after 10 minutes.
+# Memory caps sized from the phone's RAM (decision 97): this file wins over a project's gradle.properties, so a project
+# asking for -Xmx4g gets a quarter of its build slot's share (1536 MB on a 12 GB phone), two workers, and Kotlin
+# compiled inside Gradle's own JVM instead of a second daemon.
 android_gradle_props_add() {
+  local heap
+  heap="$(bash "$(dirname "${BASH_SOURCE[0]}")/pocketrocket-build-slot" config 2>/dev/null | sed -n 's/^heap_mb=//p')"
+  case "$heap" in ''|*[!0-9]*) heap=1536 ;; esac
   android_gradle_props_remove "$1"
   mkdir -p "$(dirname "$1")"
   printf '%s\n' "$ANDROID_GRADLE_BEGIN" "android.aapt2FromMavenOverride=$2" \
-    "org.gradle.daemon.idletimeout=600000" "$ANDROID_GRADLE_END" >>"$1"
+    "org.gradle.daemon.idletimeout=600000" \
+    "org.gradle.jvmargs=-Xmx${heap}m -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8" \
+    "org.gradle.workers.max=2" \
+    "kotlin.compiler.execution.strategy=in-process" "$ANDROID_GRADLE_END" >>"$1"
+}
+
+# The build-slot Gradle hook (decision 97), from the template beside this script; the app refreshes the same file at
+# every start (BuildSlots.kt) and removes it once the Android tool is gone.
+ANDROID_SLOTS_INIT_SCRIPT="$HOME/.gradle/init.d/pocketrocket-build-slots.gradle"
+android_slots_write_hook() {
+  local tmp="$ANDROID_SLOTS_INIT_SCRIPT.tmp"
+  mkdir -p "$(dirname "$ANDROID_SLOTS_INIT_SCRIPT")"
+  sed -e "s|@POCKETROCKET_BUILD_SLOT@|$PREFIX/bin/pocketrocket-build-slot|g" \
+    "$(dirname "${BASH_SOURCE[0]}")/pocketrocket-build-slots.gradle" >"$tmp" && mv -f "$tmp" "$ANDROID_SLOTS_INIT_SCRIPT"
 }
 
 # android_installed_packages: packages really installed. `dpkg-query -W` alone also lists removed ones that kept their
@@ -1106,7 +1149,12 @@ step_android_wire() {
   mkdir -p "$(dirname "$ANDROID_PROFILE")"
   printf '%s\n' "# Written by PocketRocket's Android build tool. Removed on uninstall." \
     "export JAVA_HOME=$ANDROID_JAVA_HOME" "export ANDROID_HOME=$ANDROID_SDK_DIR" >"$ANDROID_PROFILE"
-  ok "ANDROID_HOME, JAVA_HOME and aapt2 set for every session"
+  # The Gradle hook ships with this tool too (decision 96): without the NDK, native tasks fail plainly instead of the
+  # plugin downloading Google's x86_64 NDK, and Kotlin, Java and unit tests still run.
+  android_ndk_write_hook
+  # Builds take turns in the phone's build slots (decision 97); the app installs pocketrocket-build-slot itself.
+  android_slots_write_hook || fail "could not write $ANDROID_SLOTS_INIT_SCRIPT"
+  ok "ANDROID_HOME, JAVA_HOME and aapt2 set for every session, builds take turns"
   printf '[done]\n'
 }
 
@@ -1115,8 +1163,10 @@ step_android_remove_files() {
   # A running daemon would keep writing into the folders about to go.
   pkill -f GradleDaemon 2>/dev/null || true
   pkill -f KotlinCompileDaemon 2>/dev/null || true
-  # The NDK tool sits on top of this one, so it goes with it (decision 50).
+  # The NDK tool sits on top of this one, so it goes with it (decision 50), and so does the Gradle hook it owns.
   android_ndk_remove
+  rm -f "$ANDROID_SLOTS_INIT_SCRIPT"
+  android_ndk_remove_hook
   rm -rf "$ANDROID_SDK_DIR"; rmdir "$PREFIX/opt" 2>/dev/null || true
   rm -f "$ANDROID_PROFILE"
   android_gradle_props_remove "$HOME/.gradle/gradle.properties"
@@ -1166,206 +1216,160 @@ step_android_remove_packages() {
   printf '[done]\n'
 }
 
-# Android NDK, an optional tool on top of Android build (decision 50, docs/android-build.md). Google publishes no arm64
-# NDK, so Termux's clang, cmake, ninja and ndk-sysroot sit behind folders laid out the way the Android Gradle Plugin
-# expects. There is one shim; each version below is a folder that only claims that revision, so a project's ndkVersion
-# or its plugin's default is accepted. Every version is the same Termux compiler. docs/android-ndk-spike.md has the why.
-ANDROID_NDK_PACKAGES="clang cmake ninja ndk-sysroot"
-# The default NDK of each plugin: 8.0-8.3, 8.4-8.6, 8.7-8.13, 9.0-9.5. The one list of versions; the page reads the folders.
+# C and C++, an optional tool for any C or C++ project (decision 96, docs/android-build.md): Termux's compilers and build
+# tools. A package tool like Python and Bun (pkg_tool_* below; the app reads dpkg, CppTool.PACKAGES), with one twist:
+# the Android NDK tool builds on it, so removing C and C++ removes the NDK first.
+CPP_PACKAGES="clang lld llvm cmake ninja make pkg-config lldb"
+CPP_ADDED_FILE="$PR_HOME/c-cpp.packages"   # what its install brought in (pkg_tool_purge's list)
+
+# Every package is there, whoever installed it: the NDK install skips its C and C++ step.
+cpp_complete() {
+  # shellcheck disable=SC2086
+  [ -z "$(missing_packages $CPP_PACKAGES)" ]
+}
+
+step_cpp_install() { step_pkg_tool_install c-cpp; }
+
+step_cpp_remove() {
+  if android_ndk_present; then
+    step "Removing the Android NDK"
+    android_ndk_remove
+    ok "Android NDK removed"
+  fi
+  step_pkg_tool_remove c-cpp
+}
+
+# Android NDK, an optional tool on top of Android build and C and C++ (decisions 50 and 96, docs/android-build.md).
+# Google publishes no arm64 NDK, so the shim built by android-ndk.sh (beside this script) stands in: Termux's clang
+# behind folders laid out the way the Android Gradle Plugin expects, Google's ndk-build from AOSP, and four ABIs from
+# Termux's ndk-multilib. Each version below is a folder that only claims that revision, for builds that look the NDK
+# up by version without the Gradle hook; with the hook any ndkVersion goes to the shim. docs/android-ndk-gaps-spike.md.
+# shellcheck source=android-ndk.sh
+. "$(dirname "${BASH_SOURCE[0]}")/android-ndk.sh"
+# The default NDK of each plugin: 8.0-8.3, 8.4-8.6, 8.7-8.13, 9.0-9.5.
 ANDROID_NDK_VERSIONS="25.1.8937393 26.1.10909125 27.0.12077973 28.2.13676358"
 ANDROID_CMAKE_VERSION=3.22.1 # The plugin's default. Without this folder it would download Google's x86_64 CMake.
 ANDROID_NDK_DIR="$ANDROID_SDK_DIR/ndk"
 ANDROID_NDK_SHIM_DIR="$ANDROID_SDK_DIR/ndk-shim"
+ANDROID_NDK_PLACEHOLDER_DIR="$ANDROID_SDK_DIR/ndk-placeholder" # the Gradle hook's stand-in while no NDK is installed
 ANDROID_CMAKE_DIR="$ANDROID_SDK_DIR/cmake"
+# Installs before decision 96 brought the compilers in themselves and listed them here; C and C++ takes them over.
 ANDROID_NDK_ADDED_FILE="$PR_HOME/android-ndk.packages"
-ANDROID_NDK_BASELINE_FILE="$PR_HOME/android-ndk.baseline"
+ANDROID_NDK_WORK="${TMPDIR:-/tmp}/pocketrocket-ndk"
+# The Gradle hook. The Android tool writes it and owns it (with no NDK it fails native tasks plainly and keeps the
+# plugin from downloading Google's NDK); the NDK tool writes the same file, which then finds the shim.
 ANDROID_NDK_INIT_SCRIPT="$HOME/.gradle/init.d/pocketrocket-android-ndk.gradle"
 
-android_ndk_write_toolchain() {
-  cat >"$1" <<'EOF'
-# Written by PocketRocket's Android NDK tool. Stands in for the NDK's toolchain file: arm64-v8a only, on an arm64 Android host.
-get_filename_component(_NDK "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
-set(_TC "${_NDK}/toolchains/llvm/prebuilt/linux-x86_64")
+android_ndk_present() { [ -d "$ANDROID_NDK_SHIM_DIR" ] || [ -d "$ANDROID_NDK_SHIM_DIR.new" ] || [ -d "$ANDROID_NDK_DIR" ] || [ -f "$ANDROID_NDK_ADDED_FILE" ]; }
 
-if(NOT ANDROID_ABI)
-  set(ANDROID_ABI arm64-v8a)
-endif()
-if(NOT ANDROID_ABI STREQUAL "arm64-v8a")
-  message(FATAL_ERROR "PocketRocket's Android NDK tool builds arm64-v8a only; ${ANDROID_ABI} cannot be built on the phone.")
-endif()
-if(NOT ANDROID_PLATFORM)
-  set(ANDROID_PLATFORM android-24)
-endif()
-string(REPLACE "android-" "" _API "${ANDROID_PLATFORM}")
-if(NOT ANDROID_STL)
-  set(ANDROID_STL c++_shared)
-endif()
-if(ANDROID_STL STREQUAL "c++_static")
-  message(FATAL_ERROR "Termux ships no static libc++ (libc++_static.a). Set -DANDROID_STL=c++_shared in externalNativeBuild.")
-endif()
-
-set(ANDROID TRUE)
-set(CMAKE_SYSTEM_NAME Android)
-set(CMAKE_SYSTEM_VERSION ${_API})
-set(CMAKE_SYSTEM_PROCESSOR aarch64)
-set(CMAKE_ANDROID_ARCH_ABI arm64-v8a)
-set(ANDROID_NDK "${_NDK}")
-
-set(CMAKE_C_COMPILER "${_TC}/bin/clang")
-set(CMAKE_CXX_COMPILER "${_TC}/bin/clang++")
-set(CMAKE_C_COMPILER_TARGET aarch64-none-linux-android${_API})
-set(CMAKE_CXX_COMPILER_TARGET aarch64-none-linux-android${_API})
-set(CMAKE_AR "${_TC}/bin/llvm-ar" CACHE FILEPATH "")
-set(CMAKE_RANLIB "${_TC}/bin/llvm-ranlib" CACHE FILEPATH "")
-set(CMAKE_STRIP "${_TC}/bin/llvm-strip" CACHE FILEPATH "")
-set(CMAKE_SYSROOT "${_TC}/sysroot")
-
-set(CMAKE_FIND_ROOT_PATH "${_TC}/sysroot")
-set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
-set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
-set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
-set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
-
-set(_F "-DANDROID -fPIC -ffunction-sections -fdata-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security")
-set(CMAKE_C_FLAGS_INIT "${_F}")
-set(CMAKE_CXX_FLAGS_INIT "${_F}")
-set(_L "--ld-path=${_TC}/bin/ld-no-rpath -Wl,--build-id=sha1 -Wl,--no-undefined -Wl,-z,max-page-size=16384 -Qunused-arguments")
-set(CMAKE_SHARED_LINKER_FLAGS_INIT "${_L}")
-set(CMAKE_MODULE_LINKER_FLAGS_INIT "${_L}")
-set(CMAKE_EXE_LINKER_FLAGS_INIT "${_L}")
-
-# Passed through to try_compile runs, which re-read this file.
-set(CMAKE_TRY_COMPILE_PLATFORM_VARIABLES ANDROID_ABI ANDROID_PLATFORM ANDROID_STL)
-EOF
+android_ndk_write_hook() {
+  ndk_write_hook "$ANDROID_NDK_INIT_SCRIPT" "$ANDROID_NDK_SHIM_DIR" "$ANDROID_NDK_PLACEHOLDER_DIR" || fail "could not write $ANDROID_NDK_INIT_SCRIPT"
 }
 
-# android_ndk_write_init_script <file>: Gradle's side of the tool, run before the plugin looks for the NDK.
-# A project that names no STL gets c++_shared: the plugin packs libc++_shared.so only when the argument names it.
-# A version not served stops the build with a plain message. Without this the plugin downloads Google's x86_64 NDK
-# (2.4 GB on disk, measured) and then fails. Gradle still runs the plugin's own hook after a throw, so the throw alone
-# does not stop that download; the version is pointed at a served folder first.
-android_ndk_write_init_script() {
-  mkdir -p "$(dirname "$1")"
-  cat >"$1" <<EOF
-// Written by PocketRocket's Android NDK tool. Removed on uninstall.
-def served = "$ANDROID_NDK_VERSIONS".split(" ") as List
-allprojects { project ->
-    project.afterEvaluate {
-        def android = project.extensions.findByName("android")
-        if (android == null) return
-        def cmake, ndkBuild, version, path, arguments
-        try {
-            cmake = android.externalNativeBuild.cmake.path
-            ndkBuild = android.externalNativeBuild.ndkBuild.path
-            version = android.ndkVersion
-            path = android.ndkPath
-            arguments = android.defaultConfig.externalNativeBuild.cmake.arguments
-        } catch (MissingPropertyException ignored) {
-            return
-        }
-        if (path != null || (cmake == null && ndkBuild == null)) return
-        if (!served.contains(version)) android.ndkVersion = served.last()
-        if (ndkBuild != null) {
-            throw new GradleException("PocketRocket's Android NDK tool has no ndk-build. Move " + project.path + " to CMake, or build it off the phone.")
-        }
-        if (!served.contains(version)) {
-            throw new GradleException("PocketRocket's Android NDK tool does not serve NDK " + version + ". It accepts " + served.join(", ") + " (all the same Termux compiler). Change ndkVersion in " + project.path + " to one of them, or remove it.")
-        }
-        if (!arguments.any { it.startsWith("-DANDROID_STL=") }) arguments.add("-DANDROID_STL=c++_shared")
-    }
-}
-EOF
+android_ndk_remove_hook() {
+  rm -f "$ANDROID_NDK_INIT_SCRIPT"; rmdir "$(dirname "$ANDROID_NDK_INIT_SCRIPT")" 2>/dev/null || true
 }
 
-# android_ndk_make_shim: one shim, one folder per version, the CMake folder.
-android_ndk_make_shim() {
-  local shim="$ANDROID_NDK_SHIM_DIR" tc sr f b l v d
-  android_ndk_remove_folders
-  tc="$shim/toolchains/llvm/prebuilt/linux-x86_64"; sr="$tc/sysroot"
-  mkdir -p "$shim/meta" "$shim/build/cmake" "$tc/bin" "$tc/lib" "$sr/usr/lib"
-  # The plugin picks the host folder from the OS name, so an arm64 Linux-looking host still asks for linux-x86_64.
-  ln -s linux-x86_64 "$shim/toolchains/llvm/prebuilt/linux-arm64"
-  printf '{"min":21,"max":37,"aliases":{}}\n' >"$shim/meta/platforms.json"
-  printf '{"arm64-v8a":{"bitness":64,"default":true,"deprecated":false,"proc":"aarch64","arch":"arm64","triple":"aarch64-linux-android","llvm_triple":"aarch64-none-linux-android"}}\n' >"$shim/meta/abis.json"
-  printf '{}\n' >"$shim/meta/system_libs.json"
-  android_ndk_write_toolchain "$shim/build/cmake/android.toolchain.cmake"
-
-  # clang looks for its resource dir beside the path it was called by; the toolchain's -no-canonical-prefixes keeps that path.
-  ln -s "$PREFIX/lib/clang" "$tc/lib/clang"
-  for b in clang clang++ ld.lld llvm-strip llvm-objcopy llvm-ar llvm-ranlib llvm-nm llvm-readelf; do
-    ln -s "$PREFIX/bin/$b" "$tc/bin/$b"
-  done
-  # Termux's clang always adds -rpath=<sysroot>/usr/lib, a path that means nothing outside this app. No flag removes it.
-  cat >"$tc/bin/ld-no-rpath" <<EOF
-#!$PREFIX/bin/bash
-args=()
-for a in "\$@"; do case "\$a" in -rpath=*) ;; *) args+=("\$a") ;; esac; done
-exec "$PREFIX/bin/ld.lld" "\${args[@]}"
-EOF
-  chmod 700 "$tc/bin/ld-no-rpath"
-
-  # Headers from Termux. Libraries are only the crt objects and libc++ from Termux and the phone's own system libraries,
-  # so no other Termux library can be linked by accident.
-  ln -s "$PREFIX/include" "$sr/usr/include"
-  for f in crtbegin_so.o crtend_so.o crtbegin_dynamic.o crtend_android.o crt_pad_segment.o libunwind.a libatomic.a libcompiler_rt-extras.a libc++_shared.so; do
-    ln -s "$PREFIX/lib/$f" "$sr/usr/lib/$f"
-  done
-  for l in c m dl log z android EGL GLESv1_CM GLESv2 GLESv3 OpenSLES jnigraphics mediandk nativewindow vulkan aaudio binder_ndk; do
-    if [ -e "/system/lib64/lib$l.so" ]; then ln -s "/system/lib64/lib$l.so" "$sr/usr/lib/lib$l.so"; fi
-  done
-  ln -s . "$sr/usr/lib/aarch64-linux-android"
-
-  # The plugin reads the revision from the version folder, so that file is real; the rest points at the one shim.
+# android_ndk_version_folders: one folder per version claiming that revision, the rest links to the shim; and CMake.
+android_ndk_version_folders() {
+  local v d f b
   for v in $ANDROID_NDK_VERSIONS; do
     d="$ANDROID_NDK_DIR/$v"; mkdir -p "$d"
     printf 'Pkg.Desc = PocketRocket: Termux clang behind the NDK layout, not Google NDK %s\nPkg.Revision = %s\n' "$v" "$v" >"$d/source.properties"
-    for f in meta build toolchains; do ln -s "$shim/$f" "$d/$f"; done
+    for f in meta build toolchains ndk-build; do ln -sfn "$ANDROID_NDK_SHIM_DIR/$f" "$d/$f"; done
   done
-
   d="$ANDROID_CMAKE_DIR/$ANDROID_CMAKE_VERSION"; mkdir -p "$d/bin"
   printf 'Pkg.Desc = PocketRocket: Termux CMake\nPkg.Revision = %s\n' "$ANDROID_CMAKE_VERSION" >"$d/source.properties"
-  for b in cmake ctest cpack ninja; do ln -s "$PREFIX/bin/$b" "$d/bin/$b"; done
+  for b in cmake ctest cpack ninja; do ln -sfn "$PREFIX/bin/$b" "$d/bin/$b"; done
 }
 
 android_ndk_remove_folders() {
-  rm -rf "${ANDROID_NDK_SHIM_DIR:?}" "${ANDROID_NDK_DIR:?}" "${ANDROID_CMAKE_DIR:?}/${ANDROID_CMAKE_VERSION:?}"
+  rm -rf "${ANDROID_NDK_SHIM_DIR:?}" "${ANDROID_NDK_SHIM_DIR:?}.new" "${ANDROID_NDK_DIR:?}" "${ANDROID_CMAKE_DIR:?}/${ANDROID_CMAKE_VERSION:?}" "$ANDROID_NDK_WORK"
   rmdir "$ANDROID_CMAKE_DIR" 2>/dev/null || true
 }
 
-step_android_ndk_packages() {
-  step "Installing clang, CMake and Ninja"
+# The compilers an install before decision 96 brought in move to C and C++'s list, so removing the NDK leaves them.
+android_ndk_hand_over_packages() {
+  [ -f "$ANDROID_NDK_ADDED_FILE" ] || return 0
+  # shellcheck disable=SC2046
+  packages_hand_over "$ANDROID_NDK_ADDED_FILE" "$CPP_ADDED_FILE" $(cat "$ANDROID_NDK_ADDED_FILE")
+  [ -s "$ANDROID_NDK_ADDED_FILE" ] || rm -f "$ANDROID_NDK_ADDED_FILE"
+}
+
+step_android_ndk_build() {
+  step "Fetching ndk-build"
   android_sdk_ready || fail "Install the Android tool first."
+  cpp_complete || fail "Install C and C++ first."
+  rm -rf "$ANDROID_NDK_WORK/build"; mkdir -p "$ANDROID_NDK_WORK"
+  ndk_fetch_build "$ANDROID_NDK_WORK/build" 2>>"$PR_LOG" || fail "Could not fetch ndk-build from android.googlesource.com. Check the connection and try again."
+  ok "ndk-build from AOSP $NDK_BUILD_COMMIT, build/ tree $NDK_BUILD_TREE"
+}
+
+step_android_ndk_multilib() {
+  step "Downloading the other ABIs"
+  local name size pid rc=0
   apt_refresh
-  packages_baseline "$ANDROID_NDK_BASELINE_FILE" "$ANDROID_NDK_ADDED_FILE"
-  # shellcheck disable=SC2086
-  apt_install_progress $ANDROID_NDK_PACKAGES
-  local b
-  packages_record "$ANDROID_NDK_BASELINE_FILE" "$ANDROID_NDK_ADDED_FILE"
-  for b in bin/clang bin/cmake bin/ninja lib/crtbegin_so.o lib/libc++_shared.so; do
-    [ -e "$PREFIX/$b" ] || fail "$b is missing after install"
-  done
-  ok "packages installed"
+  read -r name size < <(ndk_multilib_info) || true
+  [ -n "${name:-}" ] || fail "$NDK_MULTILIB_PACKAGE is not in the package index"
+  ndk_multilib_download "$ANDROID_NDK_WORK" 2>>"$PR_LOG" &
+  pid=$!
+  watch_file "$pid" "$ANDROID_NDK_WORK/$name" "$size" "Downloading $NDK_MULTILIB_PACKAGE"
+  wait "$pid" || rc=$?
+  [ "$rc" -eq 0 ] || fail "The download of $NDK_MULTILIB_PACKAGE stopped. Check the connection and try again."
+  progress 100 "Unpacking $NDK_MULTILIB_PACKAGE"
+  ANDROID_NDK_MULTILIB="$(ndk_multilib_unpack "$ANDROID_NDK_WORK" 2>>"$PR_LOG")" || fail "could not unpack $NDK_MULTILIB_PACKAGE; see $PR_LOG"
+  ok "$NDK_MULTILIB_PACKAGE $(apt_policy_field "$NDK_MULTILIB_PACKAGE" Candidate), checked by apt"
 }
 
 step_android_ndk_wire() {
   step "Setting up the NDK folders"
-  android_ndk_make_shim
-  android_ndk_write_init_script "$ANDROID_NDK_INIT_SCRIPT"
-  ok "NDK versions ready: $ANDROID_NDK_VERSIONS"
-  printf '[done]\n'
+  progress 10 "Making stub libraries for four ABIs"
+  ndk_make_shim "$ANDROID_NDK_SHIM_DIR" "$ANDROID_NDK_WORK/build" "$ANDROID_NDK_MULTILIB" 2>>"$PR_LOG" || fail "could not set up the NDK folders; see $PR_LOG"
+  printf '%s\n' "$(apt_policy_field "$NDK_MULTILIB_PACKAGE" Candidate)" >"$ANDROID_NDK_SHIM_DIR/.ndk-multilib-version"
+  rm -rf "$ANDROID_NDK_WORK"
+  android_ndk_version_folders
+  android_ndk_write_hook
+  ok "NDK ready: ndk-build and CMake, arm64-v8a, armeabi-v7a, x86 and x86_64, any ndkVersion"
 }
 
-# Folders, the Gradle init script and exactly the packages this tool brought in. Uninstalling Android runs this first.
+# Folders and what an install before decision 96 brought in. The hook stays while the Android tool is installed (it
+# owns it) and now fails native tasks plainly. Removing Android or C and C++ runs this first.
 android_ndk_remove() {
   android_ndk_remove_folders
-  rm -f "$ANDROID_NDK_INIT_SCRIPT"; rmdir "$(dirname "$ANDROID_NDK_INIT_SCRIPT")" 2>/dev/null || true
-  # An install that stopped inside apt left a baseline but no list yet. (Only then: installs before the baseline was
-  # dropped after recording kept theirs, and it would now count what other tools added since.)
-  if [ -f "$ANDROID_NDK_BASELINE_FILE" ] && [ ! -f "$ANDROID_NDK_ADDED_FILE" ]; then
-    packages_record "$ANDROID_NDK_BASELINE_FILE" "$ANDROID_NDK_ADDED_FILE"
+  [ -d "$ANDROID_SDK_DIR" ] || android_ndk_remove_hook
+  if [ -f "$ANDROID_NDK_ADDED_FILE" ]; then
+    if pkg_installed clang; then android_ndk_hand_over_packages; fi
+    android_purge_added "$ANDROID_NDK_ADDED_FILE"
+    rm -f "$ANDROID_NDK_ADDED_FILE" "$PR_HOME/android-ndk.baseline"
   fi
-  android_purge_added "$ANDROID_NDK_ADDED_FILE"
-  rm -f "$ANDROID_NDK_ADDED_FILE" "$ANDROID_NDK_BASELINE_FILE"
+}
+
+# main_android_ndk <android-ndk|android-ndk-remove|c-cpp|c-cpp-remove>
+main_android_ndk() {
+  PR_LOG="$PR_HOME/$1.log"
+  case "$1" in
+    android-ndk) TOTAL_STEPS=4; cpp_complete || TOTAL_STEPS=5 ;;
+    android-ndk-remove) TOTAL_STEPS=2 ;;
+    c-cpp) TOTAL_STEPS=2 ;;
+    c-cpp-remove) TOTAL_STEPS=2; if android_ndk_present; then TOTAL_STEPS=3; fi ;;
+  esac
+  step "Checking the device"; preflight_checks; ok "Termux on aarch64"
+  case "$1" in
+    android-ndk)
+      android_sdk_ready || fail "Install the Android tool first."
+      cpp_complete || step_cpp_install
+      android_ndk_hand_over_packages
+      step_android_ndk_build
+      step_android_ndk_multilib
+      step_android_ndk_wire ;;
+    android-ndk-remove)
+      step "Removing the Android NDK"
+      android_ndk_remove
+      ok "Android NDK removed; C and C++ stay" ;;
+    c-cpp) step_cpp_install ;;
+    c-cpp-remove) step_cpp_remove ;;
+  esac
+  printf '[done]\n'
 }
 
 # Packages on the Updates screen (decision 41): Git, and Rust once the Flutter & Rust tool has it (decision 75).
@@ -1413,7 +1417,7 @@ step_apt_update() {
   hash -r 2>/dev/null || true
 }
 
-# The version lines main_apt_update ends with for Node.js and Chromium (decision 102). Chromium's comes from dpkg:
+# The version lines main_apt_update ends with for Node.js and Chromium (decision 103). Chromium's comes from dpkg:
 # starting the browser to ask it needs more than a version check should.
 node_npm_versions() { printf 'Node.js %s, npm %s' "$(node --version)" "$(npm --version)"; }
 chromium_version() { dpkg-query -W -f='Chromium ${Version}' chromium; }
@@ -1565,13 +1569,17 @@ FLUTTER_RELEASES="https://storage.googleapis.com/flutter_infra_release/releases/
 FLUTTER_HOME="$HOME/fvm"                                # FVM's cache folder; FlutterTool.FVM_RELATIVE
 FLUTTER_VERSIONS="$FLUTTER_HOME/versions"
 FLUTTER_DEFAULT="$FLUTTER_HOME/default"                 # FVM's global version: a link to versions/<version>
-FLUTTER_PACKAGES="which unzip"                          # flutter doctor needs which; the Dart SDK download needs unzip
+FLUTTER_PACKAGES="which unzip termux-exec-glibc"        # flutter doctor needs which; the Dart SDK download needs unzip;
+                                                        # debug APK builds need termux-exec-glibc (base has it already)
 FLUTTER_ADDED_FILE="$PR_HOME/flutter.packages"
 FLUTTER_BASELINE_FILE="$PR_HOME/flutter.baseline"
 FVM_VERSION=4.3.2
 FVM_SHA256=df05c7682eeac21b08939e7be131687dc3d54fd5575b5e4bca931717ddeb0a01   # GitHub's published digest of the asset
 FVM_URL="https://github.com/leoafarias/fvm/releases/download/$FVM_VERSION/fvm-$FVM_VERSION-linux-arm64.tar.gz"
 FVM_DIR="${PREFIX:-}/opt/fvm"
+# Debug APK builds (decision 100): the exec helper the Flutter tool needs to start gradlew. FlutterTool.EXEC_RELATIVE
+# and the launcher's PR_EXEC_DIR name the same folder.
+FLUTTER_EXEC_DIR="${PREFIX:-}/lib/pocketrocket-flutter-exec"
 RUST_PACKAGES="rust"                                    # brings rust-std-aarch64-linux-android with it
 # What the install added, for Uninstall (pkg_tool_purge rust reads these same two names). The app reads "installed"
 # from dpkg, so these are not markers: a `pkg install rust` from a terminal has none and still shows as installed.
@@ -1693,11 +1701,47 @@ step_flutter_helpers() {
     printf '%s\n' "$FVM_VERSION" >"$FVM_DIR/.version"
   fi
   flutter_launchers
+  flutter_exec_build
   POCKETROCKET_FLUTTER_PREPARE="$FVM_DIR/src" "$PREFIX/bin/flutter" >>"$PR_LOG" 2>&1 || fail "could not prepare FVM for this phone"
   out="$(fvm --version 2>&1)" || fail "fvm --version failed: $out"
   # Versions come from the tool page; FVM's mirror of the whole Flutter history would add gigabytes.
   log_run fvm config --no-use-git-cache --no-update-check || warn "could not turn off FVM's git cache"
   ok "FVM $out"
+}
+
+# flutter_exec_build: the exec helper for `flutter build apk --debug` (decision 100, docs/flutter-apk-spike.md), built
+# here from setup/flutter-exec.c with the C and C++ add-on's clang; no binary ships. The Flutter tool is a glibc
+# program and starts gradlew (#!/usr/bin/env bash) with glibc's execvp, which Termux's termux-exec-glibc never sees.
+# One LD_PRELOAD value serves both C libraries: glibc's loader reads $PLATFORM as "aarch64", bionic's takes it as is.
+#   aarch64/1.so    termux-exec-glibc            aarch64/2.so    flutter-exec.c (execvp on top of execve)
+#   $PLATFORM/1.so  Termux's bionic exec helper  $PLATFORM/2.so  an empty library
+# Without clang Flutter still works for compile checks; the launcher says what APK builds need, and the tile offers
+# Repair once clang is on the phone. Never fails the install.
+flutter_exec_build() {
+  local here src d="$FLUTTER_EXEC_DIR" new="$FLUTTER_EXEC_DIR.new" glibc_exec="$PREFIX/glibc/lib/libtermux-exec.so" bionic_exec="" lib
+  here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; src="$here/flutter-exec.c"
+  if ! command -v clang >/dev/null 2>&1; then
+    info "debug APK builds need clang: add C and C++ (and Android) from Tools, then Repair Flutter & Dart"
+    return 0
+  fi
+  for lib in "$PREFIX/lib/libtermux-exec-ld-preload.so" "$PREFIX/lib/libtermux-exec.so"; do
+    if [ -f "$lib" ]; then bionic_exec="$lib"; break; fi
+  done
+  [ -f "$src" ] && [ -f "$glibc_exec" ] && [ -n "$bionic_exec" ] \
+    || { warn "debug APK builds are not set up: flutter-exec.c, termux-exec-glibc or Termux's exec helper is missing"; return 0; }
+  rm -rf "$new"; mkdir -p "$new/aarch64" "$new/\$PLATFORM"
+  if ! log_run clang --target=aarch64-linux-gnu -O2 -fPIC -shared -nostdlib -fno-stack-protector -o "$new/libflutter-exec-glibc.so" "$src" \
+    || ! printf 'void pocketrocket_flutter_exec_empty(void) {}\n' >"$new/empty.c" \
+    || ! log_run clang -O2 -fPIC -shared -nostdlib -o "$new/libempty-bionic.so" "$new/empty.c"; then
+    rm -rf "$new"; warn "could not build the exec helper for debug APK builds; Repair tries again"; return 0
+  fi
+  rm -f "$new/empty.c"
+  ln -s "$glibc_exec" "$new/aarch64/1.so"
+  ln -s "$d/libflutter-exec-glibc.so" "$new/aarch64/2.so"
+  ln -s "$bionic_exec" "$new/\$PLATFORM/1.so"
+  ln -s "$d/libempty-bionic.so" "$new/\$PLATFORM/2.so"
+  rm -rf "$d"; mv "$new" "$d"
+  ok "debug APK builds set up (exec helper in $d)"
 }
 
 # step_flutter_download [version]: sets FLUTTER_VERSION and FLUTTER_ROOT.
@@ -1831,7 +1875,7 @@ step_flutter_remove_version() {
 
 # What uninstalling Flutter removes, besides the packages it added. The one list; the tests read it.
 flutter_remove_paths() {
-  printf '%s\n' "$FLUTTER_HOME" "$FVM_DIR" "$PREFIX/bin/flutter" "$PREFIX/bin/dart" "$PREFIX/bin/fvm" \
+  printf '%s\n' "$FLUTTER_HOME" "$FVM_DIR" "$FLUTTER_EXEC_DIR" "$PREFIX/bin/flutter" "$PREFIX/bin/dart" "$PREFIX/bin/fvm" \
     "$HOME/.pub-cache" "$HOME/.dart-tool" "$HOME/.dartServer" "$HOME/.dart" "$HOME/.flutter" "$HOME/.flutter-devtools" \
     "$HOME/.config/flutter" "$HOME/.config/fvm" "$HOME/.fvm"
 }
@@ -1895,6 +1939,9 @@ pkg_tool_packages() {
     java) printf 'openjdk-21 kotlin' ;;
     aws) printf 'awscli' ;;       # the deploy CLIs from Termux's packages (decision 98)
     flyctl) printf 'flyctl' ;;
+    c-cpp) printf '%s' "$CPP_PACKAGES" ;;
+    java-17 | java-21 | java-25) printf 'openjdk-%s' "${1#java-}" ;;   # one JDK on the Java page (decision 101)
+    kotlin) printf 'kotlin' ;;
     *) return 1 ;;
   esac
 }
@@ -1906,6 +1953,8 @@ pkg_tool_companions() {
   case "$1" in
     python) printf 'python-ensurepip-wheels' ;;
     java) printf 'openjdk-21-x' ;;
+    java-21) printf 'openjdk-21-x kotlin' ;;   # kotlin depends on openjdk-21, so it goes with it
+    java-25) printf 'openjdk-25-x' ;;
     rust) dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 'rust-std-*' 2>/dev/null | awk '$1 == "ii" {print $2}' | tr '\n' ' ' ;;
   esac
 }
@@ -1923,6 +1972,9 @@ pkg_tool_title() {
     java) printf 'Java 21 and Kotlin' ;;
     aws) printf 'the AWS CLI' ;;
     flyctl) printf 'flyctl' ;;
+    c-cpp) printf 'C and C++' ;;
+    java-17 | java-21 | java-25) printf 'Java %s' "${1#java-}" ;;
+    kotlin) printf 'Kotlin' ;;
   esac
 }
 
@@ -1941,6 +1993,10 @@ pkg_tool_check() {
     java) "$JAVA21_HOME/bin/java" -version 2>&1 | sed -n 1p && kotlinc -version 2>&1 | grep -o 'kotlinc-jvm [^ ]*' ;;
     aws) aws --version ;;
     flyctl) flyctl version ;;
+    c-cpp) for b in clang clang++ ld.lld cmake ninja make pkg-config lldb; do command -v "$b" >/dev/null 2>&1 || { printf '%s is missing' "$b"; return 1; }; done
+      clang --version 2>&1 | head -1 ;;
+    java-17 | java-21 | java-25) "${PREFIX:-}/lib/jvm/java-${1#java-}-openjdk/bin/java" -version 2>&1 | sed -n 1p ;;
+    kotlin) kotlinc -version 2>&1 | grep -o 'kotlinc-jvm [^ ]*' ;;
   esac
 }
 
@@ -1971,20 +2027,70 @@ java_keep_17() {
   update-alternatives --set java "$ANDROID_JAVA_HOME/bin/java" >>"$PR_LOG" 2>&1 || fail "could not keep Java 17 as the default java"
 }
 
+# java_tool <name>: 0 for the Java tile's jobs (the tile, one JDK, Kotlin), which all end with java_settle.
+java_tool() { case "$1" in java | java-* | kotlin) return 0 ;; *) return 1 ;; esac; }
+
+# Several JDKs side by side (decision 101). Gradle toolchains (languageVersion = 21) only look in the usual Linux
+# folders, and their auto-download fetches glibc JDKs that can't run here. So Gradle gets the list of JDKs on the phone
+# in ~/.gradle/gradle.properties, kept current after every Java job, and auto-download off. GradleJdks.kt reads the same.
+JAVA_GRADLE_PATHS=org.gradle.java.installations.paths
+JAVA_GRADLE_AUTO=org.gradle.java.installations.auto-download
+
+# java_jdk_dirs: the JDK folders with a java in them, oldest first, comma-separated ("" when none).
+java_jdk_dirs() {
+  local d n
+  for d in "${PREFIX:-}"/lib/jvm/java-*-openjdk; do
+    [ -x "$d/bin/java" ] || continue
+    n="${d##*/java-}"; n="${n%-openjdk}"
+    case "$n" in '' | *[!0-9]*) continue ;; esac
+    printf '%s %s\n' "$n" "$d"
+  done | sort -n | cut -d' ' -f2- | paste -sd, -
+}
+
+# java_gradle_jdks [gradle.properties]: sets the two keys to the JDKs there now, or takes them out when there are none.
+java_gradle_jdks() {
+  local f="${1:-$HOME/.gradle/gradle.properties}" dirs
+  dirs="$(java_jdk_dirs)"
+  if [ -n "$dirs" ]; then
+    gradle_props_set "$f" "$JAVA_GRADLE_PATHS" "$dirs"
+    gradle_props_set "$f" "$JAVA_GRADLE_AUTO" false
+  else
+    gradle_props_unset "$f" "$JAVA_GRADLE_PATHS"
+    gradle_props_unset "$f" "$JAVA_GRADLE_AUTO"
+  fi
+}
+
+# java_settle: after any Java job, java stays on 17 while it's there and Gradle knows every JDK.
+java_settle() {
+  java_keep_17
+  java_gradle_jdks
+  if [ -x "$ANDROID_JAVA_HOME/bin/java" ]; then info "java stays on Java 17 for Android builds"; fi
+  info "Gradle sees: $(java_jdk_dirs | sed 's/,/, /g')"
+}
+
+# --only java-setup: Repair on the Java page; java_settle alone, no packages.
+main_java_setup() {
+  TOTAL_STEPS=2; PR_LOG="$PR_HOME/java.log"
+  step "Checking the device"; preflight_checks; ok "Termux on aarch64"
+  step "Setting up Java"
+  java_settle
+  ok "java and Gradle's JDK list set"
+  printf '[done]\n'
+}
+
 # pkg_tool_setup <name>: what the tool needs beyond its packages, once they're in. Repair runs it again.
 pkg_tool_setup() {
   case "$1" in
     python) uv_config_add "$UV_CONFIG" ;;
     ruby) mkdir -p "$(dirname "$RUBY_PROFILE")"
       printf '%s\n' "# Written by PocketRocket's Ruby tool. Removed on uninstall." "export RUBYOPT=-rrubygems" >"$RUBY_PROFILE" ;;
-    java) java_keep_17
-      if [ -x "$ANDROID_JAVA_HOME/bin/java" ]; then info "java stays on Java 17 for Android builds; Java 21 is in $JAVA21_HOME"; fi ;;
+    java | java-* | kotlin) java_settle ;;
   esac
 }
 
 # pkg_tool_cleanup <name>: after the purge, what the tool left outside its packages; only once its main package is gone.
 # Uninstall takes everything the tool put on the phone, its config and credentials included, whoever wrote them
-# (decision 101): pkg_tool_leftovers lists it. Your own projects stay.
+# (decision 102): pkg_tool_leftovers lists it. Your own projects stay.
 pkg_tool_cleanup() {
   local main f p
   main="$(pkg_tool_packages "$1" | awk '{print $1}')"
@@ -2091,7 +2197,7 @@ step_pkg_tool_install() {
   if [ "$name" = rust-wasm ] && ! pkg_installed rust; then fail "Rust isn't installed; install Rust first"; fi
   apt_refresh
   packages_baseline "$PR_HOME/$name.baseline" "$PR_HOME/$name.packages"
-  [ "$name" != java ] || java_keep_17
+  if java_tool "$name"; then java_keep_17; fi
   # shellcheck disable=SC2046
   apt_install_progress $(pkg_tool_packages "$name")
   packages_record "$PR_HOME/$name.baseline" "$PR_HOME/$name.packages"
@@ -2107,6 +2213,14 @@ step_pkg_tool_remove() {
   pkg_tool_signout "$name"
   pkg_tool_purge "$name"
   pkg_tool_cleanup "$name"
+  # The Java tile's Uninstall takes Java 25 too, and what the page's own adds brought in (Java 17 always stays).
+  if [ "$name" = java ]; then
+    local part kept="$PKG_TOOL_KEPT"
+    for part in kotlin java-21 java-25; do pkg_tool_purge "$part"; kept="$kept $PKG_TOOL_KEPT"; done
+    # shellcheck disable=SC2086
+    PKG_TOOL_KEPT="$(printf '%s\n' $kept | sort -u | paste -sd' ' -)"
+  fi
+  if java_tool "$name"; then java_settle; fi
   if [ -n "$PKG_TOOL_KEPT" ]; then ok "removed the rest; $PKG_TOOL_KEPT stayed"; else ok "$(pkg_tool_title "$name") removed"; fi
 }
 
@@ -2145,7 +2259,7 @@ npm_tool_bin() { case "$1" in vercel) printf vercel ;; netlify) printf netlify ;
 npm_tool_download_mb() { case "$1" in vercel) printf 197 ;; netlify) printf 263 ;; firebase) printf 140 ;; esac; }
 
 # npm_tool_config <name>: where the CLI keeps its login, settings, caches and update-check state, removed with it
-# (decision 101).
+# (decision 102).
 npm_tool_config() {
   local config="${XDG_CONFIG_HOME:-$HOME/.config}" data="${XDG_DATA_HOME:-$HOME/.local/share}" cache="${XDG_CACHE_HOME:-$HOME/.cache}"
   local notifier="$config/configstore/update-notifier-$(npm_tool_package "$1").json"
@@ -2222,7 +2336,7 @@ step_npm_tool_remove() {
   ok "$pkg removed"
 }
 
-# The npm tools' Updates rows (decision 102). npm_tool_update_check <name>: `npm view <package> version`, the newest
+# The npm tools' Updates rows (decision 103). npm_tool_update_check <name>: `npm view <package> version`, the newest
 # release on npm's registry, for the app to compare with the package.json on the phone. Its own log
 # (<name>-check.log), a throwaway npm cache, no lock, no steps.
 npm_tool_update_check() {
@@ -2301,13 +2415,14 @@ main() {
     "") main_full ;;
     --only)
       case "${2:-}" in
-        claude|dockito|chromium|chromium-remove|android-build|android-build-remove|android-ndk|android-ndk-remove|wrangler|wrangler-remove|git-check|git-update) ;;
+        claude|dockito|chromium|chromium-remove|android-build|android-build-remove|android-ndk|android-ndk-remove|c-cpp|c-cpp-remove|wrangler|wrangler-remove|git-check|git-update) ;;
         flutter|flutter-default|flutter-remove-version|flutter-remove|rust|rust-remove|flutter-rust|flutter-rust-remove|rust-check|rust-update) ;;
         python|python-remove|bun|bun-remove|rust-wasm|rust-wasm-remove|python-check|python-update|bun-check|bun-update) ;;
         go|go-remove|deno|deno-remove|ruby|ruby-remove|php|php-remove|java|java-remove|golang-check|golang-update|deno-check|deno-update|ruby-check|ruby-update|php-check|php-update|openjdk-21-check|openjdk-21-update) ;;
         aws|aws-remove|flyctl|flyctl-remove|vercel|vercel-remove|netlify|netlify-remove|firebase|firebase-remove|awscli-check|awscli-update|flyctl-check|flyctl-update) ;;
+        java-17|java-17-remove|java-21|java-21-remove|java-25|java-25-remove|kotlin|kotlin-remove|java-setup) ;;
         vercel-check|vercel-update|netlify-check|netlify-update|firebase-check|firebase-update|nodejs-lts-check|nodejs-lts-update|chromium-check|chromium-update) ;;
-        *) fail "--only takes: vercel-check, vercel-update, netlify-check, netlify-update, firebase-check, firebase-update, nodejs-lts-check, nodejs-lts-update, chromium-check, chromium-update, aws, aws-remove, flyctl, flyctl-remove, vercel, vercel-remove, netlify, netlify-remove, firebase, firebase-remove, awscli-check, awscli-update, flyctl-check, flyctl-update,claude, dockito, chromium, chromium-remove, android-build, android-build-remove, android-ndk, android-ndk-remove, wrangler, wrangler-remove, flutter [version], flutter-default <version>, flutter-remove-version <version>, flutter-remove, rust, rust-remove, flutter-rust, flutter-rust-remove, python, python-remove, bun, bun-remove, rust-wasm, rust-wasm-remove, go, go-remove, deno, deno-remove, ruby, ruby-remove, php, php-remove, java, java-remove, git-check, git-update, rust-check, rust-update, python-check, python-update, bun-check, bun-update, golang-check, golang-update, deno-check, deno-update, ruby-check, ruby-update, php-check, php-update, openjdk-21-check or openjdk-21-update" ;;
+        *) fail "--only takes: vercel-check, vercel-update, netlify-check, netlify-update, firebase-check, firebase-update, nodejs-lts-check, nodejs-lts-update, chromium-check, chromium-update, aws, aws-remove, flyctl, flyctl-remove, vercel, vercel-remove, netlify, netlify-remove, firebase, firebase-remove, awscli-check, awscli-update, flyctl-check, flyctl-update, claude, dockito, chromium, chromium-remove, android-build, android-build-remove, android-ndk, android-ndk-remove, c-cpp, c-cpp-remove, wrangler, wrangler-remove, flutter [version], flutter-default <version>, flutter-remove-version <version>, flutter-remove, rust, rust-remove, flutter-rust, flutter-rust-remove, python, python-remove, bun, bun-remove, rust-wasm, rust-wasm-remove, go, go-remove, deno, deno-remove, ruby, ruby-remove, php, php-remove, java, java-remove, java-17, java-17-remove, java-21, java-21-remove, java-25, java-25-remove, kotlin, kotlin-remove, java-setup, git-check, git-update, rust-check, rust-update, python-check, python-update, bun-check, bun-update, golang-check, golang-update, deno-check, deno-update, ruby-check, ruby-update, php-check, php-update, openjdk-21-check or openjdk-21-update" ;;
       esac
       case "$2" in
         git-check|rust-check) apt_check "${2%-check}"; return 0 ;;
@@ -2333,7 +2448,10 @@ main() {
         flyctl-update) main_apt_update flyctl "flyctl version" flyctl; return 0 ;;
         aws|aws-remove|flyctl|flyctl-remove) main_pkg_tool "$2"; return 0 ;;
         vercel|vercel-remove|netlify|netlify-remove|firebase|firebase-remove) main_npm_tool "$2"; return 0 ;;
-        # Every tool that can get updates has an Updates row (decision 102): the npm CLIs, Node.js and Chromium.
+        # One JDK or Kotlin on the Java page, and its Repair (decision 101).
+        java-17|java-17-remove|java-21|java-21-remove|java-25|java-25-remove|kotlin|kotlin-remove) main_pkg_tool "$2"; return 0 ;;
+        java-setup) main_java_setup; return 0 ;;
+        # Every tool that can get updates has an Updates row (decision 103): the npm CLIs, Node.js and Chromium.
         vercel-check|vercel-update|netlify-check|netlify-update|firebase-check|firebase-update) main_npm_tool "$2"; return 0 ;;
         nodejs-lts-check|chromium-check) apt_check "${2%-check}"; return 0 ;;
         nodejs-lts-update) main_apt_update "Node.js and npm" node_npm_versions nodejs-lts; return 0 ;;
@@ -2374,22 +2492,9 @@ main() {
         step_android_remove_packages
         return 0
       fi
-      if [ "$2" = android-ndk ]; then
-        TOTAL_STEPS=3; PR_LOG="$PR_HOME/android-ndk.log"
-        step "Checking the device"; preflight_checks; ok "Termux on aarch64"
-        step_android_ndk_packages
-        step_android_ndk_wire
-        return 0
-      fi
-      if [ "$2" = android-ndk-remove ]; then
-        TOTAL_STEPS=2; PR_LOG="$PR_HOME/android-ndk.log"
-        step "Checking the device"; preflight_checks; ok "Termux on aarch64"
-        step "Removing clang, CMake and Ninja"
-        android_ndk_remove
-        ok "NDK tool removed"
-        printf '[done]\n'
-        return 0
-      fi
+      case "$2" in
+        android-ndk|android-ndk-remove|c-cpp|c-cpp-remove) main_android_ndk "$2"; return 0 ;;
+      esac
       if [ "$2" = wrangler ]; then
         TOTAL_STEPS=4; PR_LOG="$PR_HOME/wrangler.log"
         step "Checking the device"; preflight_checks; ok "Termux on aarch64"

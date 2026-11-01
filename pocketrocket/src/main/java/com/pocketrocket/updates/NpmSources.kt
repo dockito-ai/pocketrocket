@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 /*
- * The Updates rows of the tools that are global npm packages (decision 102): the deploy CLIs against npm's newest
+ * The Updates rows of the tools that are global npm packages (decision 103): the deploy CLIs against npm's newest
  * release, and Wrangler against the version this PocketRocket pins. Both versions on the phone come from npm's folder
  * (package.json), and both updates run the tool's own job, with the same steps and progress as its install.
  */

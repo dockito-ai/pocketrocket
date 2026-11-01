@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * What the Updates screen keeps current (decision 41), in the screen's order: every tool in Settings › Tools that can
- * get updates (decision 102). Optional ones show only while installed: the add-ons (Flutter and Rust, decisions 75 and
+ * get updates (decision 103). Optional ones show only while installed: the add-ons (Flutter and Rust, decisions 75 and
  * 87; Python and Bun, decision 92; the languages and deploy CLIs, decision 98; Headless Chrome and Wrangler), and
  * Node.js, whose row is Termux's nodejs-lts and goes if a terminal swapped it for another Node. A [packageTool]'s row is
  * its main package through apt; an [npmTool]'s is its npm package against `npm view`.

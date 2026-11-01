@@ -61,12 +61,12 @@ val GitUpdater = AptUpdater("git", "Git")
 val RustUpdater = AptUpdater("rust", "Rust") { FlutterRust.rustInstalled() }
 
 /**
- * Node.js and npm (decision 102): Termux's nodejs-lts, which first-run setup installs and which brings npm with it.
+ * Node.js and npm (decision 103): Termux's nodejs-lts, which first-run setup installs and which brings npm with it.
  * Its row goes while nodejs-lts isn't there (a terminal swapped it for `nodejs`), rather than offering someone else's Node.
  */
 val NodeUpdater = AptUpdater("nodejs-lts", "Node.js and npm") { dpkgHas("nodejs-lts") }
 
-/** Headless Chrome's Chromium (decision 102), from the x11 repository, while it's installed. Its MCP server is pinned. */
+/** Headless Chrome's Chromium (decision 103), from the x11 repository, while it's installed. Its MCP server is pinned. */
 val ChromiumUpdater = AptUpdater("chromium", "Headless Chrome") { dpkgHas("chromium") }
 
 /** Whether dpkg has [pkg] installed now. One small file read. */

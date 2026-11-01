@@ -71,9 +71,10 @@ class LanguageToolsTest {
         assertEquals("java isn't Java 17", PackageTool.Java.problem(both, on21))
         assertNull(PackageTool.Java.problem(both, on17))
         assertNull(PackageTool.Java.problem(both - PackageTool.JAVA_17, on21)) // no 17: 21 is the default, as apt leaves it
-        assertEquals(listOf("Java" to "21.0.13", "Kotlin" to "2.4.21"), PackageTool.Java.versions(both))
-        // Java 21 from a terminal, without Kotlin: installed, and the page offers to add it.
-        assertEquals(listOf("Kotlin"), PackageTool.Java.missing(both - "kotlin"))
+        assertEquals(listOf("Java 21" to "21.0.13", "Kotlin" to "2.4.21"), PackageTool.Java.versions(both))
+        // Java 21 from a terminal, without Kotlin: installed; the page's Kotlin row offers it (decision 101), not "Add".
+        assertTrue(PackageTool.Java.installed(both - "kotlin"))
+        assertEquals(emptyList<String>(), PackageTool.Java.missing(both - "kotlin"))
         assertFalse(PackageTool.Java.installed(pkgs(jdk17))) // Java 17 alone is the Android tool's, not this tile
     }
 
@@ -131,7 +132,7 @@ class LanguageToolsTest {
         assertEquals(0, shell("pkg_tool_cleanup go").first)
         assertFalse(File(home, "go/pkg").exists())
         assertFalse(File(home, ".cache/go-build").exists())
-        // Decision 101: what `go install` put there goes too; GOPATH code of your own in ~/go/src stays.
+        // Decision 102: what `go install` put there goes too; GOPATH code of your own in ~/go/src stays.
         assertFalse(File(home, "go/bin").exists())
         File(home, "go/src/mine").mkdirs()
         File(home, ".config/go/env").apply { parentFile?.mkdirs(); writeText("GOFLAGS=-mod=mod\n") }

@@ -75,22 +75,3 @@ fun PhpToolPage(onBack: () -> Unit) = PackageToolPage(
         ToolText("Termux's php package, updated from Settings › Updates. Composer isn't included: Termux's composer package doesn't run on the phone.")
     }
 }
-
-/** Settings → Tools → Java and Kotlin: openjdk-21 and kotlin, with Java 17 kept as the default java (decision 98). */
-@Composable
-fun JavaToolPage(onBack: () -> Unit) = PackageToolPage(
-    tool = Tool.Java,
-    purpose = "Java 21 and Kotlin, for programs and scripts.",
-    onBack = onBack,
-    removeNote = "Java 17, if the Android tool has it, stays. Your projects stay.",
-) {
-    ToolCard("WHAT IT DOES") {
-        ToolBullets(listOf("javac, java and jshell from Java 21.", "kotlinc and kotlin for Kotlin programs and .kts scripts."))
-    }
-    ToolCard("JAVA 17 STAYS THE DEFAULT") {
-        ToolText(
-            "Android and Flutter builds use Java 17 from the Android tool. While it is on the phone it stays the default java, " +
-                "and Java 21 is in \$PREFIX/lib/jvm/java-21-openjdk: run its bin/java, or set JAVA_HOME to it.",
-        )
-    }
-}

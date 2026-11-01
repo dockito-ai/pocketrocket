@@ -8,13 +8,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.platform.LocalContext
 import com.pocketrocket.androidbuild.AndroidBuild
-import com.pocketrocket.androidbuild.AndroidBuildState
 import com.pocketrocket.androidbuild.AndroidBuildTool
 import com.pocketrocket.androidbuild.AndroidNdk
 import com.pocketrocket.androidbuild.AndroidNdkTool
 import com.pocketrocket.browser.Chromium
 import com.pocketrocket.browser.ChromiumMcp
 import com.pocketrocket.browser.ChromiumState
+import com.pocketrocket.cpp.Cpp
+import com.pocketrocket.cpp.CppTool
 import com.pocketrocket.R
 import com.pocketrocket.dockito.Dockito
 import com.pocketrocket.dockito.DockitoCli
@@ -29,6 +30,7 @@ import com.pocketrocket.pkgtools.PackageTool
 import com.pocketrocket.pkgtools.PackageTools
 import com.pocketrocket.pkgtools.PackageToolsState
 import com.pocketrocket.profiles.DockitoAccounts
+import com.pocketrocket.setup.ScriptToolState
 import com.pocketrocket.ui.Routes
 import com.pocketrocket.updates.UpdateComponent
 import com.pocketrocket.updates.UpdateRow
@@ -50,7 +52,7 @@ import java.io.File
 /**
  * Every tool in Settings → Tools (decisions 64 and 87): what it declares and how its module's state reads as a
  * [ToolState]. Included (built in): Claude Code, Dockito, Git, Node.js and npm. Add-ons (optional): Android,
- * Android NDK, AWS CLI, Bun, Deno, Firebase CLI, flyctl, Flutter & Dart, Go, Headless Chrome, Java and Kotlin, Netlify
+ * Android NDK, AWS CLI, Bun, C and C++, Deno, Firebase CLI, flyctl, Flutter & Dart, Go, Headless Chrome, Java and Kotlin, Netlify
  * CLI, PHP, Python, Ruby, Rust, Vercel CLI, Wrangler. The screen orders them by name. A tool with a [pkg] is a package
  * tool (decisions 92 and 98), read from dpkg; one with an [npm] is a global npm CLI (decision 98).
  */
@@ -65,6 +67,7 @@ enum class Tool(val spec: ToolSpec, val route: String, val pkg: PackageTool? = n
     ),
     Android(ToolSpec("Android", ToolKind.Optional, downloadMb = AndroidBuildTool.DOWNLOAD_MB, installedMb = AndroidBuildTool.INSTALLED_MB), Routes.TOOL_ANDROID_BUILD),
     AndroidNdk(ToolSpec("Android NDK", ToolKind.Optional, downloadMb = AndroidNdkTool.DOWNLOAD_MB, installedMb = AndroidNdkTool.INSTALLED_MB), Routes.TOOL_ANDROID_NDK),
+    Cpp(ToolSpec("C and C++", ToolKind.Optional, downloadMb = CppTool.DOWNLOAD_MB, installedMb = CppTool.INSTALLED_MB), Routes.TOOL_CPP),
     Wrangler(
         ToolSpec("Wrangler", ToolKind.Optional, hasVersion = true, canUpdate = true, needsLogin = true, downloadMb = WranglerTool.DOWNLOAD_MB, installedMb = WranglerTool.INSTALLED_MB),
         Routes.TOOL_WRANGLER,
@@ -108,6 +111,7 @@ enum class Tool(val spec: ToolSpec, val route: String, val pkg: PackageTool? = n
         Dockito -> ToolGlyph(R.drawable.ic_tool_dockito, 0xFF1A6DFF)
         Chromium -> ToolGlyph(R.drawable.ic_tool_googlechrome, 0xFF4285F4)
         Android, AndroidNdk -> ToolGlyph(R.drawable.ic_tool_android, 0xFF3DDC84)
+        Cpp -> ToolGlyph(R.drawable.ic_tool_cplusplus, 0xFF00599C)
         Wrangler -> ToolGlyph(R.drawable.ic_tool_cloudflareworkers, 0xFFF38020)
         Flutter -> ToolGlyph(R.drawable.ic_tool_flutter, 0xFF02569B)
         Rust -> ToolGlyph(R.drawable.ic_tool_rust, 0xFF000000)
@@ -193,7 +197,8 @@ object ToolStates {
         versions = listOfNotNull(row?.installed?.let { "Chromium" to it }, "Chrome DevTools MCP" to ChromiumMcp.MCP_VERSION),
     ).withRow(row)
 
-    fun android(s: AndroidBuildState) = ToolState(
+    /** A tool installed and removed by the setup script alone (Android, C and C++). */
+    fun scriptTool(s: ScriptToolState) = ToolState(
         installed = s.installed,
         checked = s.checked,
         job = ToolModel.job(s.running, s.failed, s.removing),
@@ -202,7 +207,7 @@ object ToolStates {
     )
 
     /** A failed NDK install only counts while the Android tool is there; without it the tile says it's needed. */
-    fun ndk(s: AndroidBuildState, androidInstalled: Boolean) = ToolState(
+    fun ndk(s: ScriptToolState, androidInstalled: Boolean) = ToolState(
         installed = s.installed,
         checked = s.checked,
         job = ToolModel.job(s.running, s.failed && (androidInstalled || s.removing), s.removing),
@@ -298,7 +303,8 @@ object ToolStates {
             versions = t.versions(s.packages),
             latest = row?.latest,
             updateAvailable = row?.available == true,
-            updating = row?.running == true,
+            // A JDK or Kotlin being added or removed on Java's page shows on its tile (decision 101).
+            updating = row?.running == true || (t == PackageTool.Java && s.installed(t) && s.running && s.tool in PackageTool.JAVA_PARTS),
             sizeMb = t.sizeMb(s.packages),
             problem = s.problem(t),
             signedIn = login.who(),
@@ -344,6 +350,7 @@ fun rememberTools(): List<Pair<Tool, ToolState>> {
     val chromium by Chromium.state.collectAsState()
     val android by AndroidBuild.state.collectAsState()
     val ndk by AndroidNdk.state.collectAsState()
+    val cpp by Cpp.state.collectAsState()
     val wrangler by Wrangler.state.collectAsState()
     val flutter by FlutterRust.state.collectAsState()
     val packages by PackageTools.state.collectAsState()
@@ -359,8 +366,9 @@ fun rememberTools(): List<Pair<Tool, ToolState>> {
         Tool.Node to ToolStates.node(node, row(UpdateComponent.Node)),
         Tool.Dockito to ToolStates.dockito(dockito, row(UpdateComponent.Dockito), dockitoAccounts.default?.email, dockitoSize),
         Tool.Chromium to ToolStates.chromium(chromium, row(UpdateComponent.Chromium)),
-        Tool.Android to ToolStates.android(android),
+        Tool.Android to ToolStates.scriptTool(android),
         Tool.AndroidNdk to ToolStates.ndk(ndk, android.installed),
+        Tool.Cpp to ToolStates.scriptTool(cpp),
         Tool.Wrangler to ToolStates.wrangler(wrangler, logins.getValue(Tool.Wrangler), row(UpdateComponent.Wrangler)),
         Tool.Flutter to ToolStates.flutter(flutter, row(UpdateComponent.Flutter)),
         Tool.Rust to ToolStates.rust(flutter, row(UpdateComponent.Rust), packages.running && packages.isFor(PackageTool.RustWasm)),
@@ -379,6 +387,7 @@ fun refreshAll(context: Context) {
     Chromium.refresh()
     AndroidBuild.refresh()
     AndroidNdk.refresh()
+    Cpp.refresh()
     Wrangler.refresh()
     FlutterRust.refresh()
     PackageTools.refresh()

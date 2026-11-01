@@ -23,7 +23,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Every tool that can get updates has an update flow (decision 102): the npm CLIs against `npm view`, Wrangler against
+ * Every tool that can get updates has an update flow (decision 103): the npm CLIs against `npm view`, Wrangler against
  * its pin, Node.js and Chromium through apt; and the script's modes for them, run with a pretend npm.
  */
 class ToolUpdatesTest {
@@ -145,8 +145,8 @@ class ToolUpdatesTest {
         }
         val withRows = UpdateComponent.entries.mapNotNull { it.tool }.toSet()
         Tool.entries.filter { it.spec.canUpdate }.forEach { assertTrue("${it.name} says it updates but has no row", it in withRows) }
-        // Android and the NDK are the only installed tools without an update flow (their pins move with the app).
-        assertEquals(setOf(Tool.Android, Tool.AndroidNdk), Tool.entries.filter { !it.spec.canUpdate }.toSet())
+        // Android, the NDK and C and C++ are the tools without an update flow (their pins move with the app).
+        assertEquals(setOf(Tool.Android, Tool.AndroidNdk, Tool.Cpp), Tool.entries.filter { !it.spec.canUpdate }.toSet())
         NpmTool.entries.forEach { assertEquals(it, UpdateComponent.of(it).npmTool) }
     }
 

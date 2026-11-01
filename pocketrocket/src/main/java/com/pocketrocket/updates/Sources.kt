@@ -105,10 +105,10 @@ class AptSource(override val component: UpdateComponent, private val updater: Ap
 
 val GitSource = AptSource(UpdateComponent.Git, GitUpdater)
 
-/** Node.js and npm: Termux's nodejs-lts (decision 102). */
+/** Node.js and npm: Termux's nodejs-lts (decision 103). */
 val NodeSource = AptSource(UpdateComponent.Node, NodeUpdater)
 
-/** Headless Chrome's Chromium (decision 102), while it's installed. */
+/** Headless Chrome's Chromium (decision 103), while it's installed. */
 val ChromiumSource = AptSource(UpdateComponent.Chromium, ChromiumUpdater)
 
 /** Rust shows only while `rust` is installed (dpkg): no installed version otherwise, and Check now skips its apt-get update. */

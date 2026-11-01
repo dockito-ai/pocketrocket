@@ -1,5 +1,6 @@
 package com.pocketrocket.androidbuild
 
+import com.pocketrocket.setup.ScriptToolState
 import com.pocketrocket.setup.ToolPresence
 import com.pocketrocket.termux.DpkgStatus
 import com.pocketrocket.ui.tools.Tool
@@ -28,7 +29,7 @@ class AndroidDetectionTest {
 
     private fun pkgs(vararg names: String) = names.associateWith { DpkgStatus.Package("1", 1) }
     private val androidPkgs = pkgs("openjdk-17", "gradle", "aapt2", "aapt", "aidl", "android-tools", "unzip")
-    private val ndkPkgs = pkgs("clang", "cmake", "ninja", "ndk-sysroot")
+    private val ndkPkgs = pkgs("clang", "lld", "cmake", "ninja", "make", "ndk-sysroot")
 
     private fun file(f: File, text: String = "") = f.apply { parentFile?.mkdirs(); writeText(text) }
 
@@ -38,7 +39,7 @@ class AndroidDetectionTest {
         file(File(sdk, "platforms/android-37.0/package.xml"))
         file(File(sdk, "build-tools/36.0.0/package.xml"))
         file(File(sdk, "licenses/android-sdk-license"), "\nabc")
-        file(gradleProperties, "org.gradle.parallel=true\n# >>> PocketRocket\n${AndroidBuildTool.AAPT2_SETTING}/usr/bin/aapt2\n# <<<\n")
+        file(gradleProperties, "org.gradle.parallel=true\n# >>> PocketRocket\n${AndroidBuildTool.AAPT2_SETTING}/usr/bin/aapt2\n${AndroidBuildTool.LIMITS_SETTING}2\n# <<<\n")
     }
 
     private fun android(p: Map<String, DpkgStatus.Package> = androidPkgs) = AndroidBuildTool.presence(sdk, gradleProperties, p)
@@ -59,7 +60,7 @@ class AndroidDetectionTest {
         File(sdk, "platforms").deleteRecursively()
         assertEquals("SDK platform missing", android().problem)
         gradleProperties.writeText("org.gradle.parallel=true\n")
-        assertEquals("SDK platform, aapt2 setting missing", android().problem)
+        assertEquals("SDK platform, aapt2 setting, build limits missing", android().problem)
         // `rm -rf $PREFIX/opt/android-sdk`: gone, whatever packages stay.
         sdk.deleteRecursively()
         assertFalse(android().present)
@@ -69,8 +70,8 @@ class AndroidDetectionTest {
         File(sdk, "licenses").mkdirs() // the SDK step stopped before any download
         val p = android(pkgs("openjdk-17", "gradle", "aapt2", "aapt", "aidl"))
         assertTrue(p.present)
-        assertEquals("SDK platform, SDK build tools, SDK license, aapt2 setting missing", p.problem)
-        val state = ToolStates.android(AndroidBuildState(installed = p.present, problem = p.problem, checked = true))
+        assertEquals("SDK platform, SDK build tools, SDK license, aapt2 setting, build limits missing", p.problem)
+        val state = ToolStates.scriptTool(ScriptToolState(installed = p.present, problem = p.problem, checked = true))
         assertTrue(state.installed)
         val status = ToolModel.status(Tool.Android.spec, state)
         assertEquals("Needs repair", status.short)
@@ -79,6 +80,7 @@ class AndroidDetectionTest {
 
     private fun ndkAsInstalled() {
         file(File(prefix, "${AndroidNdkTool.SHIM_RELATIVE}/${AndroidNdkTool.TOOLCHAIN_RELATIVE}"))
+        file(File(prefix, "${AndroidNdkTool.SHIM_RELATIVE}/ndk-build"))
         file(File(prefix, "${AndroidNdkTool.VERSIONS_RELATIVE}/28.2.13676358/source.properties"), "Pkg.Revision = 28.2.13676358\n")
         file(File(home, AndroidNdkTool.INIT_SCRIPT_RELATIVE))
     }
@@ -118,7 +120,8 @@ class AndroidDetectionTest {
             return p.inputStream.bufferedReader().readText().split(" ").also { p.waitFor() }
         }
         assertTrue(scriptList("ANDROID_BUILD_PACKAGES").containsAll(AndroidBuildTool.PACKAGES.map { it.first }))
-        assertEquals(scriptList("ANDROID_NDK_PACKAGES"), AndroidNdkTool.PACKAGES.map { it.first })
+        // The NDK runs on C and C++'s packages; ndk-sysroot comes with clang.
+        assertTrue((scriptList("CPP_PACKAGES") + "ndk-sysroot").containsAll(AndroidNdkTool.PACKAGES.map { it.first }))
         assertEquals("/tmp/pr-none/${AndroidNdkTool.SHIM_RELATIVE}", scriptList("ANDROID_NDK_SHIM_DIR").single())
         assertEquals("/h/${AndroidNdkTool.INIT_SCRIPT_RELATIVE}", scriptList("ANDROID_NDK_INIT_SCRIPT").single())
     }

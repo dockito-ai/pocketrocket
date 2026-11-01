@@ -75,6 +75,7 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
     var openAgent by remember { mutableStateOf<String?>(null) }
     var picked by remember { mutableStateOf<Draft?>(null) }
     val rows = state.items.size + if (working) 1 else 0
+    val apks = rememberApkCards(state.folder, state.demo, state.items)
     val dictator = rememberDictator()
     // Settings over the session's own process, for the effort in the status line and in the controls.
     val scope = rememberCoroutineScope()
@@ -90,6 +91,11 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
     val streamingLength = (last as? ChatItem.Assistant)?.takeIf { it.streaming }?.text?.length
     LaunchedEffect(rows, if (streamingLength != null) last.id else last) {
         list.followToEnd(animate = true)
+    }
+    // An APK card appears under its call once the build has finished; keep it in view.
+    val apkCount = apks.values.sumOf { it.size }
+    LaunchedEffect(apkCount) {
+        if (apkCount > 0) list.followToEnd(animate = true)
     }
     // A permission or plan card takes room from the list; keep the latest line in view above it.
     LaunchedEffect(state.permission?.requestId) {
@@ -122,9 +128,11 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
                         UserBubble(item.text, item.attachments, menu = menu)
                     }
                     is ChatItem.Assistant -> AssistantMessage(item.text)
-                    is ChatItem.Tool -> if (item.agent != null) AgentCard(item, item.agent, onOpen = { openAgent = item.id }) else ToolCallCard(
-                        item, onOpenOutput = { openShell = item.id }, onMoveToBackground = { session.moveToBackground(item.id) },
-                    )
+                    is ChatItem.Tool -> if (item.agent != null) AgentCard(item, item.agent, onOpen = { openAgent = item.id }) else Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        ToolCallCard(item, onOpenOutput = { openShell = item.id }, onMoveToBackground = { session.moveToBackground(item.id) })
+                        // An APK this call wrote (decision 99).
+                        apks[item.id]?.forEach { ApkCard(it, state.folder) }
+                    }
                     is ChatItem.Error -> ErrorRow(item.text)
                     is ChatItem.Notice -> NoticeRow(item.text, item.byRocket)
                 }

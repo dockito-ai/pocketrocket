@@ -8,7 +8,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Decision 101: uninstalling a tool removes everything it put on the phone, its config and credentials included,
+ * Decision 102: uninstalling a tool removes everything it put on the phone, its config and credentials included,
  * whoever wrote them (keys set up by hand in ~/.aws too). Your own files stay.
  */
 class UninstallLeftoversTest {

@@ -1,0 +1,256 @@
+#!/data/data/app.pocket/files/usr/bin/bash
+# PocketRocket's build slots (decision 97), installed as $PREFIX/bin/pocketrocket-build-slot by the app at every start.
+#
+# Several Claude sessions starting Gradle or Flutter builds at once (each Gradle JVM 1.5-4 GB, plus Kotlin, the Dart VM
+# and clang) got the whole app killed by Android's low-memory killer. So builds take a slot, machine-wide: N lock files
+# in ~/.pocketrocket/builds (slot-0.lock …), a build holds one with `flock` for as long as it runs, and a build that
+# finds them all taken waits, in order of arrival, with one line on stderr. N comes from the phone's RAM: 1 under 6 GB,
+# 2 under 14 GB, else 3. ~/.pocketrocket/settings/build_slots (or POCKETROCKET_BUILD_SLOTS) overrides it; 0 turns
+# build control off and every command runs at once.
+#
+# Each holder and waiter writes <pid>.build there (key=value lines: pid, helper, state, slot, queued, started, folder,
+# session, command), which the app reads to show the queue (BuildQueue.kt). <pid> is the process the build belongs to;
+# anything started under it (cmake's ninja under Gradle, Gradle under `flutter build`, rustc under cargo) runs inside
+# the same slot instead of waiting for a second one.
+#
+#   pocketrocket-build-slot run <label> -- <command…>   run the command in a slot (flutter launcher)
+#   pocketrocket-build-slot wrap <name> <args…>         as <name> from the wrappers folder: the next <name> on PATH,
+#                                                       in a slot for compiling subcommands only (cargo, make, ninja)
+#   pocketrocket-build-slot hold <pid> <label>          for the Gradle hook: takes a slot for <pid>, prints
+#                                                       "PR_SLOT held|nested|off", keeps it until stdin closes
+#   pocketrocket-build-slot status                      the slots and the queue, for people and agents
+#   pocketrocket-build-slot config                      slots=, heap_mb= and mem_mb= for the setup script
+
+PREFIX="${PREFIX:-/data/data/app.pocket/files/usr}"
+BS_HOME="${POCKETROCKET_HOME:-$HOME/.pocketrocket}"
+BS_DIR="${POCKETROCKET_BUILDS_DIR:-$BS_HOME/builds}"
+BS_WRAPPERS="${POCKETROCKET_BUILD_WRAPPERS:-$PREFIX/libexec/pocketrocket/build-wrappers}"
+BS_POLL="${POCKETROCKET_BUILD_POLL:-2}"
+BS_STATUS=""
+BS_FD=""
+BS_SLOT=-1
+
+bs_say() { printf 'PocketRocket: %s\n' "$*" >&2; }
+bs_now() { printf '%(%s)T' -1; }
+
+# bs_mem_mb: the phone's RAM in MB (MemTotal: 11.5 GB on a "12 GB" phone).
+bs_mem_mb() {
+  local kb
+  kb="$(awk '$1 == "MemTotal:" { print $2; exit }' "${POCKETROCKET_MEMINFO:-/proc/meminfo}" 2>/dev/null)"
+  printf '%s' "$(( ${kb:-0} / 1024 ))"
+}
+
+# bs_ram_slots: how many builds fit at once in this much RAM.
+bs_ram_slots() {
+  local mem; mem="$(bs_mem_mb)"
+  if [ "$mem" -lt 6144 ]; then printf 1; elif [ "$mem" -lt 14336 ]; then printf 2; else printf 3; fi
+}
+
+# bs_slots: the setting, else from RAM. 0 means off.
+bs_slots() {
+  local n="${POCKETROCKET_BUILD_SLOTS:-}"
+  if [ -z "$n" ] && [ -f "$BS_HOME/settings/build_slots" ]; then n="$(tr -dc 0-9 <"$BS_HOME/settings/build_slots" | head -c 2)"; fi
+  case "$n" in ''|*[!0-9]*) n="$(bs_ram_slots)" ;; esac
+  printf '%s' "$(( 10#$n > 8 ? 8 : 10#$n ))"
+}
+
+# bs_heap_mb <slots>: Gradle's heap, a quarter of each slot's share of RAM, rounded up to 256 MB, 1024 to 2048.
+bs_heap_mb() {
+  local mem heap; mem="$(bs_mem_mb)"
+  heap=$(( (mem / $1 / 4 + 255) / 256 * 256 ))
+  if [ "$heap" -lt 1024 ]; then heap=1024; elif [ "$heap" -gt 2048 ]; then heap=2048; fi
+  printf '%s' "$heap"
+}
+
+bs_field() { sed -n "s/^$2=//p" "$1" 2>/dev/null | head -n 1; }
+
+# bs_live <status file>: its helper (the process holding or waiting for the lock) is still there.
+bs_live() {
+  local helper; helper="$(bs_field "$1" helper)"
+  [ -n "$helper" ] && kill -0 "$helper" 2>/dev/null
+}
+
+# bs_holds <pid>: a live build in a slot belongs to that pid.
+bs_holds() {
+  local f="$BS_DIR/$1.build"
+  [ -f "$f" ] && [ "$(bs_field "$f" state)" = running ] && bs_live "$f"
+}
+
+# bs_nested: this command runs inside a build that already has a slot: POCKETROCKET_BUILD_SLOT (set for the command a
+# slot runs; it reaches a Gradle daemon through the client's environment) or a process above this one holds it.
+bs_nested() {
+  local p="${POCKETROCKET_BUILD_SLOT:-}" i stat rest
+  case "$p" in ''|*[!0-9]*) ;; *) bs_holds "$p" && return 0 ;; esac
+  p="$PPID"
+  for (( i = 0; i < 64; i++ )); do
+    [ "$p" -gt 1 ] 2>/dev/null || return 1
+    bs_holds "$p" && return 0
+    stat="$(cat "/proc/$p/stat" 2>/dev/null)" || return 1
+    rest="${stat##*) }"            # the name may hold spaces and parentheses; the fields after it don't
+    read -r _ p _ <<<"$rest"       # state, then the parent's pid
+  done
+  return 1
+}
+
+bs_flock() {
+  if command -v flock >/dev/null 2>&1; then flock -n "$1"; else /system/bin/flock -n "$1"; fi
+}
+
+bs_clean_line() { local s="${1//[$'\n\r']/ }"; printf '%s' "${s:0:300}"; }
+
+# bs_write <state>: this build's status file, replaced whole so a reader never sees half of it.
+bs_write() {
+  local tmp="$BS_STATUS.tmp.$$"
+  printf 'pid=%s\nhelper=%s\nstate=%s\nslot=%s\nqueued=%s\nstarted=%s\nfolder=%s\nsession=%s\ncommand=%s\n' \
+    "$BS_OWNER" "$$" "$1" "$BS_SLOT" "$BS_QUEUED" "${BS_STARTED:-}" "$(bs_clean_line "$PWD")" \
+    "$(bs_clean_line "${POCKETROCKET_SESSION_FOLDER:-}")" "$(bs_clean_line "$BS_LABEL")" >"$tmp" && mv -f "$tmp" "$BS_STATUS"
+}
+
+bs_cleanup() {
+  [ -n "$BS_STATUS" ] && rm -f "$BS_STATUS" "$BS_STATUS.tmp.$$"
+  BS_STATUS=""
+}
+
+# bs_entries <state>: the live status files in that state; dead ones are removed on the way.
+bs_entries() {
+  local f
+  for f in "$BS_DIR"/*.build; do
+    [ -f "$f" ] || continue
+    if ! bs_live "$f"; then rm -f "$f"; continue; fi
+    [ "$(bs_field "$f" state)" = "$1" ] && printf '%s\n' "$f"
+  done
+}
+
+# bs_my_turn: no live build has been waiting longer than this one (ties go to the lower pid).
+bs_my_turn() {
+  local f q p
+  while IFS= read -r f; do
+    [ "$f" = "$BS_STATUS" ] && continue
+    q="$(bs_field "$f" queued)"; p="$(bs_field "$f" helper)"
+    [ -n "$q" ] && [ -n "$p" ] || continue
+    if [ "$q" -lt "$BS_QUEUED" ] || { [ "$q" -eq "$BS_QUEUED" ] && [ "$p" -lt "$$" ]; }; then return 1; fi
+  done < <(bs_entries waiting)
+  return 0
+}
+
+# bs_acquire <owner pid> <label> <slots>: waits for a free slot and keeps it open on BS_FD. Fails only when the owner
+# goes away while waiting (a Gradle daemon that stopped).
+bs_acquire() {
+  local n="$3" i fd waited=0
+  BS_OWNER="$1"; BS_LABEL="$2"; BS_QUEUED="$(bs_now)"; BS_STARTED=""
+  mkdir -p "$BS_DIR" || return 0
+  printf '%s\n' "$n" >"$BS_DIR/slots" 2>/dev/null
+  BS_STATUS="$BS_DIR/$BS_OWNER.build"
+  trap bs_cleanup EXIT
+  while :; do
+    # Before this build has written its own line, any waiting build counts as older: a newcomer never jumps the queue.
+    if bs_my_turn; then
+      for (( i = 0; i < n; i++ )); do
+        exec {fd}>>"$BS_DIR/slot-$i.lock" || continue
+        if bs_flock "$fd"; then
+          BS_FD="$fd"; BS_SLOT="$i"; BS_STARTED="$(bs_now)"
+          bs_write running
+          return 0
+        fi
+        exec {fd}>&-
+      done
+    fi
+    if [ "$waited" = 0 ]; then
+      waited=1
+      bs_write waiting
+      bs_say "waiting for another build to finish ($(bs_entries running | wc -l | tr -d ' ') running)…"
+      bs_say "builds take turns so the phone keeps enough memory; agents should run long builds in the background."
+    fi
+    kill -0 "$BS_OWNER" 2>/dev/null || return 1
+    sleep "$BS_POLL"
+  done
+}
+
+# bs_run <label> -- <command…>: the command in a slot, its exit status passed on.
+bs_run() {
+  local label="$1" n rc=0
+  shift; [ "${1:-}" = -- ] && shift
+  [ "$#" -gt 0 ] || { bs_say "usage: pocketrocket-build-slot run <label> -- <command…>"; return 2; }
+  n="$(bs_slots)"
+  if [ "$n" = 0 ] || bs_nested; then exec "$@"; fi
+  bs_acquire "$$" "$label" "$n" || return 1
+  # The command doesn't get the lock's descriptor: a daemon it leaves behind must not keep the slot.
+  POCKETROCKET_BUILD_SLOT="$$" "$@" {BS_FD}>&- || rc=$?
+  return "$rc"
+}
+
+# bs_hold <owner pid> <label>: the Gradle hook's side. stdout carries one PR_SLOT line; messages go to stderr.
+bs_hold() {
+  local owner="$1" label="$2" n
+  case "$owner" in ''|*[!0-9]*) bs_say "usage: pocketrocket-build-slot hold <pid> <label>"; return 2 ;; esac
+  n="$(bs_slots)"
+  if [ "$n" = 0 ]; then echo "PR_SLOT off"; return 0; fi
+  if bs_holds "$owner" || bs_nested; then echo "PR_SLOT nested"; return 0; fi
+  bs_acquire "$owner" "$label" "$n" || return 1
+  echo "PR_SLOT held $BS_SLOT"
+  cat >/dev/null   # until the hook closes our stdin at the end of the build, or the daemon dies
+}
+
+# bs_real <name>: the next <name> on PATH after the wrappers folder.
+bs_real() {
+  local d dirs
+  IFS=: read -ra dirs <<<"$PATH"
+  for d in "${dirs[@]}"; do
+    [ -n "$d" ] || continue
+    [ "$d" -ef "$BS_WRAPPERS" ] && continue
+    if [ -x "$d/$1" ] && [ ! -d "$d/$1" ]; then printf '%s' "$d/$1"; return 0; fi
+  done
+  return 1
+}
+
+# bs_heavy <name> <args…>: the subcommands that compile, so `cargo fmt`, `make --version` or `ninja -t` never wait.
+# Checks (cargo check, clippy) compile too and take a slot, but only while they run.
+bs_heavy() {
+  local name="$1" a sub=""
+  shift
+  case "$name" in
+    cargo)
+      for a in "$@"; do case "$a" in -*|+*) ;; *) sub="$a"; break ;; esac; done
+      case "$sub" in b|build|c|check|clippy|t|test|r|run|bench|doc|install|rustc|rustdoc) return 0 ;; esac
+      return 1 ;;
+    make|ninja)
+      for a in "$@"; do case "$a" in --version|--help|-h|-n|--dry-run|-q|--question|-t) return 1 ;; esac; done
+      return 0 ;;
+  esac
+  return 1
+}
+
+bs_wrap() {
+  local name="${1:-}" real
+  shift
+  real="$(bs_real "$name")" || { printf '%s: command not found\n' "$name" >&2; exit 127; }
+  if bs_heavy "$name" "$@"; then bs_run "$name $*" -- "$real" "$@"; exit; fi
+  exec "$real" "$@"
+}
+
+bs_status() {
+  local n f now; n="$(bs_slots)"; now="$(bs_now)"
+  if [ "$n" = 0 ]; then echo "Build slots: off (every build runs at once)"; else echo "Build slots: $n ($(bs_mem_mb) MB RAM)"; fi
+  for f in $(bs_entries running) $(bs_entries waiting); do
+    printf '%-8s pid %-7s %4s min  %s  %s\n' "$(bs_field "$f" state)" "$(bs_field "$f" pid)" \
+      "$(( (now - $(bs_field "$f" queued)) / 60 ))" "$(bs_field "$f" folder)" "$(bs_field "$f" command)"
+  done
+}
+
+bs_main() {
+  local cmd="${1:-}"
+  shift || true
+  case "$cmd" in
+    run) bs_run "$@" ;;
+    wrap) bs_wrap "$@" ;;
+    hold) bs_hold "$@" ;;
+    status) bs_status ;;
+    config) local n; n="$(bs_ram_slots)"; printf 'slots=%s\nheap_mb=%s\nmem_mb=%s\n' "$n" "$(bs_heap_mb "$n")" "$(bs_mem_mb)" ;;
+    *) bs_say "usage: pocketrocket-build-slot run <label> -- <command…> | wrap <name> <args…> | hold <pid> <label> | status | config"; return 2 ;;
+  esac
+}
+
+if [ "${POCKETROCKET_BUILD_SLOT_SOURCE_ONLY:-0}" != 1 ]; then
+  bs_main "$@"
+  exit
+fi

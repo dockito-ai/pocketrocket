@@ -78,6 +78,26 @@ class FlutterDetectionTest {
         assertEquals("Installed · Flutter SDK missing", ToolModel.status(Tool.Flutter.spec, tile).line)
     }
 
+    @Test fun clangWithoutTheExecHelperOffersRepairForApkBuilds() {
+        asInstalled()
+        assertTrue(presence().complete) // no clang: APK builds aren't expected
+        file(File(prefix, FlutterTool.CLANG_RELATIVE)) // C and C++ added after Flutter
+        assertEquals("APK builds missing", presence().problem)
+        file(File(prefix, FlutterTool.EXEC_GLIBC_RELATIVE)) // Repair built it
+        assertTrue(presence().complete)
+    }
+
+    @Test fun theScriptAndTheLauncherKeepTheExecHelperWhereTheAppLooks() {
+        if (!script.exists()) return
+        fun read(file: String, code: String): String {
+            val p = ProcessBuilder(listOf("bash", "-c", "HOME=/h PREFIX=/p $code", "_", file)).start()
+            return p.inputStream.bufferedReader().readText().also { p.waitFor() }
+        }
+        val want = "/p/${FlutterTool.EXEC_RELATIVE}\n"
+        assertEquals(want, read(script.path, "POCKETROCKET_SETUP_SOURCE_ONLY=1 . \"$1\"; printf '%s\\n' \"\$FLUTTER_EXEC_DIR\""))
+        assertEquals(want, read("../setup/flutter", "POCKETROCKET_FLUTTER_SOURCE_ONLY=1 . \"$1\"; printf '%s\\n' \"\$PR_EXEC_DIR\""))
+    }
+
     @Test fun theScriptAndTheAppNameTheSamePieces() {
         if (!script.exists()) return
         val code = "HOME=/h PREFIX=/p POCKETROCKET_SETUP_SOURCE_ONLY=1 . \"$1\"; printf '%s\\n' \"\$FVM_DIR\" \"\$FLUTTER_VERSIONS\" \"\$FLUTTER_BASELINE_FILE\""

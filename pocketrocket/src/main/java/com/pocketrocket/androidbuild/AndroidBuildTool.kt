@@ -6,12 +6,16 @@ import java.io.File
 
 /** The fixed facts of the Android build tool (decision 45). Sizes are measured on the emulator, docs/android-tools-spike.md. */
 object AndroidBuildTool {
+    const val ID = "android-build"
     const val SDK_RELATIVE = "opt/android-sdk"
     const val JAVA_RELATIVE = "lib/jvm/java-17-openjdk"
 
     /** Under home: where the setup script puts the aapt2 setting (the plugin's own aapt2 is x86_64). */
     const val GRADLE_PROPERTIES_RELATIVE = ".gradle/gradle.properties"
     const val AAPT2_SETTING = "android.aapt2FromMavenOverride="
+
+    /** One of the memory caps the setup script writes beside it (decision 97); an install from before them gets Repair. */
+    const val LIMITS_SETTING = "org.gradle.workers.max="
 
     /** The packages a build needs (the setup script's ANDROID_BUILD_PACKAGES, less unzip and adb), as the tile names them. */
     val PACKAGES = listOf("openjdk-17" to "Java 17", "gradle" to "Gradle", "aapt2" to "aapt2", "aapt" to "aapt", "aidl" to "aidl")
@@ -28,12 +32,15 @@ object AndroidBuildTool {
     /**
      * The tool as it is now, whoever set it up. It is on the phone while the SDK folder is. It works when Java, Gradle
      * and the build tools are installed (dpkg), the SDK has a platform and build tools with the package.xml the plugin
-     * reads and the accepted license, and Gradle has the aapt2 setting. Taking any of them away from a terminal shows.
+     * reads and the accepted license, and Gradle has the aapt2 setting and the build limits. Taking any of them away from
+     * a terminal shows.
      */
     fun presence(sdk: File, gradleProperties: File, pkgs: Map<String, DpkgStatus.Package>): ToolPresence {
         if (!sdk.isDirectory) return ToolPresence.Absent
         val platform = File(sdk, "platforms").listFiles()?.any { File(it, "android.jar").isFile && File(it, "package.xml").isFile } == true
-        val aapt2 = runCatching { gradleProperties.readLines() }.getOrNull().orEmpty().any { it.trim().startsWith(AAPT2_SETTING) }
+        val settings = runCatching { gradleProperties.readLines() }.getOrNull().orEmpty().map { it.trim() }
+        val aapt2 = settings.any { it.startsWith(AAPT2_SETTING) }
+        val limits = settings.any { it.startsWith(LIMITS_SETTING) }
         return ToolPresence.of(
             true,
             ToolPresence.missingPackages(pkgs, PACKAGES) + listOfNotNull(
@@ -41,6 +48,7 @@ object AndroidBuildTool {
                 "SDK build tools".takeUnless { ToolPresence.anyChildHas(File(sdk, "build-tools"), "package.xml") },
                 "SDK license".takeUnless { File(sdk, "licenses/android-sdk-license").isFile },
                 "aapt2 setting".takeUnless { aapt2 },
+                "build limits".takeUnless { limits },
             ),
         )
     }

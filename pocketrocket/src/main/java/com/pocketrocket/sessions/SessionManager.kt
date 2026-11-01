@@ -1,6 +1,7 @@
 package com.pocketrocket.sessions
 
 import com.pocketrocket.androidbuild.AndroidBuild
+import com.pocketrocket.builds.BuildSlots
 import com.pocketrocket.pkgtools.PackageTools
 import android.content.Context
 import com.pocketrocket.keepalive.ProcessMemory
@@ -183,8 +184,10 @@ object SessionManager {
         val resume = Transcript.exists(state)
         // The session's Claude account, plus the GitHub account its folder is bound to (GH_CONFIG_DIR), and its
         // folder for pocketrocket-workspace, which takes accounts from the session's workspace (decision 73). The Android
-        // tool's and the package tools' variables (RUBYOPT for Ruby, decision 98) too.
+        // tool's and the package tools' variables (RUBYOPT for Ruby, decision 98) too, and PATH with the build-slot
+        // wrappers first (decision 97).
         val environment = state.profile.environment + AccountWiring.toolEnvFor(state.folder) + AndroidBuild.environment() + PackageTools.environment() +
+            BuildSlots.environment() +
             (WorkspaceCli.SESSION_FOLDER_ENV to state.folder) + extraEnvironment
         return ClaudeProcessTransport(app, File(state.folder), state.conversationId, resume, environment, extraArguments = arguments)
     }

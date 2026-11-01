@@ -1,6 +1,7 @@
 package com.pocketrocket.pkgtools
 
 import android.content.Context
+import com.pocketrocket.androidbuild.AndroidBuildTool
 import com.pocketrocket.clilogin.CliLogins
 import com.pocketrocket.setup.SetupPhase
 import com.pocketrocket.setup.SetupState
@@ -29,6 +30,8 @@ data class PackageToolsState(
     /** The tool the running (or last) job is for. */
     val tool: PackageTool? = null,
     val removing: Boolean = false,
+    /** The job is a [PackageTool.repair], not an install. */
+    val repairing: Boolean = false,
     val outcome: String? = null,
     val failed: Boolean = false,
 ) {
@@ -66,6 +69,7 @@ object PackageTools {
     private fun disk() = PackageDisk(
         profiles = PackageTool.entries.mapNotNull { it.shell?.file }.filter { File(prefix, "etc/profile.d/$it").isFile }.toSet(),
         javaDefault = runCatching { File(prefix, "bin/java").canonicalPath }.getOrNull(),
+        gradleJdks = GradleJdks.read(prefix, File(TermuxConstants.TERMUX_HOME_DIR_PATH, AndroidBuildTool.GRADLE_PROPERTIES_RELATIVE)),
     )
 
     /**
@@ -80,21 +84,31 @@ object PackageTools {
 
     fun remove(context: Context, t: PackageTool) = run(context, t, remove = true)
 
+    /** Repair: its [PackageTool.repair] job when it has one (Java's), else the install again. */
+    fun repair(context: Context, t: PackageTool) = run(context, t, remove = false, repair = t.repair != null)
+
     /** Retry: the last job again. */
     fun retry(context: Context) {
         val s = _state.value
-        s.tool?.let { run(context, it, s.removing) }
+        s.tool?.let { run(context, it, s.removing, s.repairing) }
     }
 
-    private fun run(context: Context, t: PackageTool, remove: Boolean) {
+    private fun run(context: Context, t: PackageTool, remove: Boolean, repair: Boolean = false) {
         synchronized(this) {
             if (_state.value.running || t.login?.let { CliLogins.of(it).state.value.busy } == true) return
-            _state.update { it.copy(job = SetupState(phase = SetupPhase.Running), tool = t, removing = remove, outcome = null, failed = false) }
+            _state.update {
+                it.copy(job = SetupState(phase = SetupPhase.Running), tool = t, removing = remove, repairing = repair, outcome = null, failed = false)
+            }
         }
         val app = context.applicationContext
         Termux.startForegroundService(app)
+        val option = when {
+            remove -> t.removeOption
+            repair -> t.repair?.option ?: t.option
+            else -> t.option
+        }
         scope.launch {
-            val (exit, sawDone) = ToolScript.run(app, if (remove) t.removeOption else t.option) { change ->
+            val (exit, sawDone) = ToolScript.run(app, option) { change ->
                 _state.update { s -> s.copy(job = s.job?.let(change)) }
             }
             read()
