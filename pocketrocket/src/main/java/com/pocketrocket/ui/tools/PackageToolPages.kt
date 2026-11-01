@@ -10,6 +10,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.pocketrocket.clilogin.CliLogins
+import com.pocketrocket.clilogin.LoginState
 import com.pocketrocket.pkgtools.PackageTool
 import com.pocketrocket.pkgtools.PackageTools
 import com.pocketrocket.pkgtools.PackageToolsState
@@ -71,6 +73,8 @@ internal fun PackageToolPage(
     purpose: String,
     onBack: () -> Unit,
     removeNote: String,
+    /** Its login card, for a tool with one ([PackageTool.login]): given the login and whether its job is running. */
+    accounts: (@Composable ColumnScope.(LoginState, Boolean) -> Unit)? = null,
     about: @Composable ColumnScope.() -> Unit,
 ) {
     val pkg = requireNotNull(tool.pkg) { "${tool.name} isn't a package tool" }
@@ -78,7 +82,12 @@ internal fun PackageToolPage(
     val context = LocalContext.current
     val s by PackageTools.state.collectAsState()
     val updates by Updates.state.collectAsState()
+    val login = pkg.login?.let { CliLogins.of(it) }
+    // A tool has a login or it doesn't, so this call is always made or never.
+    val ls = login?.state?.collectAsState()?.value ?: LoginState()
     LaunchedEffect(Unit) { PackageTools.refresh() }
+    val installed = s.installed(pkg)
+    LaunchedEffect(installed) { login?.refreshAccount(context, installed) }
     val mine = s.isFor(pkg)
     val missing = pkg.missing(s.packages)
     val held = pkg.held(s.packages)
@@ -86,7 +95,7 @@ internal fun PackageToolPage(
 
     ToolPage(
         spec = tool.spec,
-        state = ToolStates.packageTool(pkg, s, component?.let { c -> updates.rows.firstOrNull { it.component == c } }),
+        state = ToolStates.packageTool(pkg, s, component?.let { c -> updates.rows.firstOrNull { it.component == c } }, ls),
         icon = tool.icon,
         purpose = purpose,
         onBack = onBack,
@@ -105,8 +114,10 @@ internal fun PackageToolPage(
                     ({ Note("${held.name} needs ${PackageTool.names(pkg.kept(s.packages))}, so they stay while it's installed.") })
                 else -> null
             },
+            holdUninstall = ls.busy,
         ),
         update = component?.let { toolUpdate(context, updates, it) },
+        accounts = accounts?.let { card -> { card(ls, s.running && mine) } },
     ) {
         if (missing.isNotEmpty() && !s.running) {
             ToolCard("NOT HERE YET") {

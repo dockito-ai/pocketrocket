@@ -26,6 +26,8 @@ enum class UpdateComponent(val label: String, val optional: Boolean = false, val
     Ruby("Ruby", optional = true, packageTool = PackageTool.Ruby),
     Php("PHP", optional = true, packageTool = PackageTool.Php),
     Java("Java and Kotlin", optional = true, packageTool = PackageTool.Java),
+    Aws("AWS CLI", optional = true, packageTool = PackageTool.Aws),
+    Fly("flyctl", optional = true, packageTool = PackageTool.Fly),
     ;
 
     companion object {

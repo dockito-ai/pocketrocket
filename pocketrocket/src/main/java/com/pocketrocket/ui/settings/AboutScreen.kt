@@ -53,7 +53,8 @@ internal object AboutCredits {
     )
 
     val icons = listOf(
-        Credit("Claude Code, Node.js, Headless Chrome, Wrangler, Flutter & Dart, Python, Bun, Go", "Simple Icons 16.36.0, CC0 1.0"),
+        Credit("Claude Code, Node.js, Headless Chrome, Wrangler, Flutter & Dart, Python, Bun, Go, Vercel, Netlify, Firebase, flyctl", "Simple Icons 16.36.0, CC0 1.0"),
+        Credit("AWS CLI (a cloud, not AWS's mark)", "Material Icons, Apache 2.0 (Google)"),
         Credit("Deno", "Simple Icons, MIT"),
         Credit("Java and Kotlin (OpenJDK)", "Simple Icons, BSD 3-Clause"),
         Credit("PHP", "Simple Icons, CC BY-SA 4.0"),

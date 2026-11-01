@@ -25,6 +25,11 @@ object Routes {
     const val TOOL_RUBY = "tool-ruby"
     const val TOOL_PHP = "tool-php"
     const val TOOL_JAVA = "tool-java"
+    const val TOOL_AWS = "tool-aws"
+    const val TOOL_FLY = "tool-flyctl"
+    const val TOOL_VERCEL = "tool-vercel"
+    const val TOOL_NETLIFY = "tool-netlify"
+    const val TOOL_FIREBASE = "tool-firebase"
     const val TOOL_GIT = "tool-git"
     /** Settings › Updates › Claude Code: versions, rollback, sessions on the old version (R9). */
     const val CLAUDE_CODE = "claude-code"

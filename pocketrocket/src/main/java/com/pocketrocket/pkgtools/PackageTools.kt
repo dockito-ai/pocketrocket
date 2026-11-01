@@ -1,6 +1,7 @@
 package com.pocketrocket.pkgtools
 
 import android.content.Context
+import com.pocketrocket.clilogin.CliLogins
 import com.pocketrocket.setup.SetupPhase
 import com.pocketrocket.setup.SetupState
 import com.pocketrocket.setup.ToolScript
@@ -57,6 +58,7 @@ object PackageTools {
     private fun read() {
         val pkgs = DpkgStatus.read(PackageTool.allWatched)
         _state.update { it.copy(packages = pkgs, disk = disk(), checked = true) }
+        PackageTool.entries.forEach { t -> t.login?.let { CliLogins.of(it).refresh() } }
     }
 
     private val prefix = File(TermuxConstants.TERMUX_PREFIX_DIR_PATH)
@@ -86,7 +88,7 @@ object PackageTools {
 
     private fun run(context: Context, t: PackageTool, remove: Boolean) {
         synchronized(this) {
-            if (_state.value.running) return
+            if (_state.value.running || t.login?.let { CliLogins.of(it).state.value.busy } == true) return
             _state.update { it.copy(job = SetupState(phase = SetupPhase.Running), tool = t, removing = remove, outcome = null, failed = false) }
         }
         val app = context.applicationContext
@@ -96,6 +98,7 @@ object PackageTools {
                 _state.update { s -> s.copy(job = s.job?.let(change)) }
             }
             read()
+            if (remove) t.login?.let { CliLogins.of(it).forget() }
             // An uninstall may leave what other packages need (Python for Headless Chrome), so only the script's word counts.
             val ok = exit == 0 && sawDone && (remove || _state.value.installed(t))
             _state.update { s ->
