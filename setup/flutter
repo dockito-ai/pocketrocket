@@ -39,8 +39,12 @@
 # Commands plugins' build scripts expect and the phone lacks (shasum) come from PR_BIN_DIR, last on PATH so real ones win.
 # The Gradle heap for APK builds is twice the build-slot cap (decision 104): Jetifier on Flutter's engine jar needs more.
 # Builds are arm64 only unless --target-platform is given (the phone's NDK serves no other ABI), with Flutter's ABI
-# filter off. Release and profile builds stop with a message: Google publishes Flutter's Android AOT compiler
-# (gen_snapshot) only for x86_64 hosts.
+# filter off.
+# Release and profile builds (decision 106) need the opt-in Release builds piece (Settings → Tools → Flutter & Dart):
+# Google publishes Flutter's Android AOT compiler, gen_snapshot, only for x86_64 hosts. Flutter downloads that one
+# (android-<arch>-<mode>/linux-x64/gen_snapshot) and on this host looks in android-<arch>-<mode>/linux-arm64/, so with
+# the piece installed every prepare writes a wrapper there that runs the x86_64 one under qemu-x86_64, with the piece's
+# x86_64 C library as its root (pr_aot_wrappers). Without it those builds stop with a message naming the piece.
 #
 # Internal modes for the setup script: POCKETROCKET_FLUTTER_PREPARE=<folder> prepares that folder and exits;
 # POCKETROCKET_FLUTTER_ROOT=<flutter folder> runs that Flutter whatever the pin.
@@ -57,6 +61,9 @@ PR_PRELOAD_VAR=POCKETROCKET_GLIBC_PRELOAD    # the one-shot glibc preload (pr_ap
 PR_WRAPPER_MARK='PocketRocket wrapper 3'     # in every wrapper this launcher writes now; older ones are written again
 PR_NAME="${0##*/}"
 PR_FVM_DIR="$PREFIX/opt/fvm"
+PR_QEMU="$PREFIX/bin/qemu-x86_64"               # Release builds (decision 106): the setup script's FLUTTER_RELEASE_QEMU,
+PR_X64_SYSROOT="$PREFIX/opt/flutter-x64-sysroot"   # FLUTTER_RELEASE_SYSROOT
+PR_AOT_MARK='PocketRocket gen_snapshot wrapper 1'  # in every gen_snapshot wrapper; the setup script finds them by it
 case "$PR_NAME" in dart*) PR_NAME=dart ;; fvm*) PR_NAME=fvm ;; *) PR_NAME=flutter ;; esac
 
 pr_say() { printf '[%s] %s\n' "$PR_NAME" "$*" >&2; }
@@ -153,6 +160,7 @@ pr_moves_checkout() {
 pr_needs_prepare() {
   local cache="$1/bin/cache" saved=""
   pr_scripts_ready "$1" || return 0
+  pr_aot_wrappers "$1" check && return 0
   [ -e "$cache/dart-sdk/bin/dart" ] && [ ! -e "$cache/dart-sdk/bin/dart.glibc" ] && return 0
   [ -e "$cache/dart-sdk/bin/dart.glibc" ] && ! grep -qF "$PR_WRAPPER_MARK" "$cache/dart-sdk/bin/dart" 2>/dev/null && return 0
   [ -f "$cache/$PR_STAMP" ] || return 0
@@ -216,12 +224,60 @@ pr_prepare_root() {
   done
   pr_fix_scripts "$1" || { pr_say "could not fix the scripts in $1/bin"; rc=1; }
   [ "$rc" = 1 ] || pr_prepare "$cache" || rc=1
+  [ "$rc" = 1 ] || pr_aot_wrappers "$1" || pr_say "could not write the gen_snapshot wrappers in $1 (release builds)"
   if [ "$rc" = 0 ]; then
     pr_signature "$1"
     printf '%s\n' "$PR_SIG" >"$cache/$PR_STAMP"
   fi
   rmdir "$lock" 2>/dev/null
   return "$rc"
+}
+
+# pr_release_ready: Release builds are installed: the emulator and the x86_64 C library.
+pr_release_ready() { [ -x "$PR_QEMU" ] && [ -e "$PR_X64_SYSROOT/lib64/ld-linux-x86-64.so.2" ]; }
+
+# pr_aot_wrapper <x86_64 gen_snapshot>: the wrapper's text, for the linux-arm64 folder beside its own.
+pr_aot_wrapper() {
+  printf '#!%s\n# %s, written by the flutter launcher for release builds (Settings → Tools → Flutter & Dart).\n# Runs Google'"'"'s x86_64 gen_snapshot under qemu-x86_64; the setup script removes it with release builds.\nunset LD_PRELOAD LD_LIBRARY_PATH %s\nexec %q -L %q %q "$@"\n' \
+    "$PR_BASH" "$PR_AOT_MARK" "$PR_PRELOAD_VAR" "$PR_QEMU" "$PR_X64_SYSROOT" "$1"
+}
+
+# pr_aot_wrappers <flutter root> [check]: with Release builds installed, the gen_snapshot wrapper at
+# android-<arch>-<mode>/linux-arm64/gen_snapshot for every release and profile linux-x64/gen_snapshot in the version,
+# written when missing or different. A file there that isn't a wrapper of ours (a real arm64 gen_snapshot, one day) is
+# left alone. With check nothing is written: 0 when one would be. 1 when there is nothing to do.
+pr_aot_wrappers() {
+  local x w want have
+  pr_release_ready || return 1
+  for x in "$1"/bin/cache/artifacts/engine/android-*-release/linux-x64/gen_snapshot "$1"/bin/cache/artifacts/engine/android-*-profile/linux-x64/gen_snapshot; do
+    [ -f "$x" ] || continue
+    w="${x%/linux-x64/gen_snapshot}/linux-arm64/gen_snapshot"
+    if [ -e "$w" ] || [ -L "$w" ]; then
+      [ -f "$w" ] && [ ! -L "$w" ] && grep -qF "$PR_AOT_MARK" "$w" 2>/dev/null || continue
+    fi
+    want="$(pr_aot_wrapper "$x")"; have=""
+    [ -f "$w" ] && have="$(<"$w")"
+    [ "$have" != "$want" ] || continue
+    [ "${2:-}" != check ] || return 0
+    mkdir -p "${w%/*}" && printf '%s\n' "$want" >"$w.tmp" && chmod 755 "$w.tmp" && mv -f "$w.tmp" "$w" || { rm -f "$w.tmp"; return 1; }
+  done
+  [ "${2:-}" != check ] || return 1
+  return 0
+}
+
+# pr_aot_setup <flutter root>: before a release or profile APK build. Flutter downloads its Android tools at the start of
+# the build, after this launcher prepared the version, so a version that has none yet gets them now (flutter precache
+# --android) and its wrappers before Gradle runs.
+pr_aot_setup() {
+  local root="$1"
+  [ -n "$root" ] || return 0
+  if [ ! -f "$root/bin/cache/artifacts/engine/android-arm64-release/linux-x64/gen_snapshot" ]; then
+    pr_say "Downloading Flutter's Android release tools"
+    (cd "$HOME" && env -u "$PR_PRELOAD_VAR" "$PR_BASH" "$root/bin/flutter" precache --android >&2) || return 1
+    pr_prepare_root "$root" || return 1
+  elif pr_needs_prepare "$root"; then
+    pr_prepare_root "$root" || return 1
+  fi
 }
 
 # pr_dart_sdk <flutter root>: fetches the Dart SDK when Flutter's own check says it is missing or old, the way
@@ -319,14 +375,19 @@ pr_has_arg() {
   return 1
 }
 
-# pr_apk_setup <flutter arguments>: for an APK or app bundle build, refuses release and profile builds, and when the
-# exec helper is there sets what the build needs: the one-shot glibc preload for the Flutter tool (pr_wrap), Flutter's
-# ABI filter off (as a Gradle project property in the environment), and arm64 unless a target platform is given, in
-# PR_EXTRA_ARGS. 1 with a message when the build can't run here.
+# pr_apk_setup <flutter arguments>: for an APK or app bundle build, refuses release and profile builds unless Release
+# builds are installed, and when the exec helper is there sets what the build needs: the one-shot glibc preload for the
+# Flutter tool (pr_wrap), Flutter's ABI filter off (as a Gradle project property in the environment), and arm64 unless a
+# target platform is given, in PR_EXTRA_ARGS; a release or profile build also gets its gen_snapshot wrappers
+# (pr_aot_setup, for the version in PR_ROOT). 1 with a message when the build can't run here.
 pr_apk_setup() {
+  local release=""
   if ! pr_has_arg --debug "$@"; then
-    pr_say "Release and profile builds don't run on the phone: Google publishes Flutter's Android AOT compiler (gen_snapshot) only for x86_64 computers. Add --debug for a debug APK, or build releases on a Mac or in CI."
-    return 1
+    if ! pr_release_ready; then
+      pr_say "Release and profile builds need Release builds: Settings → Tools → Flutter & Dart. (Google publishes Flutter's Android AOT compiler, gen_snapshot, only for x86_64 computers; that piece runs it under emulation.) Add --debug for a debug APK."
+      return 1
+    fi
+    release=1
   fi
   pr_apk_preflight || return 1
   if [ ! -f "$PR_EXEC_DIR/aarch64/2.so" ] || [ ! -e "$PR_EXEC_DIR/\$PLATFORM/1.so" ]; then
@@ -337,6 +398,10 @@ pr_apk_setup() {
   PR_RUN_ENV+=("ORG_GRADLE_PROJECT_disable-abi-filtering=true")
   pr_apk_heap
   pr_has_arg --target-platform "$@" || PR_EXTRA_ARGS+=(--target-platform android-arm64)
+  if [ -n "$release" ]; then
+    pr_aot_setup "${PR_ROOT:-}" || { pr_say "could not set up gen_snapshot for this release build"; return 1; }
+    pr_say "Release build: the AOT compile (gen_snapshot) runs under x86_64 emulation and takes a few minutes."
+  fi
 }
 
 # APK preflight (decision 105): before an APK build starts Gradle, the project is checked for what it needs from the
@@ -513,7 +578,7 @@ pr_flutter() {
     pr_restore_scripts "$root" || { pr_say "could not put back Flutter's scripts in $root/bin for git"; return 1; }
   fi
 
-  PR_EXTRA_ARGS=()
+  PR_EXTRA_ARGS=(); PR_ROOT="$root"
   if [ "$PR_NAME" = flutter ] && pr_apk_build "$@"; then pr_apk_setup "$@" || return 1; fi
 
   # Not exec: Flutter may download engine tools during this run and start them at once, before they are

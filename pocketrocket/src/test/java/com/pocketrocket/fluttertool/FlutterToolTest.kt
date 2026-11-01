@@ -213,7 +213,7 @@ class FlutterToolTest {
         }
     }
 
-    @Test fun theLauncherBuildsDebugApksForArm64AndRefusesReleaseOnes() {
+    @Test fun theLauncherBuildsDebugApksForArm64AndReleaseOnesOnlyWithReleaseBuilds() {
         if (!launcher.exists()) return
         fun apk(vararg args: String) = shell(launcher, "POCKETROCKET_FLUTTER_SOURCE_ONLY", "pr_apk_build \"$@\"", *args).first == 0
         assertTrue(apk("build", "apk", "--debug", "--flavor", "dev"))
@@ -240,6 +240,15 @@ class FlutterToolTest {
             assertEquals(0 to "--target-platform android-arm64|ORG_GRADLE_PROJECT_disable-abi-filtering=true|$preload", debug)
             val chosen = shell(launcher, "POCKETROCKET_FLUTTER_SOURCE_ONLY", setup, dir.path, "build", "apk", "--debug", "--target-platform=android-arm")
             assertEquals(0 to "|ORG_GRADLE_PROJECT_disable-abi-filtering=true|$preload", chosen)
+
+            // With Release builds (decision 106) a release build runs like a debug one, and says it is slow.
+            File(dir, "qemu-x86_64").apply { writeText("#!/bin/sh\n"); setExecutable(true) }
+            File(dir, "sysroot/lib64").mkdirs(); File(dir, "sysroot/lib64/ld-linux-x86-64.so.2").writeText("")
+            val withRelease = "PR_QEMU=\"$1/qemu-x86_64\"; PR_X64_SYSROOT=\"$1/sysroot\"; $setup"
+            val release2 = shell(launcher, "POCKETROCKET_FLUTTER_SOURCE_ONLY", withRelease, dir.path, "build", "apk", "--release")
+            assertEquals(release2.second, 0, release2.first)
+            assertTrue(release2.second, release2.second.endsWith("--target-platform android-arm64|ORG_GRADLE_PROJECT_disable-abi-filtering=true|$preload"))
+            assertTrue(release2.second, "under x86_64 emulation" in release2.second)
         } finally {
             dir.deleteRecursively()
         }
@@ -303,6 +312,46 @@ class FlutterToolTest {
             deps(plugin("named", "named"))
             write("app/android/app/build.gradle.kts", "android {\n    externalNativeBuild { cmake { path = file(\"x\") } }\n}\n")
             assertTrue(preflight("PR_NDK_BUILD=/none;").second.contains("native code (the app)"))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test fun releaseBuildsWrapEveryReleaseAndProfileGenSnapshotAndRemoveOnlyTheirOwn() {
+        if (!launcher.exists() || !script.exists()) return
+        val dir = File.createTempFile("aot", "").apply { delete(); mkdirs() }
+        try {
+            val root = File(dir, "fvm/versions/3.47.9")
+            val engine = File(root, "bin/cache/artifacts/engine")
+            fun x64(mode: String) = File(engine, "$mode/linux-x64/gen_snapshot").apply { parentFile!!.mkdirs(); writeText("ELF") }
+            fun arm64(mode: String) = File(engine, "$mode/linux-arm64/gen_snapshot")
+            listOf("android-arm64-release", "android-arm-profile", "android-x64-release").forEach { x64(it) }
+            x64("android-arm64") // debug: no AOT compiler wanted
+            arm64("android-x64-release").apply { parentFile!!.mkdirs(); writeText("a real arm64 gen_snapshot") } // not ours
+            File(dir, "qemu-x86_64").apply { writeText("#!/bin/sh\n"); setExecutable(true) }
+            val env = "PR_QEMU=\"$1/qemu-x86_64\"; PR_X64_SYSROOT=\"$1/sysroot\"; R=\"$1/fvm/versions/3.47.9\";"
+            fun aot(code: String) = shell(launcher, "POCKETROCKET_FLUTTER_SOURCE_ONLY", "$env $code", dir.path)
+
+            assertEquals(1, aot("pr_aot_wrappers \"\$R\" check").first) // not installed: nothing to do
+            File(dir, "sysroot/lib64").mkdirs(); File(dir, "sysroot/lib64/ld-linux-x86-64.so.2").writeText("")
+            assertEquals(0, aot("pr_aot_wrappers \"\$R\" check").first)
+            assertFalse(arm64("android-arm64-release").exists()) // check writes nothing
+            assertEquals(0, aot("pr_aot_wrappers \"\$R\"").first)
+            val wrapper = arm64("android-arm64-release").readText()
+            assertTrue(wrapper, wrapper.contains("${dir.path}/qemu-x86_64 -L ${dir.path}/sysroot ${x64("android-arm64-release").path} \"\$@\""))
+            assertTrue(wrapper, wrapper.contains("unset LD_PRELOAD"))
+            assertTrue(arm64("android-arm64-release").canExecute())
+            assertTrue(arm64("android-arm-profile").exists())
+            assertFalse(arm64("android-arm64").exists())
+            assertEquals("a real arm64 gen_snapshot", arm64("android-x64-release").readText())
+            assertEquals(1, aot("pr_aot_wrappers \"\$R\" check").first) // all in place
+
+            // The setup script lists only the launcher's wrappers, in every version, for removal.
+            val listed = shell(script, "POCKETROCKET_SETUP_SOURCE_ONLY", "FLUTTER_VERSIONS=\"$1/fvm/versions\"; flutter_release_wrapper_list", dir.path)
+            assertEquals(
+                setOf(arm64("android-arm64-release").path, arm64("android-arm-profile").path),
+                listed.second.lines().filter { it.isNotBlank() }.toSet(),
+            )
         } finally {
             dir.deleteRecursively()
         }

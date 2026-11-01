@@ -37,6 +37,9 @@ enum class FlutterAction(val removes: Boolean, val part: FlutterPart, val whole:
     AddVersion(false, FlutterPart.Flutter),
     SetDefault(false, FlutterPart.Flutter),
     RemoveVersion(true, FlutterPart.Flutter),
+    /** Release builds, the opt-in piece on Flutter's page (decision 106). */
+    AddReleaseBuilds(false, FlutterPart.Flutter),
+    RemoveReleaseBuilds(true, FlutterPart.Flutter),
     UninstallFlutter(true, FlutterPart.Flutter, whole = true),
     InstallRust(false, FlutterPart.Rust, whole = true),
     RemoveRust(true, FlutterPart.Rust, whole = true),
@@ -50,6 +53,8 @@ data class FlutterRustState(
     val flutterInstalled: Boolean = false,
     /** What keeps Flutter from working ("Dart SDK missing"); Repair runs the install again. */
     val flutterProblem: String? = null,
+    /** Release builds ([FlutterTool.releaseBuilds]), read from disk like the rest. */
+    val releaseBuilds: ReleaseBuilds = ReleaseBuilds.Off,
     /** Rust's packages installed now (`rust`, `rust-std-*`), from dpkg's status, whoever installed them. */
     val rustPackages: Map<String, DpkgStatus.Package> = emptyMap(),
     val checked: Boolean = false,
@@ -119,6 +124,7 @@ object FlutterRust {
         val default = defaultVersion()
         val rust = rustPackages()
         val flutter = flutterPresence()
+        val release = FlutterTool.releaseBuilds(prefix, home)
         val names = FlutterTool.installedVersions(
             versionsDir.listFiles()?.filter { File(it, "bin/flutter").isFile }?.map { it.name }.orEmpty(),
         )
@@ -127,6 +133,7 @@ object FlutterRust {
             s.copy(
                 flutterInstalled = flutter.present,
                 flutterProblem = flutter.problem,
+                releaseBuilds = release,
                 rustPackages = rust,
                 checked = true,
                 versions = names.map { FlutterVersion(it, it == default, known[it]?.bytes) },
@@ -195,11 +202,25 @@ object FlutterRust {
     fun removeVersion(context: Context, version: String) =
         run(context, "flutter-remove-version", FlutterAction.RemoveVersion, version, FlutterTool.removeVersionSteps(version), mapOf(FlutterTool.VERSION_ENV to version))
 
+    /** Adds Release builds: Termux's qemu-x86_64 and an x86_64 C library, so release and profile APKs build here. */
+    fun addReleaseBuilds(context: Context) =
+        run(context, "flutter-release", FlutterAction.AddReleaseBuilds, null, FlutterTool.RELEASE_STEPS)
+
+    fun removeReleaseBuilds(context: Context) =
+        run(context, "flutter-release-remove", FlutterAction.RemoveReleaseBuilds, null, FlutterTool.RELEASE_REMOVE_STEPS)
+
+    /**
+     * Repair on Flutter's page: when only Release builds are half there, their own install puts them back; anything
+     * else runs Flutter's install again (which also puts back half-there Release builds).
+     */
+    fun repairFlutter(context: Context) =
+        if (FlutterTool.repairsOnlyReleaseBuilds(_state.value.flutterProblem)) addReleaseBuilds(context) else installFlutter(context)
+
     fun installRust(context: Context) = run(context, "rust", FlutterAction.InstallRust, null, FlutterTool.RUST_STEPS)
 
     fun removeRust(context: Context) = run(context, "rust-remove", FlutterAction.RemoveRust, null, FlutterTool.RUST_REMOVE_STEPS)
 
-    /** Uninstall Flutter & Dart: every version, FVM and the caches. Rust stays. */
+    /** Uninstall Flutter & Dart: every version, FVM and the caches, and Release builds. Rust stays. */
     fun uninstallFlutter(context: Context) =
         run(context, "flutter-remove", FlutterAction.UninstallFlutter, null, FlutterTool.FLUTTER_REMOVE_STEPS)
 

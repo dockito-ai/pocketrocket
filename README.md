@@ -102,7 +102,7 @@ Settings → Updates keeps the tools that can move current. Android and the Andr
 
 <table>
   <tr>
-    <td align="left" valign="top" width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/flutter.svg"><img alt="Flutter and Dart" src="docs/tool-icons/light/flutter.svg" width="32" height="32"></picture><br><b>Flutter &amp; Dart</b><br>Check Dart code, keep more than one Flutter version, and build a debug APK once Android and C and C++ are installed.</td>
+    <td align="left" valign="top" width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/flutter.svg"><img alt="Flutter and Dart" src="docs/tool-icons/light/flutter.svg" width="32" height="32"></picture><br><b>Flutter &amp; Dart</b><br>Check Dart code, keep more than one Flutter version, and build a debug APK once Android and C and C++ are installed. Add Release builds for slower release APKs too.</td>
     <td align="left" valign="top" width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/cpp.svg"><img alt="C and C++" src="docs/tool-icons/light/cpp.svg" width="32" height="32"></picture><br><b>C and C++</b><br>Compile and run C and C++ with clang, CMake, Ninja, make and lldb.</td>
   </tr>
   <tr>

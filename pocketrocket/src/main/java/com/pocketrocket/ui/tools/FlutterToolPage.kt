@@ -34,6 +34,7 @@ import com.pocketrocket.fluttertool.FlutterRust
 import com.pocketrocket.fluttertool.FlutterRustState
 import com.pocketrocket.fluttertool.FlutterTool
 import com.pocketrocket.fluttertool.FlutterVersion
+import com.pocketrocket.fluttertool.ReleaseBuilds
 import com.pocketrocket.ui.components.AccentButton
 import com.pocketrocket.ui.components.OutlineButton
 import com.pocketrocket.ui.components.mockText
@@ -48,11 +49,11 @@ import kotlinx.coroutines.withContext
 
 private const val FOR_CHECKING =
     "For checking code: pub get, build_runner, analyze and test. Debug APKs build here with Android and C and C++ " +
-        "installed (flutter build apk --debug); release builds need a Mac or CI."
+        "installed (flutter build apk --debug); release APKs too once Release builds is added below."
 
 /**
  * Settings → Tools → Flutter & Dart (decisions 75 and 87): what it is for, its version with Update, the Flutter
- * versions (sizes, default, Add version, Set default, Remove), a nudge towards Rust when a workspace is a
+ * versions (sizes, default, Add version, Set default, Remove), Release builds (decision 106), a nudge towards Rust when a workspace is a
  * flutter_rust_bridge app, sizes, and Install or Uninstall. Version jobs run inside their card; installing or
  * uninstalling is the page's job. Rust is its own tool and page.
  */
@@ -83,11 +84,12 @@ fun FlutterToolPage(onBack: () -> Unit, onOpenRust: () -> Unit) {
             job = if (whole) s.job else null, outcome = s.outcome, removing = s.removing,
             installSteps = if (whole) s.steps else FlutterTool.flutterSteps(s.latestStable), removeSteps = s.steps,
             failedLine = if (s.removing) "Some of it may still be on the phone." else "Retry picks up where it stopped.",
-            onInstall = { FlutterRust.installFlutter(context) },
+            // Install, or Repair: Release builds' own install when they are all that's missing.
+            onInstall = { FlutterRust.repairFlutter(context) },
             onRetry = { FlutterRust.retry(context) },
             onUninstall = { FlutterRust.uninstallFlutter(context) },
             confirmTitle = "Uninstall Flutter & Dart?",
-            confirmBody = "Every Flutter version, FVM, and Dart's and pub's caches (~/.pub-cache) are removed. Rust and your projects stay.",
+            confirmBody = "Every Flutter version, FVM, Release builds, and Dart's and pub's caches (~/.pub-cache) are removed. Rust and your projects stay.",
             blocked = if (s.running && !whole) ({ BusyButton(if (mine) "Working…" else "Rust is busy…") }) else null,
         ),
         update = toolUpdate(context, updates, UpdateComponent.Flutter),
@@ -128,6 +130,7 @@ fun FlutterToolPage(onBack: () -> Unit, onOpenRust: () -> Unit) {
                 OutlineButton("Open Rust", onOpenRust, Modifier.fillMaxWidth())
             }
         }
+        if (s.flutterInstalled) ReleaseBuildsCard(s)
         ToolCard("FOR CHECKING CODE") { ToolText(FOR_CHECKING) }
     }
 
@@ -145,6 +148,48 @@ fun FlutterToolPage(onBack: () -> Unit, onOpenRust: () -> Unit) {
             confirm = "Remove",
             onConfirm = { removing = null; FlutterRust.removeVersion(context, v) },
             onDismiss = { removing = null },
+        )
+    }
+}
+
+/**
+ * Release builds (decision 106), added and removed on their own like the wasm target on Rust's page: Termux's
+ * qemu-x86_64 and an x86_64 C library, so `flutter build apk --release` (and --profile) run Google's x86_64 AOT
+ * compiler under emulation. Repair when only part of it is there.
+ */
+@Composable
+private fun ReleaseBuildsCard(s: FlutterRustState) {
+    val context = LocalContext.current
+    val mine = s.action == FlutterAction.AddReleaseBuilds || s.action == FlutterAction.RemoveReleaseBuilds
+    var confirm by rememberSaveable { mutableStateOf(false) }
+    ToolCard("RELEASE BUILDS") {
+        ToolText(
+            "flutter build apk --release and --profile. Google ships Flutter's Android compiler for release code only for " +
+                "x86_64 computers, so it runs here under an x86_64 emulator: slow, a few minutes for a small app and more for a " +
+                "large one. About ${FlutterTool.RELEASE_DOWNLOAD_MB} MB download, ${FlutterTool.RELEASE_INSTALLED_MB} MB on the phone. " +
+                "Uninstalling Flutter removes it too.",
+        )
+        if (mine) JobBlock(s)
+        when {
+            mine && s.running -> BusyButton(if (s.removing) "Removing…" else "Adding…")
+            s.running -> BusyButton("Waiting for another install…")
+            mine && s.failed -> Unit // JobBlock offers Retry
+            s.releaseBuilds == ReleaseBuilds.Installed -> DangerButton("Remove release builds", onClick = { confirm = true })
+            s.releaseBuilds == ReleaseBuilds.Missing -> {
+                ToolText("Part of it is gone from the phone. Repair puts it back.")
+                AccentButton("Repair release builds", onClick = { FlutterRust.addReleaseBuilds(context) }, height = 44.dp, radius = 12.dp)
+                DangerButton("Remove release builds", onClick = { confirm = true })
+            }
+            else -> AccentButton("Add release builds", onClick = { FlutterRust.addReleaseBuilds(context) }, height = 44.dp, radius = 12.dp, enabled = s.checked)
+        }
+    }
+    if (confirm) {
+        ConfirmSheet(
+            title = "Remove release builds?",
+            body = "The x86_64 emulator and C library go, unless something else needs them. Debug APK builds keep working.",
+            confirm = "Remove",
+            onConfirm = { confirm = false; FlutterRust.removeReleaseBuilds(context) },
+            onDismiss = { confirm = false },
         )
     }
 }
