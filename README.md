@@ -58,7 +58,7 @@ Phones are powerful enough now: the one we build on has 16 GB of RAM and 512 GB 
 
 ### Tools
 - **Included:** Claude Code, git, gh, Node.js and npm.
-- **Add-ons**, installed from Settings → Tools when you want them: Headless Chrome (so Claude can open and test the pages it builds), Android SDK builds, Android NDK, Flutter & Dart (with FVM), Rust, and Cloudflare Wrangler with local dev. Nothing is bundled. Each add-on is downloaded when you install it, and you can remove it later.
+- **Add-ons**, installed from Settings → Tools when you want them: Headless Chrome (so Claude can open and test the pages it builds), Android SDK builds, Android NDK, C and C++, Flutter & Dart (with FVM), Rust, and Cloudflare Wrangler with local dev. Nothing is bundled. Each add-on is downloaded when you install it, and you can remove it later.
 - **A raw terminal** whenever you want one. It's still Termux underneath, so `pkg install` works.
 
 ### Keeping it alive

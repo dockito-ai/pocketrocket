@@ -50,10 +50,16 @@ internal object AboutCredits {
         Credit("sherpa-onnx native library and keyword model", "Apache 2.0"),
         Credit("Termux packages, git, gh, Node.js and other tools", "Their own licences"),
         Credit("Dockito CLI", "Dockito's terms"),
+        Credit("ndk-build (Android NDK add-on)", "Apache 2.0, © The Android Open Source Project; fetched from AOSP"),
     )
 
     val icons = listOf(
-        Credit("Claude Code, Node.js, Headless Chrome, Wrangler, Flutter & Dart, Python, Bun", "Simple Icons 16.36.0, CC0 1.0"),
+        Credit("Claude Code, Node.js, Headless Chrome, Wrangler, Flutter & Dart, Python, Bun, Go, Vercel, Netlify, Firebase, flyctl, C and C++", "Simple Icons 16.36.0, CC0 1.0"),
+        Credit("AWS CLI (a cloud, not AWS's mark)", "Material Icons, Apache 2.0 (Google)"),
+        Credit("Deno", "Simple Icons, MIT"),
+        Credit("Java and Kotlin (OpenJDK)", "Simple Icons, BSD 3-Clause"),
+        Credit("PHP", "Simple Icons, CC BY-SA 4.0"),
+        Credit("Ruby", "Simple Icons, CC BY-SA 2.5"),
         Credit("Git", "Simple Icons, CC BY 3.0 (Jason Long)"),
         Credit("Android, Android NDK", "Simple Icons, CC BY 3.0 (Google)"),
         Credit("Rust", "Simple Icons, CC BY-SA 4.0 (Rust Foundation)"),

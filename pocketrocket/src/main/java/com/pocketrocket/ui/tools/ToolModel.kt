@@ -31,6 +31,8 @@ data class ToolSpec(
     val downloadMb: Int? = null,
     /** The size on the phone when it is not measured. */
     val installedMb: Int? = null,
+    /** How long its install takes, when that is minutes (the npm deploy CLIs, decision 98); the tile says it. */
+    val installMinutes: Int? = null,
 )
 
 /** Where a tool stands now. */
@@ -95,7 +97,10 @@ object ToolModel {
         !state.checked -> ToolStatus("Checking…", "Checking", ToolTone.Idle)
         !state.installed && spec.kind == ToolKind.BuiltIn -> ToolStatus("Not installed · run setup again", "Not installed", ToolTone.Failed)
         !state.installed && state.blockedBy != null -> ToolStatus(state.blockedBy, "Not installed", ToolTone.Idle)
-        !state.installed -> ToolStatus(listOfNotNull("Not installed", spec.downloadMb?.let { "$it MB download" }).joinToString(" · "), "Not installed", ToolTone.Idle)
+        !state.installed -> ToolStatus(
+            listOfNotNull("Not installed", spec.downloadMb?.let { "$it MB download" }, spec.installMinutes?.let { "about $it min" }).joinToString(" · "),
+            "Not installed", ToolTone.Idle,
+        )
         state.problem != null -> ToolStatus("Installed · ${state.problem}", "Needs repair", ToolTone.Update)
         else -> {
             val label = label(spec, state)

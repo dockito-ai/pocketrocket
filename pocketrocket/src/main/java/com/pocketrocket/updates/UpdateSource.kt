@@ -1,6 +1,7 @@
 package com.pocketrocket.updates
 
 import android.content.Context
+import com.pocketrocket.pkgtools.PackageTool
 import com.pocketrocket.setup.SetupPhase
 import com.pocketrocket.setup.SetupState
 import com.pocketrocket.updater.Outcome
@@ -8,17 +9,31 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * What the Updates screen keeps current (decision 41), in the screen's order. Optional ones come from an optional
- * tool and show only while it's installed (Flutter and Rust, decisions 75 and 87; Python and Bun, decision 92).
+ * tool and show only while it's installed (Flutter and Rust, decisions 75 and 87; Python and Bun, decision 92; the
+ * languages, decision 98). A [packageTool]'s row is its main package through apt.
  */
-enum class UpdateComponent(val label: String, val optional: Boolean = false) {
+enum class UpdateComponent(val label: String, val optional: Boolean = false, val packageTool: PackageTool? = null) {
     PocketRocket("PocketRocket"),
     ClaudeCode("Claude Code"),
     Git("Git"),
     Dockito("Dockito"),
     Flutter("Flutter", optional = true),
     Rust("Rust", optional = true),
-    Python("Python", optional = true),
-    Bun("Bun", optional = true),
+    Python("Python", optional = true, packageTool = PackageTool.Python),
+    Bun("Bun", optional = true, packageTool = PackageTool.Bun),
+    Go("Go", optional = true, packageTool = PackageTool.Go),
+    Deno("Deno", optional = true, packageTool = PackageTool.Deno),
+    Ruby("Ruby", optional = true, packageTool = PackageTool.Ruby),
+    Php("PHP", optional = true, packageTool = PackageTool.Php),
+    Java("Java and Kotlin", optional = true, packageTool = PackageTool.Java),
+    Aws("AWS CLI", optional = true, packageTool = PackageTool.Aws),
+    Fly("flyctl", optional = true, packageTool = PackageTool.Fly),
+    ;
+
+    companion object {
+        /** A package tool's row, or null for one without (the wasm target moves with Rust). */
+        fun of(t: PackageTool): UpdateComponent? = entries.firstOrNull { it.packageTool == t }
+    }
 }
 
 /** Screen order, except PocketRocket goes last: installing it restarts the app. */

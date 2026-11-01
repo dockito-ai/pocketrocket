@@ -1,12 +1,14 @@
 package com.pocketrocket.pkgtools
 
 import android.content.Context
+import com.pocketrocket.clilogin.CliLogins
 import com.pocketrocket.setup.SetupPhase
 import com.pocketrocket.setup.SetupState
 import com.pocketrocket.setup.ToolScript
 import com.pocketrocket.setup.finished
 import com.pocketrocket.termux.DpkgStatus
 import com.pocketrocket.termux.Termux
+import com.termux.shared.termux.TermuxConstants
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -15,11 +17,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 
 data class PackageToolsState(
     val checked: Boolean = false,
     /** The watched packages installed now, from dpkg's status. */
     val packages: Map<String, DpkgStatus.Package> = emptyMap(),
+    /** The profile.d files and the default java, read with dpkg's status. */
+    val disk: PackageDisk = PackageDisk(),
     val job: SetupState? = null,
     /** The tool the running (or last) job is for. */
     val tool: PackageTool? = null,
@@ -30,6 +35,7 @@ data class PackageToolsState(
     val running: Boolean get() = job?.phase == SetupPhase.Running
     fun isFor(t: PackageTool): Boolean = tool == t
     fun installed(t: PackageTool): Boolean = t.installed(packages)
+    fun problem(t: PackageTool): String? = t.problem(packages, disk)
 }
 
 /**
@@ -51,8 +57,24 @@ object PackageTools {
 
     private fun read() {
         val pkgs = DpkgStatus.read(PackageTool.allWatched)
-        _state.update { it.copy(packages = pkgs, checked = true) }
+        _state.update { it.copy(packages = pkgs, disk = disk(), checked = true) }
+        PackageTool.entries.forEach { t -> t.login?.let { CliLogins.of(it).refresh() } }
     }
+
+    private val prefix = File(TermuxConstants.TERMUX_PREFIX_DIR_PATH)
+
+    private fun disk() = PackageDisk(
+        profiles = PackageTool.entries.mapNotNull { it.shell?.file }.filter { File(prefix, "etc/profile.d/$it").isFile }.toSet(),
+        javaDefault = runCatching { File(prefix, "bin/java").canonicalPath }.getOrNull(),
+    )
+
+    /**
+     * What Claude sessions need from the package tools (decision 98): each [ShellSetting] whose program is on the phone
+     * now, however it got there. Terminals get the same from the profile.d files. A few file checks.
+     */
+    fun environment(): Map<String, String> =
+        PackageTool.entries.mapNotNull { it.shell }.filter { File(prefix, "bin/${it.binary}").exists() }
+            .fold(emptyMap()) { env, s -> env + s.environment }
 
     fun install(context: Context, t: PackageTool) = run(context, t, remove = false)
 
@@ -66,7 +88,7 @@ object PackageTools {
 
     private fun run(context: Context, t: PackageTool, remove: Boolean) {
         synchronized(this) {
-            if (_state.value.running) return
+            if (_state.value.running || t.login?.let { CliLogins.of(it).state.value.busy } == true) return
             _state.update { it.copy(job = SetupState(phase = SetupPhase.Running), tool = t, removing = remove, outcome = null, failed = false) }
         }
         val app = context.applicationContext
@@ -76,6 +98,7 @@ object PackageTools {
                 _state.update { s -> s.copy(job = s.job?.let(change)) }
             }
             read()
+            if (remove) t.login?.let { CliLogins.of(it).forget() }
             // An uninstall may leave what other packages need (Python for Headless Chrome), so only the script's word counts.
             val ok = exit == 0 && sawDone && (remove || _state.value.installed(t))
             _state.update { s ->

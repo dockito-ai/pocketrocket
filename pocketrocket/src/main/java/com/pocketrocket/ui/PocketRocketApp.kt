@@ -43,11 +43,22 @@ import com.pocketrocket.ui.settings.UsageScreen
 import androidx.compose.runtime.CompositionLocalProvider
 import com.pocketrocket.ui.tools.AndroidBuildToolPage
 import com.pocketrocket.ui.tools.AndroidNdkToolPage
+import com.pocketrocket.ui.tools.CppToolPage
 import com.pocketrocket.ui.tools.FlutterToolPage
 import com.pocketrocket.ui.tools.GitToolPage
 import com.pocketrocket.ui.tools.RustToolPage
 import com.pocketrocket.ui.tools.PythonToolPage
 import com.pocketrocket.ui.tools.BunToolPage
+import com.pocketrocket.ui.tools.AwsToolPage
+import com.pocketrocket.ui.tools.DenoToolPage
+import com.pocketrocket.ui.tools.FirebaseToolPage
+import com.pocketrocket.ui.tools.FlyToolPage
+import com.pocketrocket.ui.tools.NetlifyToolPage
+import com.pocketrocket.ui.tools.VercelToolPage
+import com.pocketrocket.ui.tools.GoToolPage
+import com.pocketrocket.ui.tools.JavaToolPage
+import com.pocketrocket.ui.tools.PhpToolPage
+import com.pocketrocket.ui.tools.RubyToolPage
 import com.pocketrocket.ui.tools.WranglerToolPage
 import com.pocketrocket.ui.tools.ChromiumToolPage
 import com.pocketrocket.ui.tools.DockitoToolPage
@@ -178,12 +189,23 @@ fun PocketRocketApp(startScreen: AppScreen, onOpenTerminal: () -> Unit, showSess
             r == Routes.TOOL_DOCKITO -> DockitoToolPage(onBack = ::pop)
             r == Routes.TOOL_CHROMIUM -> ChromiumToolPage(onBack = ::pop)
             r == Routes.TOOL_ANDROID_BUILD -> AndroidBuildToolPage(onBack = ::pop)
-            r == Routes.TOOL_ANDROID_NDK -> AndroidNdkToolPage(onBack = ::pop, onOpenAndroid = { push(Routes.TOOL_ANDROID_BUILD) })
+            r == Routes.TOOL_ANDROID_NDK -> AndroidNdkToolPage(onBack = ::pop, onOpenAndroid = { push(Routes.TOOL_ANDROID_BUILD) }, onOpenCpp = { push(Routes.TOOL_CPP) })
+            r == Routes.TOOL_CPP -> CppToolPage(onBack = ::pop, onOpenNdk = { push(Routes.TOOL_ANDROID_NDK) })
             r == Routes.TOOL_WRANGLER -> WranglerToolPage(onBack = ::pop)
             r == Routes.TOOL_FLUTTER -> FlutterToolPage(onBack = ::pop, onOpenRust = { push(Routes.TOOL_RUST) })
             r == Routes.TOOL_RUST -> RustToolPage(onBack = ::pop)
             r == Routes.TOOL_PYTHON -> PythonToolPage(onBack = ::pop)
             r == Routes.TOOL_BUN -> BunToolPage(onBack = ::pop)
+            r == Routes.TOOL_GO -> GoToolPage(onBack = ::pop)
+            r == Routes.TOOL_DENO -> DenoToolPage(onBack = ::pop)
+            r == Routes.TOOL_RUBY -> RubyToolPage(onBack = ::pop)
+            r == Routes.TOOL_PHP -> PhpToolPage(onBack = ::pop)
+            r == Routes.TOOL_JAVA -> JavaToolPage(onBack = ::pop)
+            r == Routes.TOOL_AWS -> AwsToolPage(onBack = ::pop)
+            r == Routes.TOOL_FLY -> FlyToolPage(onBack = ::pop)
+            r == Routes.TOOL_VERCEL -> VercelToolPage(onBack = ::pop)
+            r == Routes.TOOL_NETLIFY -> NetlifyToolPage(onBack = ::pop)
+            r == Routes.TOOL_FIREBASE -> FirebaseToolPage(onBack = ::pop)
             r == Routes.TOOL_GIT -> GitToolPage(onBack = ::pop)
             r == Routes.CLAUDE_CODE -> ClaudeCodeScreen(onBack = ::pop)
             r == Routes.UPDATES -> UpdatesScreen(onBack = ::pop, onClaudeCode = { push(Routes.CLAUDE_CODE) })
