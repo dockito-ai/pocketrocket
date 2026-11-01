@@ -5,6 +5,7 @@ import com.pocketrocket.setup.SetupPhase
 import com.pocketrocket.setup.SetupState
 import com.pocketrocket.setup.ToolScript
 import com.pocketrocket.setup.finished
+import com.pocketrocket.termux.DpkgStatus
 import com.pocketrocket.termux.Termux
 import com.pocketrocket.usage.AndroidWalkFs
 import com.pocketrocket.usage.walkDisk
@@ -45,7 +46,8 @@ data class FlutterVersion(val version: String, val isDefault: Boolean, val bytes
 
 data class FlutterRustState(
     val flutterInstalled: Boolean = false,
-    val rustInstalled: Boolean = false,
+    /** Rust's packages installed now (`rust`, `rust-std-*`), from dpkg's status, whoever installed them. */
+    val rustPackages: Map<String, DpkgStatus.Package> = emptyMap(),
     val checked: Boolean = false,
     val versions: List<FlutterVersion> = emptyList(),
     /** Recent stable releases for Add version, newest first; empty until read. */
@@ -62,6 +64,7 @@ data class FlutterRustState(
     val failed: Boolean = false,
 ) {
     val running: Boolean get() = job?.phase == SetupPhase.Running
+    val rustInstalled: Boolean get() = FlutterTool.rustInstalled(rustPackages)
     val removing: Boolean get() = action?.removes == true
     /** The running or last job belongs to [part]. */
     fun isFor(part: FlutterPart): Boolean = action?.part == part
@@ -84,7 +87,6 @@ object FlutterRust {
     private val versionsDir = File(fvm, "versions")
     private val defaultLink = File(fvm, "default")
     private val flutterMarker = File(fvm, FlutterTool.INSTALLED_MARKER)
-    private val rustMarker = File(home, FlutterTool.RUST_MARKER_RELATIVE)
     /** What an install leaves before its marker: FVM (step 2 on), or the package list (step 1). */
     private val leftovers = listOf(
         File(TermuxConstants.TERMUX_PREFIX_DIR_PATH, FlutterTool.FVM_DIR_RELATIVE),
@@ -99,16 +101,22 @@ object FlutterRust {
 
     /** Set up, or a failed install's leftovers (the setup script's flutter_present): either way Uninstall is offered. */
     fun flutterInstalled(): Boolean = flutterMarker.isFile || leftovers.any { it.exists() }
-    fun rustInstalled(): Boolean = rustMarker.isFile
+
+    /** Rust's packages from dpkg's status (one small file read). */
+    private fun rustPackages(): Map<String, DpkgStatus.Package> = DpkgStatus.read(FlutterTool::isRustPackage)
+
+    /** `rust` is on the phone now, however it got there. Blocking; for the Updates row. */
+    fun rustInstalled(): Boolean = FlutterTool.rustInstalled(rustPackages())
 
     /** The default version's folder name, from FVM's link, or null. */
     fun defaultVersion(): String? = runCatching {
         defaultLink.takeIf { File(it, "bin/flutter").isFile }?.canonicalFile?.name
     }.getOrNull()
 
-    /** Files only: what is installed, versions and the default. Sizes already measured are kept. */
+    /** Files only: what is installed (Rust from dpkg), versions and the default. Sizes already measured are kept. */
     fun refresh() {
         val default = defaultVersion()
+        val rust = rustPackages()
         val names = FlutterTool.installedVersions(
             versionsDir.listFiles()?.filter { File(it, "bin/flutter").isFile }?.map { it.name }.orEmpty(),
         )
@@ -116,7 +124,7 @@ object FlutterRust {
             val known = s.versions.associateBy { it.version }
             s.copy(
                 flutterInstalled = flutterInstalled(),
-                rustInstalled = rustInstalled(),
+                rustPackages = rust,
                 checked = true,
                 versions = names.map { FlutterVersion(it, it == default, known[it]?.bytes) },
             )

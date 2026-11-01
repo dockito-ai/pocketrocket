@@ -56,7 +56,7 @@ data class AptUpdateState(
 /** Git on the Updates screen (decision 41). */
 val GitUpdater = AptUpdater("git", "Git")
 
-/** Rust on the Updates screen, once the Rust tool has it (decisions 75 and 87). */
+/** Rust on the Updates screen, while `rust` is on the phone however it got there (decisions 75, 87 and 92). */
 val RustUpdater = AptUpdater("rust", "Rust") { FlutterRust.rustInstalled() }
 
 /** Python and Bun, while they're on the phone however they got there (decision 92). */

@@ -12,6 +12,8 @@ import com.pocketrocket.pkgtools.PackageTool
 import com.pocketrocket.pkgtools.PackageTools
 import com.pocketrocket.updates.UpdateComponent
 import com.pocketrocket.updates.Updates
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Settings → Tools → Rust (decisions 75 and 87): Termux's rust package for cargo check and clippy, with its version,
@@ -26,8 +28,12 @@ fun RustToolPage(onBack: () -> Unit) {
     val mine = s.isFor(FlutterPart.Rust)
     val packages by PackageTools.state.collectAsState()
     val wasmBusy = packages.running && packages.isFor(PackageTool.RustWasm)
-    // dpkg is read again when a Rust job ends: uninstalling Rust takes the wasm target with it.
-    LaunchedEffect(s.running) { PackageTools.refresh() }
+    // dpkg is read again on opening and when a job ends: uninstalling Rust takes the wasm target with it, and the
+    // wasm target counts in Rust's size.
+    LaunchedEffect(s.running, packages.running) {
+        PackageTools.refresh()
+        withContext(Dispatchers.IO) { FlutterRust.refresh() }
+    }
     ToolPage(
         spec = Tool.Rust.spec,
         state = ToolStates.rust(s, updates.rows.firstOrNull { it.component == UpdateComponent.Rust }, wasmBusy),
@@ -42,7 +48,8 @@ fun RustToolPage(onBack: () -> Unit) {
             onRetry = { FlutterRust.retry(context) },
             onUninstall = { FlutterRust.removeRust(context) },
             confirmTitle = "Uninstall Rust?",
-            confirmBody = "The rust packages this tool installed, the wasm target and ~/.cargo are removed. Flutter, your crates and their target folders stay.",
+            confirmBody = "Rust, its targets (the wasm target too) and ~/.cargo are removed, whether this page or a terminal installed them, " +
+                "along with what the install here brought in that nothing else needs. Flutter, your crates and their target folders stay.",
             blocked = when {
                 s.running && !mine -> ({ BusyButton("Flutter is busy…") })
                 packages.running -> ({ BusyButton("Waiting for another install…") })

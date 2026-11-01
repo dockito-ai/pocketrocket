@@ -6,6 +6,7 @@ import com.pocketrocket.fluttertool.FlutterTool
 import com.pocketrocket.fluttertool.FlutterVersion
 import com.pocketrocket.setup.SetupPhase
 import com.pocketrocket.setup.SetupState
+import com.pocketrocket.termux.DpkgStatus
 import com.pocketrocket.updates.UpdateComponent
 import com.pocketrocket.updates.UpdateRow
 import org.junit.Assert.assertEquals
@@ -19,10 +20,11 @@ import androidx.compose.ui.graphics.luminance
 /** Flutter & Dart and Rust are two tools over one module (decision 87): each tile reads only its own part. */
 class ToolStatesTest {
     private val running = SetupState(phase = SetupPhase.Running)
-    private val both = FlutterRustState(flutterInstalled = true, rustInstalled = true, checked = true, versions = listOf(FlutterVersion("3.47.9", true)))
+    private val rust = mapOf("rust" to DpkgStatus.Package("1.91.0", 578196), "rust-std-aarch64-linux-android" to DpkgStatus.Package("1.91.0", 24908))
+    private val both = FlutterRustState(flutterInstalled = true, rustPackages = rust, checked = true, versions = listOf(FlutterVersion("3.47.9", true)))
 
     @Test fun eachToolIsInstalledOnItsOwn() {
-        val flutterOnly = both.copy(rustInstalled = false)
+        val flutterOnly = both.copy(rustPackages = emptyMap())
         assertTrue(ToolStates.flutter(flutterOnly).installed)
         assertFalse(ToolStates.rust(flutterOnly, null).installed)
         val rustOnly = both.copy(flutterInstalled = false, versions = emptyList())

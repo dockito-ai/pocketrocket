@@ -217,8 +217,9 @@ object ToolStates {
     }
 
     /**
-     * Rust (decision 87): installing and removing are its jobs; its version and update come from its Updates row.
-     * Adding or removing the wasm target ([wasmBusy]) shows as Updating.
+     * Rust (decision 87): installing and removing are its jobs. Installed, version and size come from dpkg, so a
+     * `pkg install rust` from a terminal shows too; its update comes from its Updates row. Adding or removing the wasm
+     * target ([wasmBusy]) shows as Updating.
      */
     fun rust(s: FlutterRustState, row: UpdateRow?, wasmBusy: Boolean = false): ToolState {
         val mine = s.isFor(FlutterPart.Rust)
@@ -227,10 +228,11 @@ object ToolStates {
             checked = s.checked,
             job = if (mine) ToolModel.job(s.running, s.failed, s.removing) else ToolJob.None,
             progress = if (mine) s.job?.progress else null,
-            versions = listOfNotNull(row?.installed?.let { "Rust" to it }),
+            versions = listOfNotNull(FlutterTool.rustVersion(s.rustPackages)?.let { "Rust" to it }),
             latest = row?.latest,
             updateAvailable = row?.available == true,
             updating = row?.running == true || wasmBusy,
+            sizeMb = FlutterTool.rustSizeMb(s.rustPackages),
         )
     }
 
