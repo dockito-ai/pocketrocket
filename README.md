@@ -62,16 +62,18 @@ Open Settings → Tools. Four are already there after first run. The rest instal
 
 First run also installs the GitHub CLI (`gh`), OpenSSH, ripgrep, jq, curl and Zellij. They have no tile of their own.
 
-Settings → Updates keeps the tools that can move current. Android, the Android NDK, and C and C++ move only when the app does. The logos are the same marks the app shows. They belong to their owners; see `docs/third-party-icons.md`.
+Settings → Updates keeps the tools that can move current. Android, the Android NDK, and C and C++ move only when the app does. The logos are the same marks the app shows, and they switch for a light or dark page. They belong to their owners; see `docs/third-party-icons.md`.
 
 #### Comes with the app
 
 <table>
   <tr>
-    <td align="center" width="25%"><img src="docs/tool-icons/claude.svg" width="48" height="48" alt="Claude Code"><br><b>Claude Code</b><br><sub>The real CLI. The chat drives it, and you can update it or roll a release back.</sub></td>
-    <td align="center" width="25%"><img src="docs/tool-icons/git.svg" width="48" height="48" alt="Git"><br><b>Git</b><br><sub>Clone, commit, branch and push. The Git screens and worktrees use it too.</sub></td>
-    <td align="center" width="25%"><img src="docs/tool-icons/node.svg" width="48" height="48" alt="Node.js and npm"><br><b>Node.js and npm</b><br><sub>Run JavaScript and install packages. Wrangler and Headless Chrome's server sit on it.</sub></td>
-    <td align="center" width="25%"><img src="docs/tool-icons/dockito.svg" width="48" height="48" alt="Dockito"><br><b>Dockito</b><br><sub>Publish and share docs from the phone. Each Claude account gets its skill.</sub></td>
+    <td align="left" valign="top" width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/claude.svg"><img alt="Claude Code" src="docs/tool-icons/light/claude.svg" width="32" height="32"></picture><br><b>Claude Code</b><br>The real CLI. The chat drives it, and you can update it or roll a release back.</td>
+    <td align="left" valign="top" width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/git.svg"><img alt="Git" src="docs/tool-icons/light/git.svg" width="32" height="32"></picture><br><b>Git</b><br>Clone, commit, branch and push. The Git screens and worktrees use it too.</td>
+  </tr>
+  <tr>
+    <td align="left" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/node.svg"><img alt="Node.js and npm" src="docs/tool-icons/light/node.svg" width="32" height="32"></picture><br><b>Node.js and npm</b><br>Run JavaScript and install packages. Wrangler and Headless Chrome's server sit on it.</td>
+    <td align="left" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/dockito.svg"><img alt="Dockito" src="docs/tool-icons/light/dockito.svg" width="32" height="32"></picture><br><b>Dockito</b><br>Publish and share docs from the phone. Each Claude account gets its skill.</td>
   </tr>
 </table>
 
@@ -79,33 +81,33 @@ Settings → Updates keeps the tools that can move current. Android, the Android
 
 <table>
   <tr>
-    <td align="center" width="25%"><img src="docs/tool-icons/python.svg" width="48" height="48" alt="Python"><br><b>Python</b><br><sub>python3, pip and uv. uv uses this Python and never downloads its own.</sub></td>
-    <td align="center" width="25%"><img src="docs/tool-icons/bun.svg" width="48" height="48" alt="Bun"><br><b>Bun</b><br><sub>bun run, bun install and bun test.</sub></td>
-    <td align="center" width="25%"><img src="docs/tool-icons/go.svg" width="48" height="48" alt="Go"><br><b>Go</b><br><sub>go build, go run, go test and go mod.</sub></td>
-    <td align="center" width="25%"><img src="docs/tool-icons/deno.svg" width="48" height="48" alt="Deno"><br><b>Deno</b><br><sub>deno run, deno test and deno fmt, including npm and jsr imports.</sub></td>
+    <td align="left" valign="top" width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/python.svg"><img alt="Python" src="docs/tool-icons/light/python.svg" width="32" height="32"></picture><br><b>Python</b><br>python3, pip and uv. uv uses this Python and never downloads its own.</td>
+    <td align="left" valign="top" width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/bun.svg"><img alt="Bun" src="docs/tool-icons/light/bun.svg" width="32" height="32"></picture><br><b>Bun</b><br>bun run, bun install and bun test.</td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/tool-icons/ruby.svg" width="48" height="48" alt="Ruby"><br><b>Ruby</b><br><sub>ruby, gem and bundle. Gems load with a plain require.</sub></td>
-    <td align="center"><img src="docs/tool-icons/php.svg" width="48" height="48" alt="PHP"><br><b>PHP</b><br><sub>Run scripts, or php -S to serve a folder on the phone.</sub></td>
-    <td align="center"><img src="docs/tool-icons/java.svg" width="48" height="48" alt="Java and Kotlin"><br><b>Java and Kotlin</b><br><sub>Java 17, 21 and 25 side by side, plus Kotlin. Java 17 stays the default.</sub></td>
-    <td align="center"><img src="docs/tool-icons/rust.svg" width="48" height="48" alt="Rust"><br><b>Rust</b><br><sub>cargo check and clippy, and a wasm target you can add. Release builds stay off the phone.</sub></td>
+    <td align="left" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/go.svg"><img alt="Go" src="docs/tool-icons/light/go.svg" width="32" height="32"></picture><br><b>Go</b><br>go build, go run, go test and go mod.</td>
+    <td align="left" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/deno.svg"><img alt="Deno" src="docs/tool-icons/light/deno.svg" width="32" height="32"></picture><br><b>Deno</b><br>deno run, deno test and deno fmt, including npm and jsr imports.</td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/tool-icons/flutter.svg" width="48" height="48" alt="Flutter and Dart"><br><b>Flutter &amp; Dart</b><br><sub>Check Dart code, keep more than one Flutter version, and build a debug APK once Android and C and C++ are installed.</sub></td>
-    <td align="center"><img src="docs/tool-icons/cpp.svg" width="48" height="48" alt="C and C++"><br><b>C and C++</b><br><sub>Compile and run C and C++ with clang, CMake, Ninja, make and lldb.</sub></td>
-    <td></td>
-    <td></td>
+    <td align="left" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/ruby.svg"><img alt="Ruby" src="docs/tool-icons/light/ruby.svg" width="32" height="32"></picture><br><b>Ruby</b><br>ruby, gem and bundle. Gems load with a plain require.</td>
+    <td align="left" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/php.svg"><img alt="PHP" src="docs/tool-icons/light/php.svg" width="32" height="32"></picture><br><b>PHP</b><br>Run scripts, or php -S to serve a folder on the phone.</td>
+  </tr>
+  <tr>
+    <td align="left" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/java.svg"><img alt="Java and Kotlin" src="docs/tool-icons/light/java.svg" width="32" height="32"></picture><br><b>Java and Kotlin</b><br>Java 17, 21 and 25 side by side, plus Kotlin. Java 17 stays the default.</td>
+    <td align="left" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/rust.svg"><img alt="Rust" src="docs/tool-icons/light/rust.svg" width="32" height="32"></picture><br><b>Rust</b><br>cargo check and clippy, and a wasm target you can add. Release builds stay off the phone.</td>
   </tr>
 </table>
 
-#### Android apps
+#### Build on the phone
 
 <table>
   <tr>
-    <td align="center" width="25%"><img src="docs/tool-icons/android.svg" width="48" height="48" alt="Android"><br><b>Android</b><br><sub>Build Kotlin and Compose apps with Gradle. There is no emulator on the phone.</sub></td>
-    <td align="center" width="25%"><img src="docs/tool-icons/android.svg" width="48" height="48" alt="Android NDK"><br><b>Android NDK</b><br><sub>C and C++ inside Android apps, through CMake or ndk-build, for four ABIs. Only arm64 runs on the phone.</sub></td>
-    <td></td>
-    <td></td>
+    <td align="left" valign="top" width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/flutter.svg"><img alt="Flutter and Dart" src="docs/tool-icons/light/flutter.svg" width="32" height="32"></picture><br><b>Flutter &amp; Dart</b><br>Check Dart code, keep more than one Flutter version, and build a debug APK once Android and C and C++ are installed.</td>
+    <td align="left" valign="top" width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/cpp.svg"><img alt="C and C++" src="docs/tool-icons/light/cpp.svg" width="32" height="32"></picture><br><b>C and C++</b><br>Compile and run C and C++ with clang, CMake, Ninja, make and lldb.</td>
+  </tr>
+  <tr>
+    <td align="left" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/android.svg"><img alt="Android" src="docs/tool-icons/light/android.svg" width="32" height="32"></picture><br><b>Android</b><br>Build Kotlin and Compose apps with Gradle. There is no emulator on the phone.</td>
+    <td align="left" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/android.svg"><img alt="Android NDK" src="docs/tool-icons/light/android.svg" width="32" height="32"></picture><br><b>Android NDK</b><br>C and C++ inside Android apps, through CMake or ndk-build, for four ABIs. Only arm64 runs on the phone.</td>
   </tr>
 </table>
 
@@ -113,16 +115,19 @@ Settings → Updates keeps the tools that can move current. Android, the Android
 
 <table>
   <tr>
-    <td align="center" width="25%"><img src="docs/tool-icons/chrome.svg" width="48" height="48" alt="Headless Chrome"><br><b>Headless Chrome</b><br><sub>Claude opens the pages it builds, takes screenshots and reads console and network errors.</sub></td>
-    <td align="center" width="25%"><img src="docs/tool-icons/wrangler.svg" width="48" height="48" alt="Wrangler"><br><b>Wrangler</b><br><sub>wrangler dev on the phone, and wrangler deploy to Cloudflare. Its version moves only when the app does.</sub></td>
-    <td align="center" width="25%"><img src="docs/tool-icons/vercel.svg" width="48" height="48" alt="Vercel CLI"><br><b>Vercel CLI</b><br><sub>Preview and production deploys, and vercel dev on the phone. Log in opens Vercel.</sub></td>
-    <td align="center" width="25%"><img src="docs/tool-icons/netlify.svg" width="48" height="48" alt="Netlify CLI"><br><b>Netlify CLI</b><br><sub>A draft deploy, or netlify deploy --prod to publish. Log in opens Netlify.</sub></td>
+    <td align="left" valign="top" width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/chrome.svg"><img alt="Headless Chrome" src="docs/tool-icons/light/chrome.svg" width="32" height="32"></picture><br><b>Headless Chrome</b><br>Claude opens the pages it builds, takes screenshots and reads console and network errors.</td>
+    <td align="left" valign="top" width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/wrangler.svg"><img alt="Wrangler" src="docs/tool-icons/light/wrangler.svg" width="32" height="32"></picture><br><b>Wrangler</b><br>wrangler dev on the phone, and wrangler deploy to Cloudflare. Its version moves only when the app does.</td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/tool-icons/firebase.svg" width="48" height="48" alt="Firebase CLI"><br><b>Firebase CLI</b><br><sub>firebase init, then firebase deploy. Log in opens Google and gives you a code to paste back.</sub></td>
-    <td align="center"><img src="docs/tool-icons/aws.svg" width="48" height="48" alt="AWS CLI"><br><b>AWS CLI</b><br><sub>The AWS CLI v2, including S3 and Lambda. Log in opens the AWS console.</sub></td>
-    <td align="center"><img src="docs/tool-icons/fly.svg" width="48" height="48" alt="flyctl"><br><b>flyctl</b><br><sub>Launch, deploy and read logs on Fly.io. Builds run on Fly's builders, not on the phone.</sub></td>
-    <td></td>
+    <td align="left" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/vercel.svg"><img alt="Vercel CLI" src="docs/tool-icons/light/vercel.svg" width="32" height="32"></picture><br><b>Vercel CLI</b><br>Preview and production deploys, and vercel dev on the phone. Log in opens Vercel.</td>
+    <td align="left" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/netlify.svg"><img alt="Netlify CLI" src="docs/tool-icons/light/netlify.svg" width="32" height="32"></picture><br><b>Netlify CLI</b><br>A draft deploy, or netlify deploy --prod to publish. Log in opens Netlify.</td>
+  </tr>
+  <tr>
+    <td align="left" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/firebase.svg"><img alt="Firebase CLI" src="docs/tool-icons/light/firebase.svg" width="32" height="32"></picture><br><b>Firebase CLI</b><br>firebase init, then firebase deploy. Log in opens Google and gives you a code to paste back.</td>
+    <td align="left" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/aws.svg"><img alt="AWS CLI" src="docs/tool-icons/light/aws.svg" width="32" height="32"></picture><br><b>AWS CLI</b><br>The AWS CLI v2, including S3 and Lambda. Log in opens the AWS console.</td>
+  </tr>
+  <tr>
+    <td align="left" valign="top" colspan="2"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/tool-icons/dark/fly.svg"><img alt="flyctl" src="docs/tool-icons/light/fly.svg" width="32" height="32"></picture><br><b>flyctl</b><br>Launch, deploy and read logs on Fly.io. Builds run on Fly's builders, not on the phone.</td>
   </tr>
 </table>
 
