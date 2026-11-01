@@ -28,6 +28,14 @@ object FlutterTool {
     const val VERSION_FLUTTER = "bin/flutter"
     const val VERSION_DART = "bin/cache/dart-sdk/bin/dart"
 
+    /**
+     * Debug APK builds (decision 100): the exec helper the install builds with clang, under $PREFIX (the setup script's
+     * FLUTTER_EXEC_DIR, the launcher's PR_EXEC_DIR), and the clang it needs (the C and C++ add-on).
+     */
+    const val EXEC_RELATIVE = "lib/pocketrocket-flutter-exec"
+    const val EXEC_GLIBC_RELATIVE = "$EXEC_RELATIVE/aarch64/2.so"
+    const val CLANG_RELATIVE = "bin/clang"
+
     /** The package list taken before the install's apt step, under home; only a run that stopped there leaves it. */
     const val BASELINE_RELATIVE = ".pocketrocket/flutter.baseline"
 
@@ -36,6 +44,8 @@ object FlutterTool {
      * install` or a terminal), FVM and the launcher ([prefix]). On the phone while any of them is, or a run stopped in its
      * apt step (so Uninstall cleans up). Works when FVM and the launcher are there and at least one version has its Dart
      * SDK. `rm -rf ~/fvm` from a terminal leaves FVM, so it shows "Flutter SDK missing" with Repair and Uninstall.
+     * With clang on the phone but no exec helper (Flutter installed before C and C++, or before decision 100) it shows
+     * "APK builds missing", and Repair builds the helper. Without clang APK builds aren't expected, so nothing is missing.
      */
     fun presence(prefix: File, home: File): ToolPresence {
         val versions = File(home, "$FVM_RELATIVE/versions").listFiles()?.filter { File(it, VERSION_FLUTTER).isFile }.orEmpty()
@@ -52,6 +62,7 @@ object FlutterTool {
                     versions.none { File(it, VERSION_DART).isFile } -> "Dart SDK"
                     else -> null
                 },
+                "APK builds".takeIf { File(prefix, CLANG_RELATIVE).exists() && !File(prefix, EXEC_GLIBC_RELATIVE).exists() },
             ),
         )
     }

@@ -213,6 +213,38 @@ class FlutterToolTest {
         }
     }
 
+    @Test fun theLauncherBuildsDebugApksForArm64AndRefusesReleaseOnes() {
+        if (!launcher.exists()) return
+        fun apk(vararg args: String) = shell(launcher, "POCKETROCKET_FLUTTER_SOURCE_ONLY", "pr_apk_build \"$@\"", *args).first == 0
+        assertTrue(apk("build", "apk", "--debug", "--flavor", "dev"))
+        assertTrue(apk("-v", "build", "appbundle"))
+        assertFalse(apk("build", "web"))
+        assertFalse(apk("analyze"))
+        assertFalse(apk("run", "apk"))
+
+        val setup = "PR_EXEC_DIR=\"$1\"; shift; PR_EXTRA_ARGS=(); pr_apk_setup \"$@\" && " +
+            "printf '%s|%s|%s' \"\${PR_EXTRA_ARGS[*]}\" \"\${PR_RUN_ENV[*]}\" \"\$POCKETROCKET_GLIBC_PRELOAD\""
+        val dir = File.createTempFile("exec", "").apply { delete(); mkdirs() }
+        try {
+            val release = shell(launcher, "POCKETROCKET_FLUTTER_SOURCE_ONLY", setup, dir.path, "build", "apk")
+            assertEquals(1, release.first)
+            assertTrue(release.second, "gen_snapshot" in release.second)
+            val noHelper = shell(launcher, "POCKETROCKET_FLUTTER_SOURCE_ONLY", setup, dir.path, "build", "apk", "--debug")
+            assertEquals(1, noHelper.first)
+            assertTrue(noHelper.second, "C and C++" in noHelper.second)
+
+            File(dir, "aarch64").mkdirs(); File(dir, "aarch64/2.so").writeText("")
+            File(dir, "\$PLATFORM").mkdirs(); File(dir, "\$PLATFORM/1.so").writeText("")
+            val preload = "${dir.path}/\$PLATFORM/1.so:${dir.path}/\$PLATFORM/2.so"
+            val debug = shell(launcher, "POCKETROCKET_FLUTTER_SOURCE_ONLY", setup, dir.path, "build", "apk", "--debug")
+            assertEquals(0 to "--target-platform android-arm64|ORG_GRADLE_PROJECT_disable-abi-filtering=true|$preload", debug)
+            val chosen = shell(launcher, "POCKETROCKET_FLUTTER_SOURCE_ONLY", setup, dir.path, "build", "apk", "--debug", "--target-platform=android-arm")
+            assertEquals(0 to "|ORG_GRADLE_PROJECT_disable-abi-filtering=true|$preload", chosen)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
     @Test fun theLauncherRepreparesOnlyWhenFlutterDownloadedSomething() {
         if (!launcher.exists()) return
         val root = File.createTempFile("flutter", "").apply { delete(); mkdirs() }
