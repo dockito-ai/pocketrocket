@@ -7,6 +7,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import com.pocketrocket.wrangler.Wrangler
 import com.pocketrocket.wrangler.WranglerTool
+import com.pocketrocket.updates.UpdateComponent
+import com.pocketrocket.updates.Updates
 
 /**
  * Settings → Tools → Wrangler (decisions 49 and 82): what it does, its version, the Cloudflare sign-in (the shared CLI
@@ -17,16 +19,17 @@ fun WranglerToolPage(onBack: () -> Unit) {
     val context = LocalContext.current
     val s by Wrangler.state.collectAsState()
     val ls by Wrangler.login.state.collectAsState()
+    val updates by Updates.state.collectAsState()
     LaunchedEffect(Unit) { Wrangler.refreshAccount(context) }
 
     ToolPage(
         spec = Tool.Wrangler.spec,
-        state = ToolStates.wrangler(s, ls),
+        state = ToolStates.wrangler(s, ls, updates.rows.firstOrNull { it.component == UpdateComponent.Wrangler }),
         icon = Tool.Wrangler.icon,
         purpose = "Deploy and manage Cloudflare Workers.",
         onBack = onBack,
         install = ToolInstall(
-            job = s.job, outcome = s.outcome, removing = s.removing,
+            job = s.job.takeUnless { s.updating }, outcome = s.outcome, removing = s.removing,
             installSteps = WranglerTool.INSTALL_STEPS, removeSteps = WranglerTool.REMOVE_STEPS,
             failedLine = if (s.removing) "Some of it may still be on the phone." else "Retry starts it again.",
             onInstall = { Wrangler.install(context) },
@@ -34,8 +37,10 @@ fun WranglerToolPage(onBack: () -> Unit) {
             onUninstall = { Wrangler.remove(context) },
             confirmTitle = "Uninstall Wrangler?",
             confirmBody = "Wrangler and its folder are removed, and you're signed out of Cloudflare on this phone. Your projects stay, and so do your Workers on Cloudflare.",
+            blocked = if (s.running && s.updating) ({ BusyButton("Updating…") }) else null,
             holdUninstall = ls.busy,
         ),
+        update = toolUpdate(context, updates, UpdateComponent.Wrangler),
         accounts = {
             CliAccountCard(
                 "Cloudflare", Wrangler.login, ls, blocked = s.running,
@@ -46,6 +51,9 @@ fun WranglerToolPage(onBack: () -> Unit) {
         if (s.installed) {
             ToolCard("HOW TO USE") {
                 ToolText("In a terminal or a Claude session, run wrangler dev in your project to try a Worker on the phone at localhost:8787, and wrangler deploy to put it on Cloudflare. New terminals and sessions already have it.")
+            }
+            ToolCard("UPDATES") {
+                ToolText("Its version is pinned: each one needs workerd built for Android. When a PocketRocket update moves the pin, Update shows here and in Settings › Updates.")
             }
         } else {
             ToolCard("WHAT IT DOES") {

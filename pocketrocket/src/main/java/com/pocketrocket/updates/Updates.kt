@@ -43,7 +43,11 @@ object Updates {
     private const val PREFS = "pocketrocket"
     private const val KEY_CHECKED_AT = "updates_checked_at"
 
-    val sources: List<UpdateSource> = listOf(AppSource, ClaudeSource, GitSource, DockitoSource, FlutterSource, RustSource) + PackageToolSources
+    /** One per [UpdateComponent], in its order. */
+    val sources: List<UpdateSource> = (
+        listOf(AppSource, ClaudeSource, GitSource, NodeSource, DockitoSource, FlutterSource, RustSource, ChromiumSource, WranglerSource) +
+            PackageToolSources + NpmSources
+        ).sortedBy { it.component.ordinal }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val control = MutableStateFlow(UpdatesState())

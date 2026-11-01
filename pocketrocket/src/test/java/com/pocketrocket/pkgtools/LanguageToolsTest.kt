@@ -35,11 +35,18 @@ class LanguageToolsTest {
 
     private fun pkgs(vararg blocks: String) = DpkgStatus.parse(blocks.joinToString("\n"), PackageTool.allWatched)
 
-    /** Runs [code] with the script sourced, its PREFIX and HOME in the temp folder and no package installed. */
+    /** Runs [code] with the script sourced, its PREFIX and HOME in the temp folder and no package installed.
+     *  XDG_* is cleared: the script follows it, and GitHub's runner sets XDG_CONFIG_HOME outside this home. */
     private fun shell(code: String): Pair<Int, String> {
         val pb = ProcessBuilder(listOf("bash", "-c", ". \"$1\"; pkg_installed() { return 1; }; PR_LOG=/dev/null; $code", "_", script.path))
             .redirectErrorStream(true)
-        pb.environment().putAll(mapOf("PREFIX" to prefix.path, "HOME" to home.path, "POCKETROCKET_SETUP_SOURCE_ONLY" to "1"))
+        pb.environment().apply {
+            putAll(mapOf("PREFIX" to prefix.path, "HOME" to home.path, "POCKETROCKET_SETUP_SOURCE_ONLY" to "1"))
+            remove("XDG_CONFIG_HOME")
+            remove("XDG_CACHE_HOME")
+            remove("XDG_DATA_HOME")
+            remove("XDG_STATE_HOME")
+        }
         val p = pb.start()
         val out = p.inputStream.bufferedReader().readText()
         return p.waitFor() to out
@@ -121,7 +128,7 @@ class LanguageToolsTest {
         assertFalse(File(prefix, "etc/profile.d/pocketrocket-ruby.sh").exists())
     }
 
-    @Test fun goUninstallClearsCachesAndKeepsGoBin() {
+    @Test fun goUninstallClearsCachesAndWhatGoInstalled() {
         if (!script.exists()) return
         val mod = File(home, "go/pkg/mod/github.com/google/uuid@v1.6.0").apply { mkdirs() }
         File(mod, "uuid.go").writeText("package uuid\n")
@@ -132,7 +139,13 @@ class LanguageToolsTest {
         assertEquals(0, shell("pkg_tool_cleanup go").first)
         assertFalse(File(home, "go/pkg").exists())
         assertFalse(File(home, ".cache/go-build").exists())
-        assertTrue(File(home, "go/bin/hello").exists())
+        // Decision 102: what `go install` put there goes too; GOPATH code of your own in ~/go/src stays.
+        assertFalse(File(home, "go/bin").exists())
+        File(home, "go/src/mine").mkdirs()
+        File(home, ".config/go/env").apply { parentFile?.mkdirs(); writeText("GOFLAGS=-mod=mod\n") }
+        assertEquals(0, shell("pkg_tool_cleanup go").first)
+        assertTrue(File(home, "go/src/mine").exists())
+        assertFalse(File(home, ".config/go").exists())
     }
 
     @Test fun noPackageToolEverRemovesJavaSeventeen() {

@@ -15,18 +15,29 @@ import com.pocketrocket.updates.Updates
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Settings → Tools → Node.js and npm: built in (first-run setup installs nodejs-lts); its versions and size. */
+/**
+ * Settings → Tools → Node.js and npm: built in (first-run setup installs nodejs-lts); its versions and size, and Update
+ * through Updates (decision 103).
+ */
 @Composable
 fun NodeToolPage(onBack: () -> Unit) {
     val context = LocalContext.current
     val s by NodeJs.state.collectAsState()
-    LaunchedEffect(Unit) { NodeJs.refresh(context, force = true) }
+    val updates by Updates.state.collectAsState()
+    LaunchedEffect(Unit) {
+        NodeJs.refresh(context, force = true)
+        Updates.onAppOpen(context, checkAfterMs = 10 * 60_000L)
+    }
+    val row = updates.rows.firstOrNull { it.component == UpdateComponent.Node }
+    // An update changes the programs' versions; read them again once it ends.
+    LaunchedEffect(row?.running) { if (row?.running == false) NodeJs.refresh(context, force = true) }
     ToolPage(
         spec = Tool.Node.spec,
-        state = ToolStates.node(s),
+        state = ToolStates.node(s, row),
         icon = Tool.Node.icon,
         purpose = "Runs JavaScript, and npm installs packages.",
         onBack = onBack,
+        update = toolUpdate(context, updates, UpdateComponent.Node),
     ) {
         ToolCard("WHAT IT DOES") {
             ToolBullets(
@@ -38,7 +49,7 @@ fun NodeToolPage(onBack: () -> Unit) {
             )
         }
         ToolCard("WHAT IT IS") {
-            ToolText("Termux's nodejs-lts package, installed by first-run setup with git and the rest of the base set. It updates with Termux's packages (pkg upgrade in a terminal).")
+            ToolText("Termux's nodejs-lts package, installed by first-run setup with git and the rest of the base set, with npm inside it. Settings › Updates updates it on its own.")
         }
     }
 }

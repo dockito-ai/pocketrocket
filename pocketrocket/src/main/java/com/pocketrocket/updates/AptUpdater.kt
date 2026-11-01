@@ -11,6 +11,7 @@ import com.pocketrocket.setup.SetupState
 import com.pocketrocket.setup.StepStatus
 import com.pocketrocket.setup.finish
 import com.pocketrocket.setup.on
+import com.pocketrocket.termux.DpkgStatus
 import com.pocketrocket.termux.Termux
 import com.pocketrocket.termux.TermuxCommand
 import com.pocketrocket.updater.Outcome
@@ -58,6 +59,18 @@ val GitUpdater = AptUpdater("git", "Git")
 
 /** Rust on the Updates screen, while `rust` is on the phone however it got there (decisions 75, 87 and 92). */
 val RustUpdater = AptUpdater("rust", "Rust") { FlutterRust.rustInstalled() }
+
+/**
+ * Node.js and npm (decision 103): Termux's nodejs-lts, which first-run setup installs and which brings npm with it.
+ * Its row goes while nodejs-lts isn't there (a terminal swapped it for `nodejs`), rather than offering someone else's Node.
+ */
+val NodeUpdater = AptUpdater("nodejs-lts", "Node.js and npm") { dpkgHas("nodejs-lts") }
+
+/** Headless Chrome's Chromium (decision 103), from the x11 repository, while it's installed. Its MCP server is pinned. */
+val ChromiumUpdater = AptUpdater("chromium", "Headless Chrome") { dpkgHas("chromium") }
+
+/** Whether dpkg has [pkg] installed now. One small file read. */
+private fun dpkgHas(pkg: String): Boolean = DpkgStatus.read(setOf(pkg)).isNotEmpty()
 
 /**
  * A package tool's main package (Python, Bun, decision 92; the languages, decision 98), while it's on the phone however
