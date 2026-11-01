@@ -2072,16 +2072,24 @@ java_jdk_dirs() {
   done | sort -n | cut -d' ' -f2- | paste -sd, -
 }
 
-# java_gradle_jdks [gradle.properties]: sets the two keys to the JDKs there now, or takes them out when there are none.
+# The Gradle hook that compiles an Android module asking for a newer Java (Capacitor's 21) with that JDK while Gradle
+# stays on 17, from the template beside this script; the app refreshes the same file at every start (GradleJdks.kt).
+JAVA_GRADLE_HOOK="$HOME/.gradle/init.d/pocketrocket-java.gradle"
+
+# java_gradle_jdks [gradle.properties]: sets the two keys to the JDKs there now and writes the hook, or takes them out
+# when there are none.
 java_gradle_jdks() {
   local f="${1:-$HOME/.gradle/gradle.properties}" dirs
   dirs="$(java_jdk_dirs)"
   if [ -n "$dirs" ]; then
     gradle_props_set "$f" "$JAVA_GRADLE_PATHS" "$dirs"
     gradle_props_set "$f" "$JAVA_GRADLE_AUTO" false
+    mkdir -p "$(dirname "$JAVA_GRADLE_HOOK")"
+    cp -f "$(dirname "${BASH_SOURCE[0]}")/pocketrocket-java.gradle" "$JAVA_GRADLE_HOOK.tmp" && mv -f "$JAVA_GRADLE_HOOK.tmp" "$JAVA_GRADLE_HOOK" || true
   else
     gradle_props_unset "$f" "$JAVA_GRADLE_PATHS"
     gradle_props_unset "$f" "$JAVA_GRADLE_AUTO"
+    rm -f "$JAVA_GRADLE_HOOK"
   fi
 }
 
