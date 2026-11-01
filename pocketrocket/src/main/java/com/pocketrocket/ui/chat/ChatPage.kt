@@ -180,7 +180,7 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
                 ),
                 onOpenModel = { controlsAtModel = true; controls = true },
                 onOpenControls = { controlsAtModel = false; controls = true }, onShowBackground = { background = true },
-                onSwitchMode = { session.setMode(state.mode.tapNext) },
+                onSwitchMode = { session.setMode(state.mode.next) },
             )
         }
     }
