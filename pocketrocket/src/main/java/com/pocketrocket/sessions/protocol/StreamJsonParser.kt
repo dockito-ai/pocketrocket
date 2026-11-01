@@ -31,6 +31,10 @@ object StreamJsonParser {
             json.optStringOrNull("permissionMode"),
             json.optJSONArray("slash_commands")?.let { a -> (0 until a.length()).mapNotNull { a.optString(it).takeIf(String::isNotBlank) } }.orEmpty(),
         )
+        "background_tasks_changed" -> StreamEvent.LiveAgents(
+            json.optJSONArray("tasks")?.objects().orEmpty().filter { it.optString("task_type") == "local_agent" }
+                .mapNotNull { it.optStringOrNull("task_id") }.toSet(),
+        )
         "status" -> StreamEvent.Status(json.optStringOrNull("status"), json.optStringOrNull("permissionMode"))
         "compact_boundary" -> json.optJSONObject("compact_metadata").let {
             StreamEvent.Compacted(it?.optStringOrNull("trigger"), it?.optLong("pre_tokens") ?: 0, it?.optLong("post_tokens") ?: 0)
@@ -54,7 +58,7 @@ object StreamJsonParser {
         }
         return when (subtype) {
             "task_started", "task_progress" -> listOfNotNull(toolUseId?.let {
-                StreamEvent.SubagentUpdate(it, taskId = taskId, activity = json.optStringOrNull("description"), tokens = json.taskNumber("total_tokens") ?: json.taskNumber("subagent_tokens"), toolUses = json.taskNumber("tool_uses")?.toInt())
+                StreamEvent.SubagentUpdate(it, taskId = taskId, activity = json.optStringOrNull("description"), tokens = json.taskNumber("total_tokens") ?: json.taskNumber("subagent_tokens"), toolUses = json.taskNumber("tool_uses")?.toInt(), started = subtype == "task_started")
             })
             "task_updated" -> listOfNotNull(
                 taskId?.takeIf { json.optJSONObject("patch")?.optBoolean("is_backgrounded") == true }?.let { StreamEvent.TaskBackgrounded(it) },

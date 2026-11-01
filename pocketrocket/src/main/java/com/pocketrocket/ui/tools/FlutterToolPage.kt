@@ -47,7 +47,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 private const val FOR_CHECKING =
-    "For checking code: pub get, build_runner, analyze and test. No APKs on the phone; release builds need a Mac or CI."
+    "For checking code: pub get, build_runner, analyze and test. Debug APKs build here with Android and C and C++ " +
+        "installed (flutter build apk --debug); release builds need a Mac or CI."
 
 /**
  * Settings → Tools → Flutter & Dart (decisions 75 and 87): what it is for, its version with Update, the Flutter

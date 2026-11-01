@@ -67,7 +67,8 @@ object SessionReducer {
             ChatItem.Notice(state.nextId(), "Compacted · ${tokens(event.preTokens)} → ${tokens(event.postTokens)} tokens"),
         ).copy(compacting = false, context = ContextUsage(event.postTokens, state.context?.window, afterCompact = true))
         is StreamEvent.CommandOutput -> onCommandOutput(state, event.text)
-        is StreamEvent.SubagentToolUse, is StreamEvent.SubagentToolResult, is StreamEvent.SubagentText, is StreamEvent.SubagentUpdate ->
+        is StreamEvent.SubagentToolUse, is StreamEvent.SubagentToolResult, is StreamEvent.SubagentText, is StreamEvent.SubagentUpdate,
+        is StreamEvent.LiveAgents ->
             Subagents.onEvent(state, event)
         is StreamEvent.ShellStarted, is StreamEvent.TaskBackgrounded, is StreamEvent.ShellEnded -> ShellTasks.onEvent(state, event)
         is StreamEvent.PromptSuggestion -> state.copy(suggestion = event.text)
@@ -91,7 +92,7 @@ object SessionReducer {
         fun stamped(tool: ChatItem.Tool): AgentRun? {
             val run = tool.agent ?: return null
             return when {
-                run.startedAt == null && tool.result == null && tool.agentRunning -> run.copy(startedAt = now)
+                run.startedAt == null && (tool.result == null || run.revived) && tool.agentRunning -> run.copy(startedAt = now)
                 run.startedAt != null && run.endedAt == null && !tool.agentRunning -> run.copy(endedAt = now)
                 else -> null
             }
@@ -113,7 +114,10 @@ object SessionReducer {
 
     /** The CLI may send an agent to the background on its own; its result then only says it was launched (2.1.312). */
     private fun AgentRun.launched(result: String): AgentRun =
-        if (result.startsWith("Async agent launched")) copy(background = true) else this
+        if (result.startsWith("Async agent launched")) copy(background = true, taskId = taskId ?: LAUNCHED_ID.find(result)?.groupValues?.get(1)) else this
+
+    /** The agent id in a background launch's result, which is also its task id (what SendMessage and the task lines use). */
+    private val LAUNCHED_ID = Regex("""agentId: (\w+)""")
 
     /** A local command's output (/cost, /context...): one line as a notice, more as a reply. /compact's "Compacted" is said by its boundary. */
     private fun onCommandOutput(state: SessionState, text: String): SessionState = when {
