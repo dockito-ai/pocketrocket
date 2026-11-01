@@ -43,6 +43,9 @@
 #   --only rust / rust-remove  Rust alone, Termux's package (rust-remove takes the wasm target too)
 #   --only python / python-remove, bun / bun-remove, rust-wasm / rust-wasm-remove  the package tools (decision 92):
 #                     Termux packages only, 2 steps; Python's uninstall leaves what Headless Chrome needs
+#   --only go, deno, ruby, php, java (and <name>-remove)  the language tiles, package tools too (decision 98); java is
+#                     openjdk-21 with kotlin and keeps Java 17 the default java while it is installed
+#   --only golang-check / deno-check / ruby-check / php-check / openjdk-21-check, and the same with -update: as below
 #   --only git-check / rust-check / python-check / bun-check  refresh the package index and print `apt-cache policy <package>` (its
 #                     Installed and Candidate lines) for the Updates screen; no steps, no lock, no [done]
 #   --only git-update / rust-update / python-update / bun-update  upgrade the package alone (and only what the new version needs) with
@@ -1856,6 +1859,11 @@ pkg_tool_packages() {
     bun) printf 'bun' ;;
     rust-wasm) printf 'rust-std-wasm32-unknown-unknown' ;;
     rust) printf 'rust rust-std-aarch64-linux-android' ;;   # removal only: step_rust_install installs it
+    go) printf 'golang' ;;
+    deno) printf 'deno' ;;
+    ruby) printf 'ruby' ;;
+    php) printf 'php' ;;          # not composer: its package's phar fails its signature check after the prefix rewrite
+    java) printf 'openjdk-21 kotlin' ;;
     *) return 1 ;;
   esac
 }
@@ -1866,6 +1874,7 @@ pkg_tool_packages() {
 pkg_tool_companions() {
   case "$1" in
     python) printf 'python-ensurepip-wheels' ;;
+    java) printf 'openjdk-21-x' ;;
     rust) dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 'rust-std-*' 2>/dev/null | awk '$1 == "ii" {print $2}' | tr '\n' ' ' ;;
   esac
 }
@@ -1876,6 +1885,11 @@ pkg_tool_title() {
     python) printf 'Python, pip and uv' ;;
     bun) printf 'Bun' ;;
     rust-wasm) printf 'the wasm target' ;;
+    go) printf 'Go' ;;
+    deno) printf 'Deno' ;;
+    ruby) printf 'Ruby' ;;
+    php) printf 'PHP' ;;
+    java) printf 'Java 21 and Kotlin' ;;
   esac
 }
 
@@ -1887,7 +1901,62 @@ pkg_tool_check() {
     bun) printf 'bun %s' "$(bun --version 2>&1)" && bun -e 'process.exit(0)' ;;
     rust-wasm) rustc --print target-list 2>/dev/null | grep -qx wasm32-unknown-unknown \
       && [ -d "$PREFIX/lib/rustlib/wasm32-unknown-unknown" ] && printf 'wasm32-unknown-unknown for %s' "$(rustc --version 2>&1)" ;;
+    go) go version ;;
+    deno) deno eval 'console.log("deno " + Deno.version.deno)' ;;
+    ruby) RUBYOPT=-rrubygems ruby -e 'require "json"; print "ruby #{RUBY_VERSION}, gem #{Gem::VERSION}"' ;;
+    php) php -r 'echo "PHP " . PHP_VERSION;' ;;
+    java) "$JAVA21_HOME/bin/java" -version 2>&1 | sed -n 1p && kotlinc -version 2>&1 | grep -o 'kotlinc-jvm [^ ]*' ;;
   esac
+}
+
+# Ruby (decision 98): Termux's ruby doesn't load RubyGems by itself, so `require "<gem>"` fails until it does. Terminals
+# get RUBYOPT from this profile file; Claude sessions get it from the app whenever ruby is on the phone.
+RUBY_PROFILE="${PREFIX:-}/etc/profile.d/pocketrocket-ruby.sh"
+
+# Java 21 and Kotlin (decision 98): kotlin needs openjdk-21, and installing it moves update-alternatives' java group
+# (java, javac, profile.d/java.sh) to 21. Android and Flutter builds use 17 (ANDROID_JAVA_HOME), so while 17 is on the
+# phone the group is set to it by hand, before apt runs (21's install then leaves it alone) and again after. 21 stays
+# at JAVA21_HOME. Without 17 the default is 21, as apt leaves it.
+JAVA21_HOME="${PREFIX:-}/lib/jvm/java-21-openjdk"
+# Never removed by a package tool, whatever its lists say.
+PKG_TOOL_NEVER="openjdk-17 openjdk-17-x"
+
+java_keep_17() {
+  [ -x "$ANDROID_JAVA_HOME/bin/java" ] || return 0
+  update-alternatives --set java "$ANDROID_JAVA_HOME/bin/java" >>"$PR_LOG" 2>&1 || fail "could not keep Java 17 as the default java"
+}
+
+# pkg_tool_setup <name>: what the tool needs beyond its packages, once they're in. Repair runs it again.
+pkg_tool_setup() {
+  case "$1" in
+    python) uv_config_add "$UV_CONFIG" ;;
+    ruby) mkdir -p "$(dirname "$RUBY_PROFILE")"
+      printf '%s\n' "# Written by PocketRocket's Ruby tool. Removed on uninstall." "export RUBYOPT=-rrubygems" >"$RUBY_PROFILE" ;;
+    java) java_keep_17
+      if [ -x "$ANDROID_JAVA_HOME/bin/java" ]; then info "java stays on Java 17 for Android builds; Java 21 is in $JAVA21_HOME"; fi ;;
+  esac
+}
+
+# pkg_tool_cleanup <name>: after the purge, what the tool left outside its packages; only once its main package is gone.
+pkg_tool_cleanup() {
+  local main f
+  main="$(pkg_tool_packages "$1" | awk '{print $1}')"
+  [ "$1" != python ] || uv_config_remove "$UV_CONFIG"
+  ! pkg_installed "$main" || return 0
+  case "$1" in
+    go) rm -rf "$HOME/.cache/go-build"
+      # The module cache is read-only. ~/go/bin, with programs `go install` put there, stays.
+      chmod -R u+w "$HOME/go/pkg" 2>/dev/null || true
+      rm -rf "$HOME/go/pkg"; rmdir "$HOME/go" 2>/dev/null || true ;;
+    deno) rm -rf "$HOME/.cache/deno" ;;
+    ruby) rm -f "$RUBY_PROFILE"
+      # Gems installed into the prefix, and the launchers RubyGems wrote for them.
+      rm -rf "${PREFIX:-}/lib/ruby" "$HOME/.local/share/gem" "$HOME/.cache/gem"
+      for f in "${PREFIX:-}"/bin/*; do
+        if [ -f "$f" ] && head -c 4096 "$f" 2>/dev/null | grep -q 'generated by RubyGems'; then rm -f "$f"; fi
+      done ;;
+  esac
+  return 0
 }
 
 # uv uses Termux's Python and never downloads its own (those are glibc builds). One block at the top of uv's user
@@ -1931,7 +2000,8 @@ pkg_tool_purge() {
   packages_drop_stale "$baseline" "$added"
   if [ -f "$baseline" ]; then packages_record "$baseline" "$added"; fi
   # shellcheck disable=SC2046
-  { if [ -f "$added" ]; then cat "$added"; fi; printf '%s\n' $(pkg_tool_packages "$name"); } | sed '/^$/d' | sort -u >"$list"
+  { if [ -f "$added" ]; then cat "$added"; fi; printf '%s\n' $(pkg_tool_packages "$name"); } | sed '/^$/d' | sort -u \
+    | { grep -vxF -f <(printf '%s\n' $PKG_TOOL_NEVER) || true; } >"$list"
   # Companions go only when the main package can go too: python's venvs need its ensurepip wheels while it stays.
   main="$(pkg_tool_packages "$name" | awk '{print $1}')"
   if [ -n "$companions" ] && pkg_installed "$main"; then
@@ -1952,11 +2022,12 @@ step_pkg_tool_install() {
   if [ "$name" = rust-wasm ] && ! pkg_installed rust; then fail "Rust isn't installed; install Rust first"; fi
   apt_refresh
   packages_baseline "$PR_HOME/$name.baseline" "$PR_HOME/$name.packages"
+  [ "$name" != java ] || java_keep_17
   # shellcheck disable=SC2046
   apt_install_progress $(pkg_tool_packages "$name")
   packages_record "$PR_HOME/$name.baseline" "$PR_HOME/$name.packages"
   hash -r 2>/dev/null || true
-  [ "$name" != python ] || uv_config_add "$UV_CONFIG"
+  pkg_tool_setup "$name"
   out="$(pkg_tool_check "$name" 2>&1)" || fail "$(pkg_tool_title "$name") does not run: $out"
   ok "$out"
 }
@@ -1965,7 +2036,7 @@ step_pkg_tool_remove() {
   local name="$1"
   step "Removing $(pkg_tool_title "$name")"
   pkg_tool_purge "$name"
-  [ "$name" != python ] || uv_config_remove "$UV_CONFIG"
+  pkg_tool_cleanup "$name"
   if [ -n "$PKG_TOOL_KEPT" ]; then ok "removed the rest; $PKG_TOOL_KEPT stayed"; else ok "$(pkg_tool_title "$name") removed"; fi
 }
 
@@ -2020,7 +2091,8 @@ main() {
         claude|dockito|chromium|chromium-remove|android-build|android-build-remove|android-ndk|android-ndk-remove|wrangler|wrangler-remove|git-check|git-update) ;;
         flutter|flutter-default|flutter-remove-version|flutter-remove|rust|rust-remove|flutter-rust|flutter-rust-remove|rust-check|rust-update) ;;
         python|python-remove|bun|bun-remove|rust-wasm|rust-wasm-remove|python-check|python-update|bun-check|bun-update) ;;
-        *) fail "--only takes: claude, dockito, chromium, chromium-remove, android-build, android-build-remove, android-ndk, android-ndk-remove, wrangler, wrangler-remove, flutter [version], flutter-default <version>, flutter-remove-version <version>, flutter-remove, rust, rust-remove, flutter-rust, flutter-rust-remove, python, python-remove, bun, bun-remove, rust-wasm, rust-wasm-remove, git-check, git-update, rust-check, rust-update, python-check, python-update, bun-check or bun-update" ;;
+        go|go-remove|deno|deno-remove|ruby|ruby-remove|php|php-remove|java|java-remove|golang-check|golang-update|deno-check|deno-update|ruby-check|ruby-update|php-check|php-update|openjdk-21-check|openjdk-21-update) ;;
+        *) fail "--only takes: claude, dockito, chromium, chromium-remove, android-build, android-build-remove, android-ndk, android-ndk-remove, wrangler, wrangler-remove, flutter [version], flutter-default <version>, flutter-remove-version <version>, flutter-remove, rust, rust-remove, flutter-rust, flutter-rust-remove, python, python-remove, bun, bun-remove, rust-wasm, rust-wasm-remove, go, go-remove, deno, deno-remove, ruby, ruby-remove, php, php-remove, java, java-remove, git-check, git-update, rust-check, rust-update, python-check, python-update, bun-check, bun-update, golang-check, golang-update, deno-check, deno-update, ruby-check, ruby-update, php-check, php-update, openjdk-21-check or openjdk-21-update" ;;
       esac
       case "$2" in
         git-check|rust-check) apt_check "${2%-check}"; return 0 ;;
@@ -2031,6 +2103,15 @@ main() {
         python-update) main_apt_update Python "python3 --version" python python-pip uv python-ensurepip-wheels; return 0 ;;
         bun-update) main_apt_update Bun "bun --version" bun; return 0 ;;
         python|python-remove|bun|bun-remove|rust-wasm|rust-wasm-remove) main_pkg_tool "$2"; return 0 ;;
+        # The language tiles (decision 98). Checks and updates go by package name, as AptUpdater asks.
+        golang-check|deno-check|ruby-check|php-check|openjdk-21-check) apt_check "${2%-check}"; return 0 ;;
+        golang-update) main_apt_update Go "go version" golang; return 0 ;;
+        deno-update) main_apt_update Deno "deno --version" deno; return 0 ;;
+        ruby-update) main_apt_update Ruby "ruby --version" ruby; return 0 ;;
+        php-update) main_apt_update PHP "php --version" php; return 0 ;;
+        # The java group stays set to 17 by hand (java_keep_17), so an update of 21 doesn't move it.
+        openjdk-21-update) main_apt_update "Java and Kotlin" "$JAVA21_HOME/bin/java -version" openjdk-21 openjdk-21-x kotlin; return 0 ;;
+        go|go-remove|deno|deno-remove|ruby|ruby-remove|php|php-remove|java|java-remove) main_pkg_tool "$2"; return 0 ;;
       esac
       case "$2" in
         flutter*|rust*)

@@ -21,6 +21,11 @@ endorsement or affiliation.
 | Rust | `ic_tool_rust.xml` | Simple Icons 16.36.0, `rust` | `#000000` | CC BY-SA 4.0 (Rust Foundation, per Simple Icons) |
 | Python | `ic_tool_python.xml` | Simple Icons 16.36.0, `python` | `#3776AB` | CC0 1.0 (Simple Icons) |
 | Bun | `ic_tool_bun.xml` | Simple Icons 16.36.0, `bun` | `#000000` | CC0 1.0 (Simple Icons) |
+| Go | `ic_tool_go.xml` | Simple Icons 16.36.0, `go` | `#00ADD8` | CC0 1.0 (Simple Icons) |
+| Deno | `ic_tool_deno.xml` | Simple Icons 16.36.0, `deno` | `#000000` | MIT (per Simple Icons) |
+| Ruby | `ic_tool_ruby.xml` | Simple Icons 16.36.0, `ruby` | `#CC342D` | CC BY-SA 2.5 (per Simple Icons) |
+| PHP | `ic_tool_php.xml` | Simple Icons 16.36.0, `php` | `#777BB4` | CC BY-SA 4.0 (per Simple Icons) |
+| Java and Kotlin | `ic_tool_openjdk.xml` | Simple Icons 16.36.0, `openjdk` | `#000000` | BSD 3-Clause (per Simple Icons) |
 
 Simple Icons' collection is CC0; where Simple Icons records a licence for a single icon, that licence is listed above
 and applies to that file. Brand guidelines: Android, Cloudflare, Flutter, Google Chrome, Node.js, Python and Rust publish

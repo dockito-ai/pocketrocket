@@ -2,15 +2,29 @@ package com.pocketrocket.pkgtools
 
 import com.pocketrocket.termux.DpkgStatus
 
+/** Java 17's package; the enum's entries can't read their companion while they're built. */
+private const val OPENJDK_17 = "openjdk-17"
+
 /** Another package that needs part of a tool, so that part stays on uninstall: Headless Chrome needs python and pip. */
 data class HeldBy(val pkg: String, val name: String, val keeps: List<String>)
 
 /**
+ * Variables a tool needs in every shell (decision 98). The install writes them to [file] in `$PREFIX/etc/profile.d`
+ * for terminals; Claude sessions get them from the app while [binary] is in `$PREFIX/bin`, however it got there.
+ * [label] is how the tile names the file when it's missing ("gems setting missing").
+ */
+data class ShellSetting(val file: String, val binary: String, val environment: Map<String, String>, val label: String)
+
+/** What the phone says beyond dpkg, read with it: the profile.d files there, and where `$PREFIX/bin/java` leads. */
+data class PackageDisk(val profiles: Set<String> = emptySet(), val javaDefault: String? = null)
+
+/**
  * Add-ons that are only Termux packages (decision 92): Python with pip and uv, Bun, and Rust's wasm target (an option
- * on the Rust page). The setup script's `--only <option>` / `<option>-remove` installs and removes them and holds the
- * same package lists (`pkg_tool_packages`). What is installed is read from dpkg's status each time, never from a flag
- * the app saved, so a `pkg install` or `pkg uninstall` in a terminal shows on the tile too. Sizes are apt's, from the
- * desk evaluation on the phone (docs/tool-sweep.md on `fix/env-shebang`).
+ * on the Rust page); and the languages Go, Deno, Ruby, PHP, and Java with Kotlin (decision 98). The setup script's
+ * `--only <option>` / `<option>-remove` installs and removes them and holds the same package lists
+ * (`pkg_tool_packages`). What is installed is read from dpkg's status each time, never from a flag the app saved, so
+ * a `pkg install` or `pkg uninstall` in a terminal shows on the tile too. Sizes are apt's, measured on the phone
+ * (docs/tool-sweep.md).
  */
 enum class PackageTool(
     val option: String,
@@ -21,6 +35,9 @@ enum class PackageTool(
     val downloadMb: Int,
     val installedMb: Int,
     val heldBy: HeldBy? = null,
+    val shell: ShellSetting? = null,
+    /** Other packages its state depends on (Java 17, for Java's default). */
+    val alsoWatched: List<String> = emptyList(),
 ) {
     Python(
         "python", "Python, pip and uv", listOf("python" to "Python", "python-pip" to "pip", "uv" to "uv"),
@@ -29,6 +46,22 @@ enum class PackageTool(
     ),
     Bun("bun", "Bun", listOf("bun" to "Bun"), downloadMb = 25, installedMb = 85),
     RustWasm("rust-wasm", "the wasm target", listOf("rust-std-wasm32-unknown-unknown" to "wasm32-unknown-unknown"), downloadMb = 21, installedMb = 90),
+
+    // The language tiles (decision 98), sized on the phone ("Tested for tiles" in docs/tool-sweep.md).
+    Go("go", "Go", listOf("golang" to "Go"), downloadMb = 36, installedMb = 218),
+    Deno("deno", "Deno", listOf("deno" to "Deno"), downloadMb = 26, installedMb = 93),
+    Ruby(
+        "ruby", "Ruby", listOf("ruby" to "Ruby"), downloadMb = 9, installedMb = 45,
+        // Termux's ruby doesn't load RubyGems by itself, so `require` of an installed gem fails without it.
+        shell = ShellSetting("pocketrocket-ruby.sh", "ruby", mapOf("RUBYOPT" to "-rrubygems"), "gems setting"),
+    ),
+    /** Not composer: Termux's package fails its phar signature check once the prefix is rewritten. */
+    Php("php", "PHP", listOf("php" to "PHP"), downloadMb = 13, installedMb = 101),
+    /** kotlin needs openjdk-21; Java 17 (the Android tool's) stays the default `java` while it is on the phone. */
+    Java(
+        "java", "Java 21 and Kotlin", listOf("openjdk-21" to "Java", "kotlin" to "Kotlin"), downloadMb = 196, installedMb = 350,
+        alsoWatched = listOf(OPENJDK_17),
+    ),
     ;
 
     val main: String get() = packages.first().first
@@ -36,11 +69,23 @@ enum class PackageTool(
     val installSteps: List<String> get() = listOf("Checking the device", "Installing $title")
     val removeSteps: List<String> get() = listOf("Checking the device", "Removing $title")
 
-    /** Every package worth reading from dpkg for this tool: its own and the one that holds part of it. */
-    val watched: Set<String> get() = packages.map { it.first }.toSet() + listOfNotNull(heldBy?.pkg)
+    /** Every package worth reading from dpkg for this tool: its own, the one that holds part of it, and [alsoWatched]. */
+    val watched: Set<String> get() = packages.map { it.first }.toSet() + listOfNotNull(heldBy?.pkg) + alsoWatched
 
     /** On the phone: its main package is installed, whoever put it there. */
     fun installed(pkgs: Map<String, DpkgStatus.Package>): Boolean = main in pkgs
+
+    /**
+     * What keeps it from working the way its tile installs it, read from the phone, or null: Ruby without its gems
+     * setting (after a `pkg install ruby` in a terminal), or `java` leading to 21 while 17 is there. Repair runs the
+     * install again, which puts it right.
+     */
+    fun problem(pkgs: Map<String, DpkgStatus.Package>, disk: PackageDisk): String? = when {
+        !installed(pkgs) -> null
+        shell != null && shell.file !in disk.profiles -> "${shell.label} missing"
+        this == Java && JAVA_17 in pkgs && disk.javaDefault?.contains("/java-21-openjdk/") == true -> "java isn't Java 17"
+        else -> null
+    }
 
     /** Its other packages that aren't there (Python without uv): their names, for "Add uv". */
     fun missing(pkgs: Map<String, DpkgStatus.Package>): List<String> =
@@ -81,6 +126,9 @@ enum class PackageTool(
     }
 
     companion object {
+        /** The package the Android tool's builds use; no package tool ever removes it (`PKG_TOOL_NEVER`). */
+        const val JAVA_17 = OPENJDK_17
+
         /** Every package any tool watches, for one read of dpkg's status. */
         val allWatched: Set<String> get() = entries.flatMap { it.watched }.toSet()
 
