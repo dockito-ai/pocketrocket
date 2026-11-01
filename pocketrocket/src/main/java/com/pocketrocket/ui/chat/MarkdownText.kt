@@ -21,6 +21,7 @@ import com.pocketrocket.ui.theme.PrType
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
@@ -50,11 +51,14 @@ fun MarkdownText(text: String, modifier: Modifier = Modifier, color: Color = PrT
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         blocks.forEach { block ->
             when (block) {
+                // The Copy icon sits in the corner, outside the scroll; the code leaves room for it on the right.
                 is MarkdownBlocks.Block.Code -> Box(
-                    Modifier.fillMaxWidth().background(c.background, RoundedCornerShape(8.dp)).border(1.dp, c.border, RoundedCornerShape(8.dp))
-                        .horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 10.dp),
+                    Modifier.fillMaxWidth().background(c.background, RoundedCornerShape(8.dp)).border(1.dp, c.border, RoundedCornerShape(8.dp)),
                 ) {
-                    Text(block.text, style = PrType.codeSmall.copy(lineHeight = 17.sp), color = color)
+                    Box(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 12.dp, end = 36.dp, top = 10.dp, bottom = 10.dp)) {
+                        Text(block.text, style = PrType.codeSmall.copy(lineHeight = 17.sp), color = color)
+                    }
+                    CopyIcon(block.text, "Copy code", "Copied the code", Modifier.align(Alignment.TopEnd))
                 }
                 is MarkdownBlocks.Block.Bullet -> Row {
                     Text("•", style = body, color = c.accent, modifier = Modifier.width(16.dp))

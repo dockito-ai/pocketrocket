@@ -1,5 +1,15 @@
 package com.pocketrocket.ui.chat
 
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.Icon
+import com.pocketrocket.ui.components.MockIcons
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.ui.draw.drawBehind
@@ -76,6 +86,7 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
     var picked by remember { mutableStateOf<Draft?>(null) }
     val rows = state.items.size + if (working) 1 else 0
     val apks = rememberApkCards(state.folder, state.demo, state.items)
+    val copyable = remember(state.items, working) { TurnReplies.copyable(state.items, working) }
     val dictator = rememberDictator()
     // Settings over the session's own process, for the effort in the status line and in the controls.
     val scope = rememberCoroutineScope()
@@ -86,31 +97,45 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
         if (alive && !state.demo && !setup) setupPanel.refreshSettings()
     }
 
-    // Follow the conversation as it grows: animate for new items, jump (no animation per token) while text streams.
+    // Follow the conversation as it grows (animate for new items, jump with no animation per token while text
+    // streams), but only while he is at the bottom: scrolling up to read stops it, and coming back down or tapping
+    // the ↓ button starts it again. Sending a message or a permission card always brings him back.
+    var follow by remember { mutableStateOf(true) }
+    val atEnd by remember { derivedStateOf { list.isAtEnd() } }
+    val dragged by list.interactionSource.collectIsDraggedAsState()
+    LaunchedEffect(list) {
+        var touched = false
+        snapshotFlow { dragged to list.isScrollInProgress }.collect { (drag, scrolling) ->
+            if (drag) { touched = true; follow = false }
+            else if (!scrolling && touched) { touched = false; follow = list.isAtEnd() }
+        }
+    }
     val last = state.items.lastOrNull()
     val streamingLength = (last as? ChatItem.Assistant)?.takeIf { it.streaming }?.text?.length
     LaunchedEffect(rows, if (streamingLength != null) last.id else last) {
-        list.followToEnd(animate = true)
+        if (last is ChatItem.User) follow = true
+        if (follow) list.followToEnd(animate = true)
     }
     // An APK card appears under its call once the build has finished; keep it in view.
     val apkCount = apks.values.sumOf { it.size }
     LaunchedEffect(apkCount) {
-        if (apkCount > 0) list.followToEnd(animate = true)
+        if (apkCount > 0 && follow) list.followToEnd(animate = true)
     }
     // A permission or plan card takes room from the list; keep the latest line in view above it.
     LaunchedEffect(state.permission?.requestId) {
-        if (state.permission != null) { delay(250); list.followToEnd(animate = true) }
+        if (state.permission != null) { follow = true; delay(250); list.followToEnd(animate = true) }
     }
     LaunchedEffect(streamingLength) {
-        if (streamingLength != null && !list.isScrollInProgress) list.followToEnd(animate = false)
+        if (streamingLength != null && follow && !list.isScrollInProgress) list.followToEnd(animate = false)
     }
 
     val c = PrTheme.colors
     DictationOverlay(dictator, modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
+        Box(Modifier.weight(1f).fillMaxWidth()) {
         LazyColumn(
             state = list,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -127,7 +152,11 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
                         )
                         UserBubble(item.text, item.attachments, menu = menu)
                     }
-                    is ChatItem.Assistant -> AssistantMessage(item.text)
+                    is ChatItem.Assistant -> {
+                        val turn = copyable[item.id]
+                        if (turn == null) AssistantMessage(item.text)
+                        else Column { AssistantMessage(item.text); ReplyCopyRow(turn) }
+                    }
                     is ChatItem.Tool -> if (item.agent != null) AgentCard(item, item.agent, onOpen = { openAgent = item.id }) else Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         ToolCallCard(item, onOpenOutput = { openShell = item.id }, onMoveToBackground = { session.moveToBackground(item.id) })
                         // An APK this call wrote (decision 99).
@@ -154,6 +183,11 @@ fun ChatPage(session: Session, modifier: Modifier = Modifier, active: Boolean = 
                     }
                 }
             }
+        }
+        if (!atEnd && !follow) JumpToEnd(Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp)) {
+            follow = true
+            scope.launch { list.followToEnd(animate = true) }
+        }
         }
         // The composer strip: chat box, then the status line (Session.dc.html: #141821, 8/12/10 padding, 8 gap).
         Column(
@@ -296,6 +330,28 @@ private fun EmptyChat() {
 internal fun Modifier.drawTopBorder(color: Color) = drawBehind {
     drawRect(color, size = Size(size.width, 1.dp.toPx()))
 }
+
+/** The ↓ button over the chat when he has scrolled up: back to the latest message, following again. */
+@Composable
+private fun JumpToEnd(modifier: Modifier, onClick: () -> Unit) {
+    val c = PrTheme.colors
+    Box(
+        modifier.size(40.dp).shadow(4.dp, CircleShape).clip(CircleShape).background(c.raised).border(1.dp, c.borderStrong, CircleShape)
+            .clickable(onClickLabel = "Scroll to the latest message", role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(MockIcons.ChevronDown, contentDescription = "Scroll to the latest message", tint = c.text, modifier = Modifier.size(20.dp))
+    }
+}
+
+/** Whether the bottom of the list (its last item and the padding after it) is in view, give or take a few pixels. */
+internal fun LazyListState.isAtEnd(): Boolean {
+    val info = layoutInfo
+    val last = info.visibleItemsInfo.lastOrNull() ?: return true
+    return last.index >= info.totalItemsCount - 1 && last.offset + last.size + info.afterContentPadding <= info.viewportEndOffset + AT_END_SLACK_PX
+}
+
+private const val AT_END_SLACK_PX = 48
 
 /**
  * Scrolls to the very end of the list, so the bottom of a tall last item (a long reply) is in view, not its top.
