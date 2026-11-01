@@ -151,7 +151,7 @@ if [ "${1:-}" = --only ]; then
         [ -z "$next" ] || ln -s "versions/$next" "$fvm_home/default"
       fi
       echo "[done]"; exit 0 ;;
-    # Release builds (decision 106): a fake emulator and C library loader where the app looks.
+    # Release builds (decision 108): a fake emulator and C library loader where the app looks.
     flutter-release)
       TOTAL=3; step 1 "Checking the device"; step 2 "Installing the x86_64 emulator"; printf '[progress 50] Downloading qemu-user-x86-64 · 1 of 2 MB\n'; sleep "$pace"
       printf '#!/bin/sh\n' > "$PREFIX/bin/qemu-x86_64"; chmod 755 "$PREFIX/bin/qemu-x86_64"; printf 'qemu-user-x86-64\n' > "$HOME/.pocketrocket/flutter-release.packages"

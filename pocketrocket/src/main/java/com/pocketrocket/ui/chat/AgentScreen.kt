@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -173,7 +174,10 @@ private fun FinalAnswer(text: String) {
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text("FINAL ANSWER", style = PrType.micro, fontWeight = FontWeight.SemiBold, color = c.green)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("FINAL ANSWER", style = PrType.micro, fontWeight = FontWeight.SemiBold, color = c.green, modifier = Modifier.weight(1f))
+            CopyIcon(text, "Copy answer", "Copied the answer", Modifier.offset(x = 8.dp))
+        }
         AssistantMessage(text)
     }
 }

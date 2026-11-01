@@ -53,7 +53,7 @@ private const val FOR_CHECKING =
 
 /**
  * Settings → Tools → Flutter & Dart (decisions 75 and 87): what it is for, its version with Update, the Flutter
- * versions (sizes, default, Add version, Set default, Remove), Release builds (decision 106), a nudge towards Rust when a workspace is a
+ * versions (sizes, default, Add version, Set default, Remove), Release builds (decision 108), a nudge towards Rust when a workspace is a
  * flutter_rust_bridge app, sizes, and Install or Uninstall. Version jobs run inside their card; installing or
  * uninstalling is the page's job. Rust is its own tool and page.
  */
@@ -153,7 +153,7 @@ fun FlutterToolPage(onBack: () -> Unit, onOpenRust: () -> Unit) {
 }
 
 /**
- * Release builds (decision 106), added and removed on their own like the wasm target on Rust's page: Termux's
+ * Release builds (decision 108), added and removed on their own like the wasm target on Rust's page: Termux's
  * qemu-x86_64 and an x86_64 C library, so `flutter build apk --release` (and --profile) run Google's x86_64 AOT
  * compiler under emulation. Repair when only part of it is there.
  */

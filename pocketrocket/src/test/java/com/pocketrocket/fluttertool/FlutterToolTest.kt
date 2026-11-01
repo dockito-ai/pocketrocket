@@ -241,7 +241,7 @@ class FlutterToolTest {
             val chosen = shell(launcher, "POCKETROCKET_FLUTTER_SOURCE_ONLY", setup, dir.path, "build", "apk", "--debug", "--target-platform=android-arm")
             assertEquals(0 to "|ORG_GRADLE_PROJECT_disable-abi-filtering=true|$preload", chosen)
 
-            // With Release builds (decision 106) a release build runs like a debug one, and says it is slow.
+            // With Release builds (decision 108) a release build runs like a debug one, and says it is slow.
             File(dir, "qemu-x86_64").apply { writeText("#!/bin/sh\n"); setExecutable(true) }
             File(dir, "sysroot/lib64").mkdirs(); File(dir, "sysroot/lib64/ld-linux-x86-64.so.2").writeText("")
             val withRelease = "PR_QEMU=\"$1/qemu-x86_64\"; PR_X64_SYSROOT=\"$1/sysroot\"; $setup"

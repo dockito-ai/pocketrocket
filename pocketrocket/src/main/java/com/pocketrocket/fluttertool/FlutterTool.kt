@@ -10,7 +10,7 @@ import java.util.Locale
 data class FlutterRelease(val version: String, val date: String)
 
 /**
- * Release builds, the opt-in piece of Flutter & Dart (decision 106): [Off] when it was never added (or was removed),
+ * Release builds, the opt-in piece of Flutter & Dart (decision 108): [Off] when it was never added (or was removed),
  * [Installed] when the emulator and the x86_64 C library are both there, [Missing] when only part of it is (Repair).
  */
 enum class ReleaseBuilds { Off, Installed, Missing }
@@ -43,7 +43,7 @@ object FlutterTool {
     const val CLANG_RELATIVE = "bin/clang"
 
     /**
-     * Release builds (decision 106): Termux's qemu-x86_64 and the x86_64 C library the setup script unpacks, under
+     * Release builds (decision 108): Termux's qemu-x86_64 and the x86_64 C library the setup script unpacks, under
      * $PREFIX (the setup script's FLUTTER_RELEASE_QEMU and FLUTTER_RELEASE_SYSROOT, the launcher's PR_QEMU and
      * PR_X64_SYSROOT), and the list of what its install added, under home, which only that install writes.
      */

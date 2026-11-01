@@ -37,7 +37,7 @@ enum class FlutterAction(val removes: Boolean, val part: FlutterPart, val whole:
     AddVersion(false, FlutterPart.Flutter),
     SetDefault(false, FlutterPart.Flutter),
     RemoveVersion(true, FlutterPart.Flutter),
-    /** Release builds, the opt-in piece on Flutter's page (decision 106). */
+    /** Release builds, the opt-in piece on Flutter's page (decision 108). */
     AddReleaseBuilds(false, FlutterPart.Flutter),
     RemoveReleaseBuilds(true, FlutterPart.Flutter),
     UninstallFlutter(true, FlutterPart.Flutter, whole = true),

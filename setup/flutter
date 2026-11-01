@@ -40,7 +40,7 @@
 # The Gradle heap for APK builds is twice the build-slot cap (decision 104): Jetifier on Flutter's engine jar needs more.
 # Builds are arm64 only unless --target-platform is given (the phone's NDK serves no other ABI), with Flutter's ABI
 # filter off.
-# Release and profile builds (decision 106) need the opt-in Release builds piece (Settings → Tools → Flutter & Dart):
+# Release and profile builds (decision 108) need the opt-in Release builds piece (Settings → Tools → Flutter & Dart):
 # Google publishes Flutter's Android AOT compiler, gen_snapshot, only for x86_64 hosts. Flutter downloads that one
 # (android-<arch>-<mode>/linux-x64/gen_snapshot) and on this host looks in android-<arch>-<mode>/linux-arm64/, so with
 # the piece installed every prepare writes a wrapper there that runs the x86_64 one under qemu-x86_64, with the piece's
@@ -61,7 +61,7 @@ PR_PRELOAD_VAR=POCKETROCKET_GLIBC_PRELOAD    # the one-shot glibc preload (pr_ap
 PR_WRAPPER_MARK='PocketRocket wrapper 3'     # in every wrapper this launcher writes now; older ones are written again
 PR_NAME="${0##*/}"
 PR_FVM_DIR="$PREFIX/opt/fvm"
-PR_QEMU="$PREFIX/bin/qemu-x86_64"               # Release builds (decision 106): the setup script's FLUTTER_RELEASE_QEMU,
+PR_QEMU="$PREFIX/bin/qemu-x86_64"               # Release builds (decision 108): the setup script's FLUTTER_RELEASE_QEMU,
 PR_X64_SYSROOT="$PREFIX/opt/flutter-x64-sysroot"   # FLUTTER_RELEASE_SYSROOT
 PR_AOT_MARK='PocketRocket gen_snapshot wrapper 1'  # in every gen_snapshot wrapper; the setup script finds them by it
 case "$PR_NAME" in dart*) PR_NAME=dart ;; fvm*) PR_NAME=fvm ;; *) PR_NAME=flutter ;; esac

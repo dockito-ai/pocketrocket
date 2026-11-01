@@ -2,7 +2,7 @@
 
 Since decision 87 these are two tools, Flutter & Dart and Rust, each installed and removed on its own; what follows describes both.
 
-Decision 75. An optional tool for checking code on the phone, from a terminal or a Claude session: `flutter pub get`, `dart run build_runner build`, `flutter analyze`, `flutter test`, `cargo check` and `cargo clippy`. Since decision 100 it also builds debug APKs (`flutter build apk --debug`) when Android and C and C++ are installed, and since decision 106 release and profile APKs too once its opt-in Release builds piece is added. How it was worked out: `docs/flutter-spike.md` and `docs/flutter-apk-spike.md`.
+Decision 75. An optional tool for checking code on the phone, from a terminal or a Claude session: `flutter pub get`, `dart run build_runner build`, `flutter analyze`, `flutter test`, `cargo check` and `cargo clippy`. Since decision 100 it also builds debug APKs (`flutter build apk --debug`) when Android and C and C++ are installed, and since decision 108 release and profile APKs too once its opt-in Release builds piece is added. How it was worked out: `docs/flutter-spike.md` and `docs/flutter-apk-spike.md`.
 
 ## Install and remove
 
@@ -79,7 +79,7 @@ Not yet tried on the phone from the tile: the spike built a hello-world debug AP
 
 ## Release builds
 
-Decision 106. An opt-in piece on the Flutter & Dart page ("Release builds": Add, Remove, Repair), for `flutter build apk --release` and `--profile` (and `appbundle`). Slow, and meant for when a release APK is needed away from a computer.
+Decision 108. An opt-in piece on the Flutter & Dart page ("Release builds": Add, Remove, Repair), for `flutter build apk --release` and `--profile` (and `appbundle`). Slow, and meant for when a release APK is needed away from a computer.
 
 **Why it needs one.** A release build compiles the app's Dart code ahead of time with `gen_snapshot`, and Google publishes the Android `gen_snapshot` only for x86_64 hosts. Flutter downloads it anyway with its Android tools (`bin/cache/artifacts/engine/android-<arch>-<mode>/linux-x64/gen_snapshot`), and on this `linux-arm64` host looks for it in `android-<arch>-<mode>/linux-arm64/` (`_getAndroidArtifactPath` in Flutter's `artifacts.dart`). Nothing else in a release build is x86_64-only: `font-subset`, `const_finder` and the frontend server run natively.
 

@@ -41,7 +41,7 @@
 #   --only flutter [version]  add a Flutter version (newest stable by default; POCKETROCKET_FLUTTER_VERSION
 #                     also works, POCKETROCKET_FLUTTER_DEFAULT=1 makes it the default)
 #   --only flutter-default <version> / flutter-remove-version <version> / flutter-remove
-#   --only flutter-release / flutter-release-remove  Release builds, the opt-in piece of Flutter & Dart (decision 106):
+#   --only flutter-release / flutter-release-remove  Release builds, the opt-in piece of Flutter & Dart (decision 108):
 #                     Termux's qemu-user-x86-64 and an x86_64 C library, so release and profile APKs build; 3 steps
 #                     (remove: 2). Uninstall of Flutter takes it too
 #   --only rust / rust-remove  Rust alone, Termux's package (rust-remove takes the wasm target too)
@@ -1976,7 +1976,7 @@ step_flutter_remove() {
   ok "Flutter removed"
 }
 
-# Release builds (decision 106, docs/flutter-tool.md): an opt-in piece of Flutter & Dart for `flutter build apk` in
+# Release builds (decision 108, docs/flutter-tool.md): an opt-in piece of Flutter & Dart for `flutter build apk` in
 # release and profile mode. Google publishes Flutter's Android AOT compiler, gen_snapshot, only for x86_64 hosts. Flutter
 # downloads it anyway (android-<arch>-<mode>/linux-x64/gen_snapshot) and on this linux-arm64 host looks for it in
 # android-<arch>-<mode>/linux-arm64/, so the launcher writes a wrapper there that runs the x86_64 one under Termux's
