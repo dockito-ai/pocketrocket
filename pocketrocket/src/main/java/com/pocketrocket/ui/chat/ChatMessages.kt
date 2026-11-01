@@ -7,7 +7,12 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import com.pocketrocket.ui.components.MockIcons
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -89,6 +94,27 @@ fun UserBubble(
 @Composable
 fun AssistantMessage(text: String) {
     SelectionContainer { MarkdownText(text, Modifier.fillMaxWidth()) }
+}
+
+/** The Copy button under a finished reply: copies [text], the reply's Markdown. */
+@Composable
+fun ReplyCopyRow(text: String) {
+    Row(Modifier.fillMaxWidth().offset(x = (-8).dp)) {
+        CopyIcon(text, "Copy reply", "Copied the reply")
+    }
+}
+
+/** A small Copy icon with a 36 dp touch area; puts [text] on the clipboard and says [toast]. */
+@Composable
+fun CopyIcon(text: String, label: String, toast: String, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    Box(
+        modifier.size(36.dp).clip(CircleShape)
+            .clickable(onClickLabel = label, role = Role.Button) { copyText(context, label, text, toast) },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(MockIcons.Copy, contentDescription = label, tint = PrTheme.colors.textMuted, modifier = Modifier.size(16.dp))
+    }
 }
 
 /** A quiet centred line, for things like "Allowed Bash". */

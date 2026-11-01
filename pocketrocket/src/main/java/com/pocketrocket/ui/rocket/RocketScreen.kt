@@ -49,6 +49,7 @@ import com.pocketrocket.assistant.askRocket
 import com.pocketrocket.sessions.SessionManager
 import com.pocketrocket.ui.Routes
 import com.pocketrocket.ui.chat.AssistantMessage
+import com.pocketrocket.ui.chat.ReplyCopyRow
 import com.pocketrocket.ui.chat.Composer
 import com.pocketrocket.ui.chat.ComposerVoice
 import com.pocketrocket.ui.chat.MicVisual
@@ -169,7 +170,12 @@ private fun TurnRows(turn: Turn) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (turn.question.isNotBlank()) UserBubble(turn.question)
         if (turn.pending != null) WorkingRow(turn.reply.text.removeSuffix(".").removeSuffix("…"))
-        else AssistantMessage(ReplyText.markdown(turn.reply))
+        else ReplyText.markdown(turn.reply).let { reply ->
+            Column {
+                AssistantMessage(reply)
+                if (reply.isNotBlank()) ReplyCopyRow(reply)
+            }
+        }
         turn.note?.let { Text(it, style = PrType.caption, color = PrTheme.colors.textMuted) }
     }
 }
