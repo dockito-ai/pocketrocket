@@ -93,7 +93,7 @@ Decision 106. An opt-in piece on the Flutter & Dart page ("Release builds": Add,
 
 **A release build.** `pr_apk_setup` lets it through when the piece is installed, and otherwise stops with "Release and profile builds need Release builds: Settings → Tools → Flutter & Dart". Everything else is the debug path: the APK preflight (decision 105), the exec helper, arm64 by default with Flutter's ABI filter off, the build slot and the Gradle heap. Flutter fetches its Android tools at the start of a build, after the launcher prepared the version, so when the version has none yet the launcher runs `flutter precache --android` and writes the wrappers before the build starts. It prints one line saying the AOT compile runs under emulation and takes minutes.
 
-Measured on the Poco F7: the hello sample's release APK in about 3 minutes from clean, about 70 s of it `gen_snapshot` under qemu, peaking near 190 MB.
+Measured on the Poco F7: the hello sample's release APK (15.5 MB, `lib/arm64-v8a/libapp.so` inside) in 254 s after `flutter clean`, about 150 s of it `gen_snapshot` under qemu, which peaked near 190 MB of memory.
 
 **Removal** (`--only flutter-release-remove`, 2 steps, and part of Uninstall of Flutter & Dart): the wrappers that carry the mark, in every version; the C library; the packages the install added, except what other packages need. A `qemu-x86_64` that was on the phone before stays.
 
