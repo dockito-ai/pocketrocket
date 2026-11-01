@@ -2,7 +2,7 @@
 
 Since decision 87 these are two tools, Flutter & Dart and Rust, each installed and removed on its own; what follows describes both.
 
-Decision 75. An optional tool for checking code on the phone, from a terminal or a Claude session: `flutter pub get`, `dart run build_runner build`, `flutter analyze`, `flutter test`, `cargo check` and `cargo clippy`. No APKs on the phone; release builds need a Mac or CI. How it was worked out: `docs/flutter-spike.md`.
+Decision 75. An optional tool for checking code on the phone, from a terminal or a Claude session: `flutter pub get`, `dart run build_runner build`, `flutter analyze`, `flutter test`, `cargo check` and `cargo clippy`. Since decision 100 it also builds debug APKs (`flutter build apk --debug`) when Android and C and C++ are installed; release builds need a Mac or CI. How it was worked out: `docs/flutter-spike.md` and `docs/flutter-apk-spike.md`.
 
 ## Install and remove
 
@@ -25,7 +25,7 @@ Settings › Updates shows Flutter and Rust only while they are installed. Flutt
 
 Official only, in FVM's layout so `fvm` and PocketRocket agree:
 
-1. `which` and `unzip` from Termux (`flutter doctor` needs `which`; Flutter's Dart download needs `unzip`). What they add is recorded in `~/.pocketrocket/flutter.packages` and only that is removed later.
+1. `which`, `unzip` and `termux-exec-glibc` from Termux (`flutter doctor` needs `which`; Flutter's Dart download needs `unzip`; debug APKs need `termux-exec-glibc`, which the base set already brings). When clang is on the phone (the C and C++ add-on), the exec helper for debug APKs is built from `setup/flutter-exec.c` (see Debug APKs below). What they add is recorded in `~/.pocketrocket/flutter.packages` and only that is removed later.
 2. FVM 4.3.2, its official `linux-arm64` release from GitHub, checked against the SHA-256 GitHub publishes for the asset (pinned in the script), into `$PREFIX/opt/fvm`, with `$PREFIX/bin/fvm`. Its bundled Dart is prepared like Flutter's. FVM's git cache (a mirror of Flutter's whole history) and its update check are turned off.
 3. `git clone --depth 1 -b <version>` of `github.com/flutter/flutter` into `~/fvm/versions/<version>`, then `HEAD` is checked against the commit Flutter's `releases_linux.json` names for that version. A git commit names its whole content, so this is the checksum.
 4. Flutter's own `update_dart_sdk.sh` downloads `dart-sdk-linux-arm64.zip` (225 MB) from Google's storage.
@@ -44,6 +44,22 @@ Why a clone and not Flutter's archive: the Linux archives in `releases_linux.jso
 - Git: with that flag git refuses to move the checkout when the new revision changes one of those scripts. So before `flutter upgrade`, `flutter channel <name>` and `flutter downgrade` the launcher puts the scripts back as git has them, and points them again afterwards. When the checkout moved and Flutter's own second half (it starts `bin/flutter` from Dart, which can't run the original first line) failed, the launcher sets up the new Dart SDK and builds the tool itself. In a release folder (`~/fvm/versions/3.47.9`) those commands stop with a message instead: FVM checks that the folder still holds that release and otherwise stops at a question, which a Claude session can't answer. Only channel folders (`fvm install stable`) move.
 - Then it sets Termux's bionic exec helper and runs `bash <version>/bin/flutter` or `bin/dart`. It waits rather than `exec`, so that tools Flutter downloads during a run are prepared right after; if that run failed because of them, it says to run the command again.
 
+## Debug APKs
+
+Decision 100, from `docs/flutter-apk-spike.md`. `flutter build apk --debug` (and `appbundle --debug`) works when the Android add-on (SDK, Java 17, Gradle) and the C and C++ add-on (clang) are installed. Three things make it work:
+
+- **The exec helper.** Flutter starts the project's `android/gradlew` (`#!/usr/bin/env bash`) from the Flutter tool, a glibc program, with glibc's `execvp`. Termux's `termux-exec-glibc` fixes such paths only in `execve`, which glibc's `execvp` bypasses. `setup/flutter-exec.c` defines `execvp`, `execvpe` and `execv` on top of the exported `execve`. The install builds it with clang into `$PREFIX/lib/pocketrocket-flutter-exec/` (no binary ships), next to links that make one `LD_PRELOAD` value work in both C libraries: glibc's loader reads `$PLATFORM` in the path as `aarch64`, bionic's takes it literally. So `<dir>/$PLATFORM/1.so:<dir>/$PLATFORM/2.so` gives the Flutter tool `termux-exec-glibc` plus the helper, and gives its bionic children (bash, Java) Termux's usual exec helper plus an empty library.
+- **Only the Flutter tool gets it.** For an APK build the launcher exports `POCKETROCKET_GLIBC_PRELOAD` with that value. Every wrapper the launcher writes turns it into `LD_PRELOAD` and drops it, so only the next glibc program (the Flutter tool's Dart) has it. Glibc tools started further down (Gradle running `flutter assemble`, `gen_snapshot`) run as before. Wrappers written by an older launcher are written again on the next run.
+- **arm64 only.** The phone's NDK serves only arm64, and Flutter's Gradle plugin asks for armeabi-v7a and x86_64 too, which stops AGP at configuration (`CXX1201`). The launcher adds `--target-platform android-arm64` unless one is given, and turns Flutter's ABI filter off through the Gradle project property `disable-abi-filtering` in the environment.
+
+Release and profile builds (`flutter build apk` without `--debug`) stop at once with a message. They need `gen_snapshot`, and Google publishes the Android one only for x86_64 hosts. Running it under qemu, building it from source or using a community build were left out (Shankar: release builds on the phone are emergency-only).
+
+Memory: an APK build is a full Gradle build. Gradle's memory caps and the one-build-at-a-time slot are the build-control work's, not this tool's.
+
+The tile: when clang is on the phone but the helper isn't (Flutter installed before C and C++, or before decision 100), Flutter & Dart reads "Installed · APK builds missing" and Repair builds it. Without clang nothing is missing; the launcher says what APK builds need when one is tried.
+
+Not yet tried on the phone from the tile: the spike built a hello-world debug APK with the same pieces run by hand.
+
 ## FVM
 
 `$PREFIX/bin/fvm` is a link to the same launcher. It runs FVM 4.3.2 (its Dart prepared by the setup script) and makes the versions it touches ready around it: before `fvm install`, `use`, `global`, `flutter`, `dart`, `spawn` and `exec` every installed version gets its scripts pointed and anything new prepared, and a version with no Dart SDK yet (one FVM cloned) gets it downloaded, prepared and its tool built, which is FVM's own setup step. FVM's setup of a version it just cloned fails first (it runs `bin/flutter` before the launcher has seen the version), so after `install`, `use` and `global` the launcher finishes that version and, if FVM's command had failed, runs it once more. `fvm flutter upgrade` (and `channel`, `downgrade`) goes through the launcher's own path above. Tried on the phone with `LD_PRELOAD` empty: `fvm install 3.47.8`, `fvm flutter --version`, `fvm dart --version`, `fvm use 3.47.8` in a project, then `fvm flutter analyze` and `flutter analyze` there.
@@ -54,7 +70,8 @@ Sessions need nothing extra: `flutter`, `dart`, `fvm`, `cargo` and `rustc` are a
 
 ## Limits
 
-- No APKs, no `flutter run`: Flutter starts `gradlew` (`#!/usr/bin/env bash`) from Dart, which runs without the exec helper.
+- Debug APKs only, arm64 only, and only with Android and C and C++ installed. No release or profile builds. `flutter run` gets no special handling.
+- Plugins with `ndk-build` native code are refused by the NDK tool's Gradle hook.
 - `flutter upgrade` and `flutter downgrade` only work in a channel folder; a release (the tile's versions, `fvm install 3.47.9`) stays as it is. Updates go through Settings › Updates, or `fvm install` and `fvm use`.
 - `flutter doctor` shows the channel as `[user-branch]` for a tag clone, and no Android toolchain.
 - Rust is one version (Termux's), whatever `rust-toolchain.toml` says.
@@ -62,4 +79,4 @@ Sessions need nothing extra: `flutter`, `dart`, `fvm`, `cargo` and `rustc` are a
 
 ## Code
 
-`fluttertool/` (`FlutterTool`: facts, release list, version order, sizes, options; `FlutterRust`: state and jobs), `ui/tools/FlutterToolPage.kt`, `updates/` (`FlutterSource`; `AptUpdater` now serves Git and Rust), `setup/flutter`, and the Flutter & Rust part of `setup/pocketrocket-setup.sh`. The setup stub (`-Ppocketrocket.setupStub`) fakes every option with empty version folders. Tests: `FlutterToolTest` (release list, version order in the app and the script, sizes, removal set, the script's release lookup, removal list and package lists, the launcher's `.fvmrc` search, its prepare check, and its script pointing and putting back around git).
+`fluttertool/` (`FlutterTool`: facts, release list, version order, sizes, options; `FlutterRust`: state and jobs), `ui/tools/FlutterToolPage.kt`, `updates/` (`FlutterSource`; `AptUpdater` now serves Git and Rust), `setup/flutter`, `setup/flutter-exec.c`, and the Flutter & Rust part of `setup/pocketrocket-setup.sh`. The setup stub (`-Ppocketrocket.setupStub`) fakes every option with empty version folders. Tests: `FlutterToolTest` (release list, version order in the app and the script, sizes, removal set, the script's release lookup, removal list and package lists, the launcher's `.fvmrc` search, its prepare check, and its script pointing and putting back around git; the APK build detection, release refusal and arm64 default), `FlutterDetectionTest` ("APK builds missing" and the helper's folder agreed by the app, the script and the launcher).
