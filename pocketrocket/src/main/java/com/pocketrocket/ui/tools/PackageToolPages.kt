@@ -101,9 +101,10 @@ internal fun PackageToolPage(
         onBack = onBack,
         install = ToolInstall(
             job = if (mine) s.job else null, outcome = s.outcome, removing = s.removing,
-            installSteps = pkg.installSteps, removeSteps = pkg.removeSteps,
+            installSteps = if (mine && s.repairing) pkg.repairSteps else pkg.installSteps, removeSteps = pkg.removeSteps,
             failedLine = if (s.removing) "Some of it may still be on the phone." else "Retry picks up where it stopped.",
-            onInstall = { PackageTools.install(context, pkg) },
+            // Install, or Repair while it's installed with a problem.
+            onInstall = { if (s.installed(pkg)) PackageTools.repair(context, pkg) else PackageTools.install(context, pkg) },
             onRetry = { PackageTools.retry(context) },
             onUninstall = { PackageTools.remove(context, pkg) },
             confirmTitle = "Uninstall ${tool.spec.name}?",

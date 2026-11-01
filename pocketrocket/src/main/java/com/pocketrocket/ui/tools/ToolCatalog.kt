@@ -279,7 +279,8 @@ object ToolStates {
             versions = t.versions(s.packages),
             latest = row?.latest,
             updateAvailable = row?.available == true,
-            updating = row?.running == true,
+            // A JDK or Kotlin being added or removed on Java's page shows on its tile (decision 101).
+            updating = row?.running == true || (t == PackageTool.Java && s.installed(t) && s.running && s.tool in PackageTool.JAVA_PARTS),
             sizeMb = t.sizeMb(s.packages),
             problem = s.problem(t),
             signedIn = login.who(),
