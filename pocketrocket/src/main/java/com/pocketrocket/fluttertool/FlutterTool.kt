@@ -1,5 +1,6 @@
 package com.pocketrocket.fluttertool
 
+import com.pocketrocket.termux.DpkgStatus
 import org.json.JSONObject
 import java.io.File
 import java.util.Locale
@@ -25,8 +26,25 @@ object FlutterTool {
     const val PACKAGES_RELATIVE = ".pocketrocket/flutter.packages"
     const val BASELINE_RELATIVE = ".pocketrocket/flutter.baseline"
 
-    /** What the Rust install added, written last; means "Rust installed". Under home. */
-    const val RUST_MARKER_RELATIVE = ".pocketrocket/rust.packages"
+    /**
+     * Rust is Termux's `rust` package (decision 87). Whether it is installed, its version and its size come from dpkg,
+     * so a `pkg install rust` or `pkg uninstall rust` from a terminal or a Claude session shows on the tile too (as
+     * decision 92 has for Python and Bun). The script's `~/.pocketrocket/rust.packages`, written by the tile's
+     * install, only lists what that install brought in, for Uninstall; it no longer means "installed".
+     */
+    const val RUST_PACKAGE = "rust"
+
+    /** Rust's own packages: the compiler and every target's standard library (`rust-std-*`, the wasm target too). */
+    fun isRustPackage(name: String): Boolean = name == RUST_PACKAGE || name.startsWith("rust-std-")
+
+    fun rustInstalled(pkgs: Map<String, DpkgStatus.Package>): Boolean = RUST_PACKAGE in pkgs
+
+    /** The installed version as shown ("1.99.1"), or null. */
+    fun rustVersion(pkgs: Map<String, DpkgStatus.Package>): String? = pkgs[RUST_PACKAGE]?.let { DpkgStatus.display(it.version) }
+
+    /** What Rust takes on the phone, its targets included (Uninstall removes them all), in MB; null when it isn't there. */
+    fun rustSizeMb(pkgs: Map<String, DpkgStatus.Package>): Int? =
+        if (!rustInstalled(pkgs)) null else DpkgStatus.sizeMb(pkgs.filterKeys(::isRustPackage).values)
 
     /** Flutter's release list. The same file the setup script reads for the newest stable and each release's commit. */
     const val RELEASES_URL = "https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json"

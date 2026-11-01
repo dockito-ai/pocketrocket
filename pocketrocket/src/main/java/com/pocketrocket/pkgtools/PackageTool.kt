@@ -51,10 +51,7 @@ enum class PackageTool(
         packages.mapNotNull { (pkg, label) -> pkgs[pkg]?.let { label to DpkgStatus.display(it.version) } }
 
     /** Its installed packages' size in MB, from dpkg; null when none is there or dpkg gives no sizes. */
-    fun sizeMb(pkgs: Map<String, DpkgStatus.Package>): Int? {
-        val kb = packages.mapNotNull { pkgs[it.first]?.installedKb }.takeIf { it.isNotEmpty() }?.sum() ?: return null
-        return ((kb + 512) / 1024).coerceAtLeast(1)
-    }
+    fun sizeMb(pkgs: Map<String, DpkgStatus.Package>): Int? = DpkgStatus.sizeMb(packages.mapNotNull { pkgs[it.first] })
 
     /** What keeps part of it now (Headless Chrome is installed), or null. */
     fun held(pkgs: Map<String, DpkgStatus.Package>): HeldBy? = heldBy?.takeIf { it.pkg in pkgs }

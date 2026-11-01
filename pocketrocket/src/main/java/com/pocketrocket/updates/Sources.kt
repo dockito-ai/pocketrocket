@@ -105,7 +105,7 @@ class AptSource(override val component: UpdateComponent, private val updater: Ap
 
 val GitSource = AptSource(UpdateComponent.Git, GitUpdater)
 
-/** Rust shows only while the tool has it: no installed version otherwise, and Check now skips its apt-get update. */
+/** Rust shows only while `rust` is installed (dpkg): no installed version otherwise, and Check now skips its apt-get update. */
 val RustSource = AptSource(UpdateComponent.Rust, RustUpdater)
 
 val PythonSource = AptSource(UpdateComponent.Python, PythonUpdater)

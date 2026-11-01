@@ -1535,7 +1535,9 @@ FVM_SHA256=df05c7682eeac21b08939e7be131687dc3d54fd5575b5e4bca931717ddeb0a01   # 
 FVM_URL="https://github.com/leoafarias/fvm/releases/download/$FVM_VERSION/fvm-$FVM_VERSION-linux-arm64.tar.gz"
 FVM_DIR="${PREFIX:-}/opt/fvm"
 RUST_PACKAGES="rust"                                    # brings rust-std-aarch64-linux-android with it
-RUST_ADDED_FILE="$PR_HOME/rust.packages"                # FlutterTool.RUST_MARKER: what the install added; means installed
+# What the install added, for Uninstall (pkg_tool_purge rust reads these same two names). The app reads "installed"
+# from dpkg, so these are not markers: a `pkg install rust` from a terminal has none and still shows as installed.
+RUST_ADDED_FILE="$PR_HOME/rust.packages"
 RUST_BASELINE_FILE="$PR_HOME/rust.baseline"
 
 # flutter_release <releases_linux.json> [version|stable]: "<version> <commit>" of the newest stable, or of that version
@@ -1819,21 +1821,19 @@ step_rust_install() {
   hash -r 2>/dev/null || true
   out="$(cargo --version 2>&1)" || fail "cargo --version failed: $out"
   out="$(rustc --version 2>&1)" || fail "rustc --version failed: $out"
-  # Written last: the app reads this file as "installed".
   packages_record "$RUST_BASELINE_FILE" "$RUST_ADDED_FILE"
   ok "$out"
 }
 
+# Uninstall works the same whether this tool or a terminal installed rust: rust and its targets go (pkg_tool_packages
+# and pkg_tool_companions rust), plus what the tool's own install brought in when it did (clang, lld, libllvm…), except
+# what other packages still need. The wasm target goes first with its own record.
 step_rust_remove() {
   step "Removing Rust"
-  if [ -f "$RUST_BASELINE_FILE" ]; then packages_record "$RUST_BASELINE_FILE" "$RUST_ADDED_FILE"; fi
-  if [ ! -s "$RUST_ADDED_FILE" ] && pkg_installed rust; then info "Rust was on the phone before this tool, so it stays"; fi
-  # Rust's extra targets go with it (the wasm target has no dependency on rust, so apt would leave it).
   pkg_tool_purge rust-wasm
-  android_purge_added "$RUST_ADDED_FILE"
-  rm -f "$RUST_ADDED_FILE" "$RUST_BASELINE_FILE"
+  pkg_tool_purge rust
   rm -rf "$HOME/.cargo"
-  ok "Rust removed"
+  if [ -n "$PKG_TOOL_KEPT" ]; then ok "removed the rest; $PKG_TOOL_KEPT stayed"; else ok "Rust removed"; fi
 }
 
 # Package tools (decision 92): add-ons that are only Termux packages, Python (with pip and uv), bun, and Rust's wasm
@@ -1846,20 +1846,24 @@ pkg_tool_packages() {
     python) printf 'python python-pip uv' ;;
     bun) printf 'bun' ;;
     rust-wasm) printf 'rust-std-wasm32-unknown-unknown' ;;
+    rust) printf 'rust rust-std-aarch64-linux-android' ;;   # removal only: step_rust_install installs it
     *) return 1 ;;
   esac
 }
 
 # pkg_tool_companions <name>: packages that come with the tool's own (python recommends its ensurepip wheels) and go
-# with it on uninstall.
+# with it on uninstall. Rust's are every target installed (rust-std-*, however added): none depends on rust, so apt
+# would leave them behind.
 pkg_tool_companions() {
   case "$1" in
     python) printf 'python-ensurepip-wheels' ;;
+    rust) dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 'rust-std-*' 2>/dev/null | awk '$1 == "ii" {print $2}' | tr '\n' ' ' ;;
   esac
 }
 
 pkg_tool_title() {
   case "$1" in
+    rust) printf 'Rust' ;;
     python) printf 'Python, pip and uv' ;;
     bun) printf 'Bun' ;;
     rust-wasm) printf 'the wasm target' ;;
