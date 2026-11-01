@@ -3,8 +3,10 @@ package com.pocketrocket.androidbuild
 import android.content.Context
 import com.pocketrocket.setup.SetupPhase
 import com.pocketrocket.setup.SetupState
+import com.pocketrocket.setup.ToolPresence
 import com.pocketrocket.setup.ToolScript
 import com.pocketrocket.setup.finished
+import com.pocketrocket.termux.DpkgStatus
 import com.pocketrocket.termux.Termux
 import com.termux.shared.termux.TermuxConstants
 import kotlinx.coroutines.CoroutineScope
@@ -24,15 +26,23 @@ import java.io.File
 object AndroidBuild {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val prefix = TermuxConstants.TERMUX_PREFIX_DIR_PATH
-    private val marker = File("$prefix/${AndroidBuildTool.SDK_RELATIVE}", AndroidBuildTool.INSTALLED_MARKER)
+    private val sdk = File("$prefix/${AndroidBuildTool.SDK_RELATIVE}")
+    private val gradleProperties = File(TermuxConstants.TERMUX_HOME_DIR_PATH, AndroidBuildTool.GRADLE_PROPERTIES_RELATIVE)
 
     private val _state = MutableStateFlow(AndroidBuildState())
     val state: StateFlow<AndroidBuildState> = _state.asStateFlow()
 
-    fun installed(): Boolean = marker.isFile
+    /** What is on the phone now (the SDK folder, dpkg, Gradle's setting), whoever put it there. Blocking: small reads. */
+    fun presence(): ToolPresence = AndroidBuildTool.presence(sdk, gradleProperties, DpkgStatus.read(AndroidBuildTool.PACKAGES.map { it.first }.toSet()))
 
+    fun installed(): Boolean = sdk.isDirectory
+
+    /** Reads [presence] off the main thread. */
     fun refresh() {
-        _state.update { it.copy(installed = installed(), checked = true) }
+        scope.launch {
+            val p = presence()
+            _state.update { it.copy(installed = p.present, problem = p.problem, checked = true) }
+        }
     }
 
     /** For a new session's process; its Bash tool inherits it. Empty until the tool is installed. */
@@ -52,11 +62,12 @@ object AndroidBuild {
         Termux.startForegroundService(app)
         scope.launch {
             val (exit, sawDone) = ToolScript.run(app, option, environment) { change -> _state.update { s -> s.copy(job = s.job?.let(change)) } }
-            val onDisk = installed()
-            val ok = exit == 0 && sawDone && onDisk != remove
+            val onDisk = presence()
+            val ok = exit == 0 && sawDone && if (remove) !onDisk.present else onDisk.complete
             _state.update { s ->
                 s.copy(
-                    installed = onDisk,
+                    installed = onDisk.present,
+                    problem = onDisk.problem,
                     checked = true,
                     job = s.job?.finished(ok),
                     outcome = if (ok) null else s.job?.error ?: "Stopped unexpectedly (exit code $exit).",
@@ -68,7 +79,10 @@ object AndroidBuild {
 }
 
 data class AndroidBuildState(
+    /** Some of the tool is on the phone ([ToolPresence.present]). */
     val installed: Boolean = false,
+    /** What keeps it from working, when something does ("Gradle missing"); Repair runs the install again. */
+    val problem: String? = null,
     val checked: Boolean = false,
     val job: SetupState? = null,
     val outcome: String? = null,

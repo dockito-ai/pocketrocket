@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import com.pocketrocket.setup.SetupPhase
 import com.pocketrocket.setup.SetupState
+import com.pocketrocket.setup.ToolPresence
 import com.pocketrocket.setup.ToolScript
 import com.pocketrocket.setup.finished
 import com.pocketrocket.termux.Termux
@@ -29,8 +30,7 @@ object Wrangler {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val prefix = TermuxConstants.TERMUX_PREFIX_DIR_PATH
     private val home = File(TermuxConstants.TERMUX_HOME_DIR_PATH)
-    private val marker = File("$prefix/${WranglerTool.PACKAGE_RELATIVE}", WranglerTool.INSTALLED_MARKER)
-    private val workerd = File("$prefix/${WranglerTool.PACKAGE_RELATIVE}", WranglerTool.WORKERD_RELATIVE)
+    private val dir = File("$prefix/${WranglerTool.PACKAGE_RELATIVE}")
     private val config = File(home, WranglerTool.CONFIG_RELATIVE)
     private val debugLogs = File(TermuxConstants.TERMUX_TMP_PREFIX_DIR_PATH, "pocketrocket-wrangler")
 
@@ -39,13 +39,26 @@ object Wrangler {
 
     @Volatile private var loginProcess: Process? = null
 
-    /** An install from before local dev (decision 82) has no workerd, so it reads as not installed and Install brings it up to date. */
-    fun installed(): Boolean = marker.isFile && workerd.isFile
+    /** Wrangler's folder as it is now, whoever installed it ([WranglerTool.presence]). Small file reads. */
+    fun presence(): ToolPresence = WranglerTool.presence(dir)
 
     private fun signedIn(): Boolean = WranglerTool.hasLogin(runCatching { config.readText() }.getOrNull())
 
+    /** What's on disk now, and its versions from npm's package files. */
+    private fun read(s: WranglerState): WranglerState {
+        val p = presence()
+        return s.copy(
+            installed = p.present,
+            problem = p.problem,
+            version = WranglerTool.packageVersion(dir).takeIf { p.present },
+            workerdVersion = WranglerTool.packageVersion(File(dir, WranglerTool.WORKERD_PACKAGE_RELATIVE)).takeIf { p.present },
+            signedIn = signedIn(),
+            checked = true,
+        )
+    }
+
     fun refresh() {
-        _state.update { it.copy(installed = installed(), signedIn = signedIn(), checked = true) }
+        _state.update(::read)
     }
 
     /** Asks Wrangler which account the login belongs to. Needs the network; without it the page just shows no address. */
@@ -54,7 +67,7 @@ object Wrangler {
         val s = _state.value
         // A sign-in the phone killed midway could have left its debug log, with the address in it, in the temp folder.
         if (!s.authBusy) debugLogs.deleteRecursively()
-        if (!s.installed || !s.signedIn || s.account != null || s.authBusy) return
+        if (!s.installed || s.problem != null || !s.signedIn || s.account != null || s.authBusy) return
         val app = context.applicationContext
         scope.launch {
             val lines = mutableListOf<String>()
@@ -75,14 +88,11 @@ object Wrangler {
         Termux.startForegroundService(app)
         scope.launch {
             val (exit, sawDone) = ToolScript.run(app, option) { change -> _state.update { s -> s.copy(job = s.job?.let(change)) } }
-            val onDisk = installed()
-            val ok = exit == 0 && sawDone && onDisk != remove
+            val onDisk = presence()
+            val ok = exit == 0 && sawDone && if (remove) !onDisk.present else onDisk.complete
             _state.update { s ->
-                s.copy(
-                    installed = onDisk,
-                    signedIn = signedIn(),
+                read(s).copy(
                     account = if (remove) null else s.account,
-                    checked = true,
                     job = s.job?.finished(ok),
                     outcome = if (ok) null else s.job?.error ?: "Stopped unexpectedly (exit code $exit).",
                     failed = !ok,
@@ -186,7 +196,13 @@ object Wrangler {
 enum class AuthAction { LoggingIn, LoggingOut }
 
 data class WranglerState(
+    /** npm's folder for Wrangler is there ([ToolPresence.present]). */
     val installed: Boolean = false,
+    /** What keeps it from working fully ("local dev missing"); Repair runs the install again. */
+    val problem: String? = null,
+    /** Wrangler's and its workerd's versions, from their package.json files. */
+    val version: String? = null,
+    val workerdVersion: String? = null,
     val checked: Boolean = false,
     val job: SetupState? = null,
     val outcome: String? = null,

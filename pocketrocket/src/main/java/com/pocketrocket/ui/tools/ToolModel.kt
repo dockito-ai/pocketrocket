@@ -51,6 +51,11 @@ data class ToolState(
     val sizeMb: Int? = null,
     /** Why it can't be installed yet ("Needs the Android tool"), shown instead of its download size. */
     val blockedBy: String? = null,
+    /**
+     * What keeps an installed tool from working, read from the phone ("Gradle missing", after a `pkg uninstall gradle`
+     * in a terminal). The tile says it after Installed, and the page offers Repair beside Uninstall.
+     */
+    val problem: String? = null,
 )
 
 object ToolModel {
@@ -91,6 +96,7 @@ object ToolModel {
         !state.installed && spec.kind == ToolKind.BuiltIn -> ToolStatus("Not installed · run setup again", "Not installed", ToolTone.Failed)
         !state.installed && state.blockedBy != null -> ToolStatus(state.blockedBy, "Not installed", ToolTone.Idle)
         !state.installed -> ToolStatus(listOfNotNull("Not installed", spec.downloadMb?.let { "$it MB download" }).joinToString(" · "), "Not installed", ToolTone.Idle)
+        state.problem != null -> ToolStatus("Installed · ${state.problem}", "Needs repair", ToolTone.Update)
         else -> {
             val label = label(spec, state)
             val tone = if (state.updateAvailable && state.latest != null) ToolTone.Update else ToolTone.Installed

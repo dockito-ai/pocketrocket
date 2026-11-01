@@ -23,7 +23,7 @@ Both go through `setup/pocketrocket-setup.sh`:
 
 `build-tools/36.0.0/{aapt,aapt2,aidl}` and `platform-tools/{adb,fastboot}` are symlinks to Termux's arm64 builds.
 
-The tool counts as installed when `$ANDROID_HOME/.pocketrocket-installed` exists; the script writes it last.
+The tile reads what is on the phone each time Tools opens, whoever set it up; no flag is saved at install (`AndroidBuildTool.presence`). It shows Installed while `$ANDROID_HOME` exists, and it works when `openjdk-17`, `gradle`, `aapt2`, `aapt` and `aidl` are installed (dpkg), the SDK has a platform with `android.jar` and `package.xml`, build tools with `package.xml` and `licenses/android-sdk-license`, and `~/.gradle/gradle.properties` has the aapt2 setting. When something is missing (a `pkg uninstall gradle` in a terminal, or an install that stopped) the tile reads "Installed · Gradle missing" and the page offers Repair, which runs the install again (license sheet first), beside Uninstall. Deleting `$ANDROID_HOME` makes it Not installed. Uninstall removes the SDK, the Gradle setting and downloads whoever made them, and the packages listed in `~/.pocketrocket/android-build.packages` except what other packages need; Java or Gradle installed by hand, with no record, stay. The NDK install checks the same SDK pieces (`android_sdk_ready`). Installs from before this wrote `.pocketrocket-installed`; it is no longer read or written.
 
 ## Limits
 
@@ -52,6 +52,8 @@ The Gradle hook does two things:
 - **A project that names no STL gets `-DANDROID_STL=c++_shared`.** The toolchain's own default is not enough: the plugin packs `libc++_shared.so` only when the argument names it, and the app would build and then fail to load.
 
 Uninstalling the Android tool removes the NDK tool first; its confirm sheet says so. The NDK page offers no Install without the Android tool.
+
+The NDK tile reads the phone too (`AndroidNdkTool.presence`): Installed while `$ANDROID_HOME/ndk-shim` exists; working when `clang`, `cmake`, `ninja` and `ndk-sysroot` are installed, the shim has its toolchain file, a version folder under `ndk/` has its `source.properties`, and `~/.gradle/init.d/pocketrocket-android-ndk.gradle` is there. Otherwise "Installed · clang missing" (for example) with Repair and Uninstall.
 
 Limits: arm64 only; `c++_static` stops with a message; `ndk-build` stops with a message; linking uses the phone's system libraries, so an app can link something an older phone lacks with no build error; `pkg upgrade` moves the compiler. Termux's Gradle (9.8) cannot run AGP 8.13 ("relies on ... a Gradle internal API that was removed in Gradle 9.6.0"), so such a project needs its own `./gradlew`. Build Play releases with Google's real NDK.
 

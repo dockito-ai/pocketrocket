@@ -1,5 +1,6 @@
 package com.pocketrocket.fluttertool
 
+import com.pocketrocket.setup.ToolPresence
 import com.pocketrocket.termux.DpkgStatus
 import org.json.JSONObject
 import java.io.File
@@ -16,15 +17,44 @@ object FlutterTool {
     /** FVM's folder under home. Versions are `versions/<version>`; the default is the link `default`. */
     const val FVM_RELATIVE = "fvm"
 
-    /** In FVM's folder; the setup script writes it once a Flutter version is set up. Means "Flutter installed". */
-    const val INSTALLED_MARKER = ".pocketrocket-installed"
-
-    /** FVM itself, under $PREFIX: there from an install's second step. */
+    /** FVM itself, under $PREFIX: there from an install's second step. Its snapshot is what `fvm` runs. */
     const val FVM_DIR_RELATIVE = "opt/fvm"
+    const val FVM_SNAPSHOT_RELATIVE = "$FVM_DIR_RELATIVE/src/fvm.snapshot"
 
-    /** The packages the Flutter part added, and the list taken before its apt step. Under home. */
-    const val PACKAGES_RELATIVE = ".pocketrocket/flutter.packages"
+    /** The `flutter` launcher (setup/flutter) under $PREFIX; `dart` and `fvm` link to it. */
+    const val LAUNCHER_RELATIVE = "bin/flutter"
+
+    /** In a version's folder: Flutter's script, and the Dart SDK it runs on. */
+    const val VERSION_FLUTTER = "bin/flutter"
+    const val VERSION_DART = "bin/cache/dart-sdk/bin/dart"
+
+    /** The package list taken before the install's apt step, under home; only a run that stopped there leaves it. */
     const val BASELINE_RELATIVE = ".pocketrocket/flutter.baseline"
+
+    /**
+     * Flutter & Dart as it is now, whoever set it up: the versions FVM holds ([home]/fvm/versions, from the tile, `fvm
+     * install` or a terminal), FVM and the launcher ([prefix]). On the phone while any of them is, or a run stopped in its
+     * apt step (so Uninstall cleans up). Works when FVM and the launcher are there and at least one version has its Dart
+     * SDK. `rm -rf ~/fvm` from a terminal leaves FVM, so it shows "Flutter SDK missing" with Repair and Uninstall.
+     */
+    fun presence(prefix: File, home: File): ToolPresence {
+        val versions = File(home, "$FVM_RELATIVE/versions").listFiles()?.filter { File(it, VERSION_FLUTTER).isFile }.orEmpty()
+        val fvm = File(prefix, FVM_SNAPSHOT_RELATIVE).isFile
+        val launcher = File(prefix, LAUNCHER_RELATIVE).isFile
+        val present = versions.isNotEmpty() || fvm || launcher || File(prefix, FVM_DIR_RELATIVE).exists() || File(home, BASELINE_RELATIVE).exists()
+        return ToolPresence.of(
+            present,
+            listOfNotNull(
+                "FVM".takeUnless { fvm },
+                "flutter command".takeUnless { launcher },
+                when {
+                    versions.isEmpty() -> "Flutter SDK"
+                    versions.none { File(it, VERSION_DART).isFile } -> "Dart SDK"
+                    else -> null
+                },
+            ),
+        )
+    }
 
     /**
      * Rust is Termux's `rust` package (decision 87). Whether it is installed, its version and its size come from dpkg,

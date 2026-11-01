@@ -146,6 +146,7 @@ object ToolStates {
         checked = s.checked,
         job = ToolModel.job(s.running, s.failed, s.removing),
         progress = s.job?.progress,
+        problem = s.problem,
     )
 
     /** A failed NDK install only counts while the Android tool is there; without it the tile says it's needed. */
@@ -154,6 +155,7 @@ object ToolStates {
         checked = s.checked,
         job = ToolModel.job(s.running, s.failed && (androidInstalled || s.removing), s.removing),
         progress = s.job?.progress,
+        problem = s.problem,
         blockedBy = if (androidInstalled) null else "Needs the Android tool",
     )
 
@@ -162,7 +164,9 @@ object ToolStates {
         checked = s.checked,
         job = ToolModel.job(s.running, s.failed, s.removing),
         progress = s.job?.progress,
-        versions = listOf("Wrangler" to WranglerTool.VERSION, "workerd" to WranglerTool.WORKERD_VERSION),
+        // What npm installed, which a terminal may have changed; the pinned versions until it has been read.
+        versions = listOf("Wrangler" to (s.version ?: WranglerTool.VERSION), "workerd" to (s.workerdVersion ?: WranglerTool.WORKERD_VERSION)),
+        problem = s.problem,
         signedIn = if (s.signedIn) s.account ?: "Signed in" else null,
     )
 
@@ -194,6 +198,7 @@ object ToolStates {
             updateAvailable = row?.available == true,
             updating = (mine && s.running && !whole) || row?.running == true,
             sizeMb = FlutterTool.flutterSizeMb(s.flutterInstalled, s.versions.size, s.flutterBytes).takeIf { s.flutterInstalled },
+            problem = s.flutterProblem,
         )
     }
 

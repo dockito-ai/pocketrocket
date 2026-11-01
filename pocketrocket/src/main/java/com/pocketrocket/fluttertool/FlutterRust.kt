@@ -3,6 +3,7 @@ package com.pocketrocket.fluttertool
 import android.content.Context
 import com.pocketrocket.setup.SetupPhase
 import com.pocketrocket.setup.SetupState
+import com.pocketrocket.setup.ToolPresence
 import com.pocketrocket.setup.ToolScript
 import com.pocketrocket.setup.finished
 import com.pocketrocket.termux.DpkgStatus
@@ -45,7 +46,10 @@ enum class FlutterAction(val removes: Boolean, val part: FlutterPart, val whole:
 data class FlutterVersion(val version: String, val isDefault: Boolean, val bytes: Long? = null)
 
 data class FlutterRustState(
+    /** Some of Flutter is on the phone ([FlutterTool.presence]), whoever put it there. */
     val flutterInstalled: Boolean = false,
+    /** What keeps Flutter from working ("Dart SDK missing"); Repair runs the install again. */
+    val flutterProblem: String? = null,
     /** Rust's packages installed now (`rust`, `rust-std-*`), from dpkg's status, whoever installed them. */
     val rustPackages: Map<String, DpkgStatus.Package> = emptyMap(),
     val checked: Boolean = false,
@@ -86,21 +90,18 @@ object FlutterRust {
     private val fvm = File(home, FlutterTool.FVM_RELATIVE)
     private val versionsDir = File(fvm, "versions")
     private val defaultLink = File(fvm, "default")
-    private val flutterMarker = File(fvm, FlutterTool.INSTALLED_MARKER)
-    /** What an install leaves before its marker: FVM (step 2 on), or the package list (step 1). */
-    private val leftovers = listOf(
-        File(TermuxConstants.TERMUX_PREFIX_DIR_PATH, FlutterTool.FVM_DIR_RELATIVE),
-        File(home, FlutterTool.PACKAGES_RELATIVE),
-        File(home, FlutterTool.BASELINE_RELATIVE),
-    )
+    private val prefix = File(TermuxConstants.TERMUX_PREFIX_DIR_PATH)
     private val measuring = AtomicBoolean(false)
     private val measureAgain = AtomicBoolean(false)
 
     private val _state = MutableStateFlow(FlutterRustState())
     val state: StateFlow<FlutterRustState> = _state.asStateFlow()
 
-    /** Set up, or a failed install's leftovers (the setup script's flutter_present): either way Uninstall is offered. */
-    fun flutterInstalled(): Boolean = flutterMarker.isFile || leftovers.any { it.exists() }
+    /** Flutter's versions, FVM and the launcher as they are now, whoever put them there ([FlutterTool.presence]). */
+    fun flutterPresence(): ToolPresence = FlutterTool.presence(prefix, home)
+
+    /** Some of Flutter is on the phone, working or not: Uninstall is offered. */
+    fun flutterInstalled(): Boolean = flutterPresence().present
 
     /** Rust's packages from dpkg's status (one small file read). */
     private fun rustPackages(): Map<String, DpkgStatus.Package> = DpkgStatus.read(FlutterTool::isRustPackage)
@@ -117,13 +118,15 @@ object FlutterRust {
     fun refresh() {
         val default = defaultVersion()
         val rust = rustPackages()
+        val flutter = flutterPresence()
         val names = FlutterTool.installedVersions(
             versionsDir.listFiles()?.filter { File(it, "bin/flutter").isFile }?.map { it.name }.orEmpty(),
         )
         _state.update { s ->
             val known = s.versions.associateBy { it.version }
             s.copy(
-                flutterInstalled = flutterInstalled(),
+                flutterInstalled = flutter.present,
+                flutterProblem = flutter.problem,
                 rustPackages = rust,
                 checked = true,
                 versions = names.map { FlutterVersion(it, it == default, known[it]?.bytes) },

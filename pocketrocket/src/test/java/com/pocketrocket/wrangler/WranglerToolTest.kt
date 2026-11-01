@@ -23,7 +23,6 @@ class WranglerToolTest {
     @Test fun theAppAndTheScriptAgree() {
         if (!script.exists()) return
         assertEquals(WranglerTool.VERSION, shell("printf %s \"\$WRANGLER_VERSION\"").second)
-        assertEquals(WranglerTool.INSTALLED_MARKER, shell("printf %s \"\$WRANGLER_MARKER\"").second)
         assertEquals("/tmp/pr-none/${WranglerTool.PACKAGE_RELATIVE}", shell("printf %s \"\$WRANGLER_DIR\"").second)
         assertEquals(WranglerTool.WORKERD_VERSION, shell("printf %s \"\$WORKERD_VERSION\"").second)
         assertTrue(shell("printf %s \"\$WORKERD_URL\"").second.contains("/dockito-ai/pocketrocket/releases/download/workerd-v${WranglerTool.WORKERD_VERSION}/"))
