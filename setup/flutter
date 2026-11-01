@@ -328,6 +328,7 @@ pr_apk_setup() {
     pr_say "Release and profile builds don't run on the phone: Google publishes Flutter's Android AOT compiler (gen_snapshot) only for x86_64 computers. Add --debug for a debug APK, or build releases on a Mac or in CI."
     return 1
   fi
+  pr_apk_preflight || return 1
   if [ ! -f "$PR_EXEC_DIR/aarch64/2.so" ] || [ ! -e "$PR_EXEC_DIR/\$PLATFORM/1.so" ]; then
     pr_say "Debug APK builds need Android and C and C++ from Settings → Tools, then Repair on Flutter & Dart."
     return 1
@@ -336,6 +337,104 @@ pr_apk_setup() {
   PR_RUN_ENV+=("ORG_GRADLE_PROJECT_disable-abi-filtering=true")
   pr_apk_heap
   pr_has_arg --target-platform "$@" || PR_EXTRA_ARGS+=(--target-platform android-arm64)
+}
+
+# APK preflight (decision 105): before an APK build starts Gradle, the project is checked for what it needs from the
+# add-ons, so a missing one stops the build at once with its name instead of ten minutes into Gradle. Generic, never
+# per project: the Android SDK always; Rust when a plugin builds Rust code through cargokit; the Android NDK when the
+# app or a plugin declares an externalNativeBuild, or a plugin uses cargokit. Plugins come from the project's
+# .flutter-plugins-dependencies (written by pub get); without it the plugin checks are skipped, as Flutter runs pub get
+# first. POCKETROCKET_FLUTTER_PREFLIGHT=0 turns the check off.
+PR_SDK_DIR="$PREFIX/opt/android-sdk"                 # the Android add-on's SDK (AndroidBuildTool.SDK_RELATIVE)
+PR_SDK_JAVA="$PREFIX/lib/jvm/java-17-openjdk/bin/java"   # and its Java (AndroidBuildTool.JAVA_RELATIVE)
+PR_NDK_BUILD="$PREFIX/opt/android-sdk/ndk-shim/ndk-build"   # the Android NDK add-on's shim (AndroidNdkTool.SHIM_RELATIVE)
+
+# pr_project_root [folder]: the nearest folder up from it (default: the current one) with a pubspec.yaml, in PR_PROJECT.
+pr_project_root() {
+  local d="${1:-$PWD}"
+  PR_PROJECT=""
+  while :; do
+    if [ -f "$d/pubspec.yaml" ]; then PR_PROJECT="${d:-/}"; return 0; fi
+    [ -n "$d" ] && [ "$d" != / ] || return 1
+    d="${d%/*}"
+  done
+}
+
+# pr_android_plugins <project>: "<name> <path>" per Android plugin in its .flutter-plugins-dependencies, one per line.
+# The file is one line of JSON: the android list is cut out, then each {"name":"…","path":"…"} entry read.
+pr_android_plugins() {
+  local f="$1/.flutter-plugins-dependencies" json
+  [ -f "$f" ] && json="$(<"$f")" || return 0
+  case "$json" in *'"android":['*) ;; *) return 0 ;; esac
+  printf '%s\n' "$json" | sed -e 's/^.*"android":\[//' -e 's/\],"[A-Za-z_]*":\[.*$//' -e 's/\]},".*$//' |
+    sed 's/{"name":"/\n/g' |
+    sed -n 's/^\([^"]*\)","path":"\([^"]*\)".*$/\1 \2/p'
+}
+
+# pr_native_gradle <file>...: 0 when a Gradle build file declares an externalNativeBuild block (CMake or ndk-build).
+pr_native_gradle() {
+  local f
+  for f in "$@"; do
+    [ -f "$f" ] || continue
+    awk '/^[[:space:]]*\/\// { next } /externalNativeBuild[[:space:]]*(\{|$)/ { found = 1; exit } END { exit !found }' "$f" && return 0
+  done
+  return 1
+}
+
+# pr_uses_cargokit <plugin folder>: 0 when the plugin builds Rust code through cargokit: a cargokit folder in it, or
+# its Android build applying cargokit (from its own folder or its repository's, ../cargokit).
+pr_uses_cargokit() {
+  local p="${1%/}" f
+  [ -d "$p/cargokit" ] && return 0
+  for f in "$p"/android/build.gradle "$p"/android/build.gradle.kts; do
+    [ -f "$f" ] || continue
+    awk '/^[[:space:]]*\/\// { next } /cargokit/ { found = 1; exit } END { exit !found }' "$f" && return 0
+  done
+  return 1
+}
+
+# pr_apk_preflight: 1 with a message per missing add-on when the project's APK build needs one this phone lacks.
+pr_apk_preflight() {
+  local name path rust="" native="" problems=()
+  [ "${POCKETROCKET_FLUTTER_PREFLIGHT:-1}" != 0 ] || return 0
+  pr_project_root || return 0
+  pr_native_gradle "$PR_PROJECT"/android/app/build.gradle "$PR_PROJECT"/android/app/build.gradle.kts && native="the app"
+  while read -r name path; do
+    [ -n "$name" ] && [ -d "$path" ] || continue
+    if pr_uses_cargokit "$path"; then
+      rust="${rust:+$rust, }$name"
+      native="${native:-$name}"
+    elif [ -z "$native" ] && pr_native_gradle "${path%/}"/android/build.gradle "${path%/}"/android/build.gradle.kts; then
+      native="$name"
+    fi
+  done < <(pr_android_plugins "$PR_PROJECT")
+  pr_android_sdk_ready || problems+=("Building an APK needs Android: add it from Settings → Tools.")
+  if [ -n "$native" ] && [ ! -x "$PR_NDK_BUILD" ]; then
+    problems+=("This project has native code ($native): add Android NDK from Settings → Tools.")
+  fi
+  if [ -n "$rust" ]; then
+    if ! command -v cargo >/dev/null 2>&1; then
+      problems+=("This project has a plugin with Rust code ($rust): add Rust from Settings → Tools.")
+    elif ! command -v rustup >/dev/null 2>&1; then
+      problems+=("This project has a plugin with Rust code ($rust), which needs PocketRocket's rustup: open the PocketRocket app once and it adds it.")
+    fi
+  fi
+  [ "${#problems[@]}" = 0 ] && return 0
+  for name in "${problems[@]}"; do pr_say "$name"; done
+  pr_say "(POCKETROCKET_FLUTTER_PREFLIGHT=0 skips this check.)"
+  return 1
+}
+
+# pr_android_sdk_ready: the Android add-on's SDK can build, as the setup script's android_sdk_ready reads it: Java, a
+# platform and build tools.
+pr_android_sdk_ready() {
+  local p b
+  [ -x "$PR_SDK_JAVA" ] || return 1
+  for p in "$PR_SDK_DIR"/platforms/*/package.xml; do
+    [ -f "$p" ] || continue
+    for b in "$PR_SDK_DIR"/build-tools/*/package.xml; do [ -f "$b" ] && return 0; done
+  done
+  return 1
 }
 
 # pr_apk_heap: Gradle's heap for this APK build, twice the cap in ~/.gradle/gradle.properties (decision 97), at most 4 GB:

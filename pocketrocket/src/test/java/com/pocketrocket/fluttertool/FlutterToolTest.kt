@@ -245,6 +245,69 @@ class FlutterToolTest {
         }
     }
 
+    @Test fun theApkPreflightNamesTheAddOnsAProjectNeeds() {
+        if (!launcher.exists()) return
+        val dir = File.createTempFile("preflight", "").apply { delete(); mkdirs() }
+        try {
+            fun write(path: String, text: String = "") = File(dir, path).apply { parentFile!!.mkdirs(); writeText(text) }
+            // An app with three plugins: Rust through its repository's cargokit, a CMake build, and one that only names
+            // externalNativeBuild tasks (as Rive does), which needs nothing.
+            write("repo/cargokit/gradle/plugin.gradle")
+            write("repo/rusty/android/build.gradle", "apply from: \"../../cargokit/gradle/plugin.gradle\"\ncargokit {\n}\n")
+            write("cmake_plugin/android/build.gradle", "android {\n  externalNativeBuild {\n    cmake { path \"CMakeLists.txt\" }\n  }\n}\n")
+            write("named/android/build.gradle", "// externalNativeBuild tasks\ntasks.matching { it.name.startsWith(\"externalNativeBuild\") }\n")
+            write("app/pubspec.yaml", "name: app\n")
+            write("app/android/app/build.gradle", "android {\n}\n")
+            write("app/lib/main.dart")
+            fun plugin(name: String, path: String) = "{\"name\":\"$name\",\"path\":\"${dir.path}/$path/\",\"native_build\":true,\"dependencies\":[],\"dev_dependency\":false}"
+            fun deps(vararg plugins: String) = write(
+                "app/.flutter-plugins-dependencies",
+                "{\"info\":\"x\",\"plugins\":{\"ios\":[${plugin("ios_only", "named")}],\"android\":[${plugins.joinToString(",")}]," +
+                    "\"macos\":[]},\"dependencyGraph\":[{\"name\":\"rusty\",\"dependencies\":[]}]}",
+            )
+            // The phone: the SDK, the NDK's ndk-build, and cargo and rustup on PATH, each one taken away below.
+            write("sdk/platforms/android-36/package.xml"); write("sdk/build-tools/36.0.0/package.xml")
+            write("java/bin/java").setExecutable(true)
+            write("ndk-build").setExecutable(true)
+            listOf("cargo", "rustup").forEach { write("bin/$it", "#!/bin/sh\n").setExecutable(true) }
+            fun preflight(setup: String = "") = shell(
+                launcher, "POCKETROCKET_FLUTTER_SOURCE_ONLY",
+                "D=\"$1\"; for c in sed awk; do ln -sf \"\$(command -v \$c)\" \"\$D/bin/\$c\"; done; PATH=\"\$D/bin\"; " +
+                    "PR_SDK_DIR=\"\$D/sdk\"; PR_SDK_JAVA=\"\$D/java/bin/java\"; PR_NDK_BUILD=\"\$D/ndk-build\"; cd \"\$D/app/lib\"; $setup pr_apk_preflight",
+                dir.path,
+            )
+
+            assertEquals(0 to "", preflight()) // no plugin list yet: pub get comes first
+            deps(plugin("named", "named"))
+            assertEquals(0 to "", preflight())
+            assertEquals(1, preflight("PR_SDK_DIR=/none;").first)
+            assertTrue(preflight("PR_SDK_DIR=/none;").second.contains("needs Android: add it from Settings → Tools"))
+
+            deps(plugin("named", "named"), plugin("cmake_plugin", "cmake_plugin"))
+            assertEquals(0 to "", preflight())
+            val noNdk = preflight("PR_NDK_BUILD=/none;")
+            assertEquals(1, noNdk.first)
+            assertTrue(noNdk.second, noNdk.second.contains("native code (cmake_plugin): add Android NDK from Settings → Tools"))
+
+            deps(plugin("named", "named"), plugin("rusty", "repo/rusty"))
+            assertEquals(0 to "", preflight())
+            File(dir, "bin/cargo").delete()
+            val noRust = preflight("PR_NDK_BUILD=/none;")
+            assertEquals(1, noRust.first)
+            assertTrue(noRust.second, noRust.second.contains("plugin with Rust code (rusty): add Rust from Settings → Tools"))
+            assertTrue(noRust.second, noRust.second.contains("native code (rusty): add Android NDK"))
+            assertTrue(noRust.second, noRust.second.contains("POCKETROCKET_FLUTTER_PREFLIGHT=0"))
+            assertEquals(0 to "", preflight("POCKETROCKET_FLUTTER_PREFLIGHT=0;"))
+
+            // A native build in the app's own Gradle file counts too.
+            deps(plugin("named", "named"))
+            write("app/android/app/build.gradle.kts", "android {\n    externalNativeBuild { cmake { path = file(\"x\") } }\n}\n")
+            assertTrue(preflight("PR_NDK_BUILD=/none;").second.contains("native code (the app)"))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
     @Test fun theLauncherRepreparesOnlyWhenFlutterDownloadedSomething() {
         if (!launcher.exists()) return
         val root = File.createTempFile("flutter", "").apply { delete(); mkdirs() }
