@@ -35,6 +35,8 @@ private val EXTRA_ROWS = listOf(
     "Memory" to "About ${AndroidBuildTool.BUILD_MEMORY_GB} GB while building",
 )
 
+private const val CAPACITOR = "Svelte, React or Vue apps wrapped with Capacitor build here too: npm run build, npx cap sync android, then ./gradlew assembleDebug in the android folder. Capacitor needs Java 21, so install Java and Kotlin in Tools; Gradle picks it up for those projects by itself."
+
 private const val NO_NDK = "Kotlin and Java apps. For native code (C or C++), add the Android NDK in Tools; until then a native project's C and C++ tasks stop with a message, and its Kotlin, Java and unit tests still build. There is no emulator on the phone."
 
 /** Settings → Tools → Android (decision 45): what it does, its sizes, the SDK license, and Install, Uninstall or Retry. */
@@ -74,6 +76,7 @@ fun AndroidBuildToolPage(onBack: () -> Unit) {
             ToolCard("HOW TO BUILD") {
                 ToolText("In a terminal or a Claude session, run gradle assembleDebug or ./gradlew assembleDebug in your project. JAVA_HOME, ANDROID_HOME and the aapt2 setting are already there. New terminals and sessions pick them up.")
             }
+            ToolCard("CAPACITOR APPS") { ToolText(CAPACITOR) }
             ToolCard("BUILDS TAKE TURNS") {
                 ToolText("So the phone keeps enough memory, only a few builds run at once, from any session or terminal; the rest wait their turn. Gradle gets a heap sized for this phone and compiles Kotlin in its own process. The session's Background sheet shows what is building and waiting.")
             }
@@ -85,6 +88,7 @@ fun AndroidBuildToolPage(onBack: () -> Unit) {
                     listOf(
                         "Provides an Android development environment on this device.",
                         "Builds Kotlin and Compose apps.",
+                        "Builds Capacitor apps (Svelte, React, Vue) with Java and Kotlin installed.",
                         "Works in terminals and Claude sessions.",
                         "Needs no Developer options.",
                     ),
