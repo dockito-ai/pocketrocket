@@ -98,6 +98,8 @@ data class AgentRun(
     val durationMs: Long? = null,
     val startedAt: Long? = null,
     val endedAt: Long? = null,
+    /** Ended once, then brought back by SendMessage: running again although its tool call has a result. */
+    val revived: Boolean = false,
 ) {
     /** Its tool calls still kept, in order. */
     val steps: List<ChatItem.Tool> get() = log.filterIsInstance<ChatItem.Tool>()
@@ -113,12 +115,15 @@ data class AgentRun(
     }
 }
 
-/** True while this Task/Agent call's subagent still works: no final status, not stopped, and no result yet (a background one: seen starting live). */
+/**
+ * True while this Task/Agent call's subagent still works: no final status, not stopped, and no result yet (a background
+ * one: seen starting live, or brought back by SendMessage).
+ */
 val ChatItem.Tool.agentRunning: Boolean
     get() {
         val run = agent ?: return false
         if (run.status != null || run.endedAt != null || isError) return false
-        return result == null || (run.background && run.startedAt != null)
+        return result == null || (run.background && (run.startedAt != null || run.revived))
     }
 
 internal fun JSONArray?.objects(): List<JSONObject> = if (this == null) emptyList() else (0 until length()).mapNotNull { optJSONObject(it) }
