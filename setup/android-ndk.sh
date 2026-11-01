@@ -36,7 +36,7 @@ x86_64 x86_64-linux-android x86_64-none-linux-android x86_64 x86_64 64"
 NDK_SYSTEM_LIBS="c m dl log android z EGL GLESv1_CM GLESv2 GLESv3 OpenSLES OpenMAXAL vulkan jnigraphics mediandk nativewindow aaudio amidi camera2ndk binder_ndk sync"
 NDK_SYSTEM_LIB_DIR=${NDK_SYSTEM_LIB_DIR:-/system/lib64}
 # clang's resource dir by a name that survives `pkg upgrade` (the clang package keeps `latest` pointing at its version).
-NDK_CLANG_RESOURCE="$PREFIX/lib/clang/latest"
+NDK_CLANG_RESOURCE="${PREFIX:-}/lib/clang/latest"
 
 ndk_say() { printf '%s\n' "$*" >&2; }
 
