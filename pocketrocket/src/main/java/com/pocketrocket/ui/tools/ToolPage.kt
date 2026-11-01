@@ -49,7 +49,7 @@ class ToolInstall(
     val confirmBody: String,
     /** Replaces the Install button while another tool blocks it (busy, or needed first); null when nothing does. */
     val blocked: (@Composable () -> Unit)? = null,
-    /** Uninstall waits while this is true (a sign-in running). */
+    /** While true (a sign-in running) the page says to finish or cancel it instead of offering Uninstall. */
     val holdUninstall: Boolean = false,
 )
 
@@ -144,12 +144,14 @@ fun ToolPage(
                 state.job == ToolJob.Installing || state.job == ToolJob.Uninstalling -> BusyButton(if (install.removing) "Uninstalling…" else "Installing…")
                 install.blocked != null -> install.blocked.invoke()
                 failed -> AccentButton("Retry", onClick = install.onRetry, height = 48.dp, radius = 12.dp)
+                // A sign-in holds its tool (the job would run under it); say so instead of a button that does nothing.
+                state.installed && install.holdUninstall -> BusyButton("Finish or cancel signing in to uninstall…")
                 // Something was taken away (or never finished): Repair runs the install again, which puts back what's missing.
                 state.installed && state.problem != null -> {
                     AccentButton("Repair", onClick = install.onInstall, height = 48.dp, radius = 12.dp)
-                    DangerButton("Uninstall", onClick = { if (!install.holdUninstall) confirm = true })
+                    DangerButton("Uninstall", onClick = { confirm = true })
                 }
-                state.installed -> DangerButton("Uninstall", onClick = { if (!install.holdUninstall) confirm = true })
+                state.installed -> DangerButton("Uninstall", onClick = { confirm = true })
                 else -> AccentButton("Install", onClick = install.onInstall, height = 48.dp, radius = 12.dp, enabled = state.checked)
             }
         }
