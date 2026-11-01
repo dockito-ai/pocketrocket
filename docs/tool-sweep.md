@@ -149,6 +149,10 @@ Using the results, each tool becomes one of:
 
 Each choice is Shankar's call and goes into `decisions.md`.
 
+### Not offered: Swift (1 Nov 2026)
+
+Termux packages Swift 6.4.2 (132 MB download, about 600 MB installed, with SwiftPM and sourcekit-lsp), but the use case was compile checks for iOS repos, and those can't be done here. SwiftUI, UIKit and the other Apple frameworks only ship with Xcode, so any file importing them fails to type-check off a Mac, and `.xcodeproj` projects don't build with `swift build`. What's left is a syntax check (`swiftc -parse`) and type checks of pure-Swift packages, which isn't worth a 600 MB tile. Shankar's call: not a tile. iOS compile checks belong on a Mac or macOS CI.
+
 ## Idea for later: bundles
 
 Not planned. Shankar floated it on 31 Oct 2026: bundles of tools that go together (mobile, Flutter, a web stack) installed with one tap, each just a list of existing tools. Revisit once the sweep shows what works.
