@@ -11,9 +11,15 @@
 
 PocketRocket is a native Android app wrapped around Anthropic's own Claude Code CLI. You get a proper chat screen in place of a terminal. Several sessions run at once, each workspace has its own git and GitHub accounts, and a voice assistant can tell you what your sessions are doing.
 
-PocketRocket is a fork of [Termux](https://github.com/termux/termux-app), licensed under the GNU GPL v3 (see `LICENSE.md`). It is not affiliated with Anthropic or the Termux project.
+**Free and open source, use it as is.** There's no paid version, no paid tier and no catch. PocketRocket is a fork of [Termux](https://github.com/termux/termux-app), licensed under the GNU GPL v3 (see `LICENSE.md`). It is not affiliated with Anthropic or the Termux project.
 
 > **Early and experimental.** PocketRocket is a Dockito Labs project, under active development, and we use it every day. Things move fast and can break between releases, so expect rough edges.
+
+## Get it
+
+**[Download the APK from Releases](../../releases)** (the newest **PocketRocket** release, `pocketrocket-vX.Y.Z-arm64.apk`). You need an arm64 Android phone and your own Claude account with Claude Code access. PocketRocket is free; the Claude plan is between you and Anthropic. Step-by-step: [Install](#install).
+
+<!-- Demo video goes here: 30–60 s on a real phone, from a session to a pushed change. -->
 
 ## Screenshots
 
@@ -146,7 +152,7 @@ A raw terminal is there whenever you want one. It's still Termux underneath, so 
 ## Requirements
 
 - An **arm64 Android phone**. We build and test on Android 16 (Poco F7); older versions may work but aren't tested.
-- A **Claude account** with Claude Code access, such as a Pro or Max plan.
+- A **Claude account** with Claude Code access, such as a Pro or Max plan. That's Anthropic's requirement for Claude Code; PocketRocket itself is free.
 - A few GB of free space, plus more for any add-on tools.
 - Android only: iOS doesn't let an app run programs like this.
 
@@ -175,7 +181,7 @@ You need the Android SDK with NDK, and JDK 17 or newer.
 
 ## Feedback
 
-Bug reports and ideas are welcome in [Issues](../../issues). It's an experimental Labs project, so we can't promise a fix or a reply to everything. For security problems, see `SECURITY.md`.
+Bug reports and ideas are welcome in [Issues](../../issues). PocketRocket is free and offered as is, and it's an experimental Labs project, so we can't promise a fix or a reply to everything. For security problems, see `SECURITY.md`.
 
 ## Credits and licence
 
