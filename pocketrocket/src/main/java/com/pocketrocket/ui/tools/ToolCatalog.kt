@@ -57,16 +57,16 @@ import java.io.File
 enum class Tool(val spec: ToolSpec, val route: String, val pkg: PackageTool? = null, val npm: NpmTool? = null) {
     ClaudeCode(ToolSpec("Claude Code", ToolKind.BuiltIn, hasVersion = true, canUpdate = true), Routes.CLAUDE_CODE),
     Git(ToolSpec("Git", ToolKind.BuiltIn, hasVersion = true, canUpdate = true), Routes.TOOL_GIT),
-    Node(ToolSpec("Node.js and npm", ToolKind.BuiltIn, hasVersion = true), Routes.TOOL_NODE),
+    Node(ToolSpec("Node.js and npm", ToolKind.BuiltIn, hasVersion = true, canUpdate = true), Routes.TOOL_NODE),
     Dockito(ToolSpec("Dockito", ToolKind.BuiltIn, hasVersion = true, canUpdate = true, needsLogin = true), Routes.TOOL_DOCKITO),
     Chromium(
-        ToolSpec("Headless Chrome", ToolKind.Optional, hasVersion = true, downloadMb = ChromiumMcp.DOWNLOAD_MB, installedMb = ChromiumMcp.INSTALLED_MB),
+        ToolSpec("Headless Chrome", ToolKind.Optional, hasVersion = true, canUpdate = true, downloadMb = ChromiumMcp.DOWNLOAD_MB, installedMb = ChromiumMcp.INSTALLED_MB),
         Routes.TOOL_CHROMIUM,
     ),
     Android(ToolSpec("Android", ToolKind.Optional, downloadMb = AndroidBuildTool.DOWNLOAD_MB, installedMb = AndroidBuildTool.INSTALLED_MB), Routes.TOOL_ANDROID_BUILD),
     AndroidNdk(ToolSpec("Android NDK", ToolKind.Optional, downloadMb = AndroidNdkTool.DOWNLOAD_MB, installedMb = AndroidNdkTool.INSTALLED_MB), Routes.TOOL_ANDROID_NDK),
     Wrangler(
-        ToolSpec("Wrangler", ToolKind.Optional, hasVersion = true, needsLogin = true, downloadMb = WranglerTool.DOWNLOAD_MB, installedMb = WranglerTool.INSTALLED_MB),
+        ToolSpec("Wrangler", ToolKind.Optional, hasVersion = true, canUpdate = true, needsLogin = true, downloadMb = WranglerTool.DOWNLOAD_MB, installedMb = WranglerTool.INSTALLED_MB),
         Routes.TOOL_WRANGLER,
     ),
     Flutter(
@@ -130,14 +130,20 @@ enum class Tool(val spec: ToolSpec, val route: String, val pkg: PackageTool? = n
  * An Updates row's icon: the same brand mark as its tool, and PocketRocket's own rocket (the launcher mark cropped)
  * in its orange.
  */
-val UpdateComponent.icon: ToolGlyph get() = when (this) {
-    UpdateComponent.PocketRocket -> ToolGlyph(R.drawable.ic_pr_notification, 0xFFFF7A1A)
-    UpdateComponent.ClaudeCode -> Tool.ClaudeCode.icon
-    UpdateComponent.Git -> Tool.Git.icon
-    UpdateComponent.Dockito -> Tool.Dockito.icon
-    UpdateComponent.Flutter -> Tool.Flutter.icon
-    UpdateComponent.Rust -> Tool.Rust.icon
-    else -> Tool.entries.first { it.pkg != null && it.pkg == packageTool }.icon
+val UpdateComponent.icon: ToolGlyph get() = tool?.icon ?: ToolGlyph(R.drawable.ic_pr_notification, 0xFFFF7A1A)
+
+/** The tool whose Updates row this is; null only for PocketRocket itself. */
+val UpdateComponent.tool: Tool? get() = when (this) {
+    UpdateComponent.PocketRocket -> null
+    UpdateComponent.ClaudeCode -> Tool.ClaudeCode
+    UpdateComponent.Git -> Tool.Git
+    UpdateComponent.Node -> Tool.Node
+    UpdateComponent.Dockito -> Tool.Dockito
+    UpdateComponent.Flutter -> Tool.Flutter
+    UpdateComponent.Rust -> Tool.Rust
+    UpdateComponent.Chromium -> Tool.Chromium
+    UpdateComponent.Wrangler -> Tool.Wrangler
+    else -> Tool.entries.first { (packageTool != null && it.pkg == packageTool) || (npmTool != null && it.npm == npmTool) }
 }
 
 /** A package tool's tile (decision 92): an add-on with its versions, updated from Updates. */
@@ -146,7 +152,7 @@ private fun PackageTool.spec(name: String) =
 
 /** An npm CLI's tile (decision 98): its version from npm's folder, its login, and how long the install takes. */
 private fun NpmTool.spec(name: String) = ToolSpec(
-    name, ToolKind.Optional, hasVersion = true, needsLogin = true,
+    name, ToolKind.Optional, hasVersion = true, canUpdate = true, needsLogin = true,
     downloadMb = downloadMb, installedMb = installedMb, installMinutes = installMinutes,
 )
 
@@ -155,12 +161,17 @@ private fun LoginState.who(): String? = if (signedIn) account ?: "Signed in" els
 
 /** How each module's state reads as a [ToolState]. */
 object ToolStates {
-    fun node(s: NodeState) = ToolState(
+    /** Node.js and npm: versions from the programs, the update from nodejs-lts's Updates row ([row]). */
+    fun node(s: NodeState, row: UpdateRow? = null) = ToolState(
         installed = s.installed,
         checked = s.checked,
         versions = listOfNotNull(s.node?.let { "Node.js" to it }, s.npm?.let { "npm" to it }),
         sizeMb = s.sizeMb,
-    )
+    ).withRow(row)
+
+    /** A tool's state with its Updates row's latest version, update and running update. */
+    private fun ToolState.withRow(row: UpdateRow?) =
+        copy(latest = row?.latest, updateAvailable = row?.available == true, updating = updating || row?.running == true)
 
     fun dockito(s: DockitoState, row: UpdateRow?, signedIn: String?, sizeMb: Int?) = ToolState(
         installed = s.installed != null,
@@ -173,13 +184,14 @@ object ToolStates {
         sizeMb = sizeMb,
     )
 
-    fun chromium(s: ChromiumState) = ToolState(
+    /** Headless Chrome: Chromium's version and update from its Updates row ([row]); the MCP server is pinned. */
+    fun chromium(s: ChromiumState, row: UpdateRow? = null) = ToolState(
         installed = s.installed,
         checked = s.checked,
         job = ToolModel.job(s.running, s.failed, s.removing),
         progress = s.job?.progress,
-        versions = listOf("Chrome DevTools MCP" to ChromiumMcp.MCP_VERSION),
-    )
+        versions = listOfNotNull(row?.installed?.let { "Chromium" to it }, "Chrome DevTools MCP" to ChromiumMcp.MCP_VERSION),
+    ).withRow(row)
 
     fun android(s: AndroidBuildState) = ToolState(
         installed = s.installed,
@@ -199,11 +211,18 @@ object ToolStates {
         blockedBy = if (androidInstalled) null else "Needs the Android tool",
     )
 
-    fun wrangler(s: WranglerState, login: LoginState = LoginState()) = ToolState(
+    /**
+     * Wrangler: its update is the install again at the pinned version, shown as Updating on the tile and in the Version
+     * section ([row]), not as an install.
+     */
+    fun wrangler(s: WranglerState, login: LoginState = LoginState(), row: UpdateRow? = null) = ToolState(
         installed = s.installed,
         checked = s.checked,
-        job = ToolModel.job(s.running, s.failed, s.removing),
-        progress = s.job?.progress,
+        job = if (s.updating) ToolJob.None else ToolModel.job(s.running, s.failed, s.removing),
+        progress = if (s.updating) null else s.job?.progress,
+        latest = row?.latest,
+        updateAvailable = row?.available == true,
+        updating = (s.updating && s.running) || row?.running == true,
         // What npm installed, which a terminal may have changed; the pinned versions until it has been read.
         versions = listOf("Wrangler" to (s.version ?: WranglerTool.VERSION), "workerd" to (s.workerdVersion ?: WranglerTool.WORKERD_VERSION)),
         problem = s.problem,
@@ -212,17 +231,22 @@ object ToolStates {
 
     /**
      * A deploy CLI from npm (decision 98): installed while npm's folder for it is there, its version from there, Repair
-     * when its command is missing, and who is signed in from its own config.
+     * when its command is missing, and who is signed in from its own config. Its update ([NpmTools.update], from its
+     * Updates row) shows as Updating, not as an install.
      */
-    fun npmTool(t: NpmTool, s: NpmToolsState, login: LoginState = LoginState()): ToolState {
+    fun npmTool(t: NpmTool, s: NpmToolsState, login: LoginState = LoginState(), row: UpdateRow? = null): ToolState {
         val mine = s.isFor(t)
+        val install = mine && !s.updating
         val here = s.present[t]
         return ToolState(
             installed = here != null,
             checked = s.checked,
-            job = if (mine) ToolModel.job(s.running, s.failed, s.removing) else ToolJob.None,
-            progress = if (mine) s.job?.progress else null,
+            job = if (install) ToolModel.job(s.running, s.failed, s.removing) else ToolJob.None,
+            progress = if (install) s.job?.progress else null,
             versions = listOfNotNull(here?.version?.let { t.npm to it }),
+            latest = row?.latest ?: s.latest[t],
+            updateAvailable = row?.available ?: s.updateAvailable(t),
+            updating = mine && s.updating && s.running,
             problem = here?.problem,
             signedIn = login.who(),
         )
@@ -332,18 +356,18 @@ fun rememberTools(): List<Pair<Tool, ToolState>> {
     return listOf(
         Tool.ClaudeCode to ToolStates.fromRow(row(UpdateComponent.ClaudeCode)),
         Tool.Git to ToolStates.fromRow(row(UpdateComponent.Git)),
-        Tool.Node to ToolStates.node(node),
+        Tool.Node to ToolStates.node(node, row(UpdateComponent.Node)),
         Tool.Dockito to ToolStates.dockito(dockito, row(UpdateComponent.Dockito), dockitoAccounts.default?.email, dockitoSize),
-        Tool.Chromium to ToolStates.chromium(chromium),
+        Tool.Chromium to ToolStates.chromium(chromium, row(UpdateComponent.Chromium)),
         Tool.Android to ToolStates.android(android),
         Tool.AndroidNdk to ToolStates.ndk(ndk, android.installed),
-        Tool.Wrangler to ToolStates.wrangler(wrangler, logins.getValue(Tool.Wrangler)),
+        Tool.Wrangler to ToolStates.wrangler(wrangler, logins.getValue(Tool.Wrangler), row(UpdateComponent.Wrangler)),
         Tool.Flutter to ToolStates.flutter(flutter, row(UpdateComponent.Flutter)),
         Tool.Rust to ToolStates.rust(flutter, row(UpdateComponent.Rust), packages.running && packages.isFor(PackageTool.RustWasm)),
     ) + Tool.entries.mapNotNull { tool ->
         val login = logins.getValue(tool)
         tool.pkg?.let { tool to ToolStates.packageTool(it, packages, UpdateComponent.of(it)?.let(::row), login) }
-            ?: tool.npm?.let { tool to ToolStates.npmTool(it, npm, login) }
+            ?: tool.npm?.let { tool to ToolStates.npmTool(it, npm, login, row(UpdateComponent.of(it))) }
     }
 }
 

@@ -120,7 +120,7 @@ class LanguageToolsTest {
         assertFalse(File(prefix, "etc/profile.d/pocketrocket-ruby.sh").exists())
     }
 
-    @Test fun goUninstallClearsCachesAndKeepsGoBin() {
+    @Test fun goUninstallClearsCachesAndWhatGoInstalled() {
         if (!script.exists()) return
         val mod = File(home, "go/pkg/mod/github.com/google/uuid@v1.6.0").apply { mkdirs() }
         File(mod, "uuid.go").writeText("package uuid\n")
@@ -131,7 +131,13 @@ class LanguageToolsTest {
         assertEquals(0, shell("pkg_tool_cleanup go").first)
         assertFalse(File(home, "go/pkg").exists())
         assertFalse(File(home, ".cache/go-build").exists())
-        assertTrue(File(home, "go/bin/hello").exists())
+        // Decision 101: what `go install` put there goes too; GOPATH code of your own in ~/go/src stays.
+        assertFalse(File(home, "go/bin").exists())
+        File(home, "go/src/mine").mkdirs()
+        File(home, ".config/go/env").apply { parentFile?.mkdirs(); writeText("GOFLAGS=-mod=mod\n") }
+        assertEquals(0, shell("pkg_tool_cleanup go").first)
+        assertTrue(File(home, "go/src/mine").exists())
+        assertFalse(File(home, ".config/go").exists())
     }
 
     @Test fun noPackageToolEverRemovesJavaSeventeen() {

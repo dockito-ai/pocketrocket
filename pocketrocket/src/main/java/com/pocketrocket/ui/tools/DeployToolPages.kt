@@ -9,6 +9,8 @@ import androidx.compose.ui.platform.LocalContext
 import com.pocketrocket.clilogin.CliLogins
 import com.pocketrocket.clitools.NpmTool
 import com.pocketrocket.clitools.NpmTools
+import com.pocketrocket.updates.UpdateComponent
+import com.pocketrocket.updates.Updates
 
 /*
  * The deploy CLIs' pages (decision 98): Vercel, Netlify and Firebase from npm, the AWS CLI and flyctl from Termux's
@@ -122,19 +124,26 @@ private fun NpmToolPage(
     val context = LocalContext.current
     val s by NpmTools.state.collectAsState()
     val ls by login.state.collectAsState()
-    LaunchedEffect(Unit) { NpmTools.refresh() }
+    val updates by Updates.state.collectAsState()
+    val component = UpdateComponent.of(npm)
+    LaunchedEffect(Unit) {
+        NpmTools.load(context)
+        Updates.onAppOpen(context, checkAfterMs = 10 * 60_000L)
+    }
     val installed = s.installed(npm)
     LaunchedEffect(installed) { login.refreshAccount(context, installed) }
     val mine = s.isFor(npm)
+    // Its update runs as its Version section's job (the Updates flow), not as an install.
+    val installJob = mine && !s.updating
 
     ToolPage(
         spec = tool.spec,
-        state = ToolStates.npmTool(npm, s, ls),
+        state = ToolStates.npmTool(npm, s, ls, updates.rows.firstOrNull { it.component == component }),
         icon = tool.icon,
         purpose = purpose,
         onBack = onBack,
         install = ToolInstall(
-            job = if (mine) s.job else null, outcome = s.outcome, removing = s.removing,
+            job = if (installJob) s.job else null, outcome = s.outcome, removing = s.removing,
             installSteps = npm.installSteps, removeSteps = npm.removeSteps,
             failedLine = if (s.removing) "Some of it may still be on the phone." else "Retry starts it again.",
             onInstall = { NpmTools.install(context, npm) },
@@ -142,10 +151,15 @@ private fun NpmToolPage(
             onUninstall = { NpmTools.remove(context, npm) },
             confirmTitle = "Uninstall ${tool.spec.name}?",
             confirmBody = "${npm.npm} and its folder are removed. $removeNote",
-            blocked = if (s.running && !mine) ({ BusyButton("Another install is running…") }) else null,
+            blocked = when {
+                s.running && mine && s.updating -> ({ BusyButton("Updating…") })
+                s.running && !mine -> ({ BusyButton("Another install is running…") })
+                else -> null
+            },
             holdUninstall = ls.busy,
         ),
-        accounts = { CliAccountCard(service, login, ls, why = why, blocked = s.running && mine) },
+        update = toolUpdate(context, updates, component),
+        accounts ={ CliAccountCard(service, login, ls, why = why, blocked = s.running && mine) },
     ) {
         if (installed) {
             howTo()
@@ -153,7 +167,7 @@ private fun NpmToolPage(
             ToolCard("WHAT IT IS") {
                 ToolText(
                     "${npm.npm} from npm, the newest release. About ${npm.downloadMb} MB to download and ${npm.installMinutes} to " +
-                        "${npm.installMinutes + 1} minutes to install. Update it by uninstalling and installing again.",
+                        "${npm.installMinutes + 1} minutes to install. Settings › Updates keeps it current.",
                 )
             }
         }

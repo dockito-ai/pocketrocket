@@ -3,6 +3,7 @@ package com.pocketrocket.wrangler
 import android.content.Context
 import com.pocketrocket.clilogin.CliLogin
 import com.pocketrocket.clilogin.CliLogins
+import com.pocketrocket.node.NpmGlobal
 import com.pocketrocket.setup.SetupPhase
 import com.pocketrocket.setup.SetupState
 import com.pocketrocket.setup.ToolPresence
@@ -66,13 +67,20 @@ object Wrangler {
 
     fun install(context: Context) = run(context, remove = false)
 
+    /**
+     * Its Updates row: the install again, which puts in the version this PocketRocket pins ([WranglerTool.VERSION]) with
+     * its Android workerd. Wrangler is pinned because each release needs a workerd built for Android, so it only has an
+     * update when an app update moves the pin past what is on the phone.
+     */
+    fun update(context: Context) = run(context, remove = false, isUpdate = true)
+
     fun remove(context: Context) = run(context, remove = true)
 
-    private fun run(context: Context, remove: Boolean) {
+    private fun run(context: Context, remove: Boolean, isUpdate: Boolean = false) {
         if (_state.value.running || login.state.value.busy) return
         val app = context.applicationContext
         val option = if (remove) "wrangler-remove" else "wrangler"
-        _state.update { it.copy(job = SetupState(phase = SetupPhase.Running), outcome = null, failed = false, removing = remove) }
+        _state.update { it.copy(job = SetupState(phase = SetupPhase.Running), outcome = null, failed = false, removing = remove, updating = isUpdate) }
         Termux.startForegroundService(app)
         scope.launch {
             val (exit, sawDone) = ToolScript.run(app, option) { change -> _state.update { s -> s.copy(job = s.job?.let(change)) } }
@@ -104,6 +112,11 @@ data class WranglerState(
     val failed: Boolean = false,
     /** The last run was a removal, not an install. */
     val removing: Boolean = false,
+    /** The last run was its Updates row's update (the install, to the pinned version). */
+    val updating: Boolean = false,
 ) {
     val running: Boolean get() = job?.phase == SetupPhase.Running
+
+    /** This PocketRocket pins a newer Wrangler than the one on the phone. Not while it needs Repair. */
+    val updateAvailable: Boolean get() = installed && problem == null && NpmGlobal.newer(version, WranglerTool.VERSION)
 }

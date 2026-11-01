@@ -1,6 +1,7 @@
 package com.pocketrocket.updates
 
 import android.content.Context
+import com.pocketrocket.clitools.NpmTool
 import com.pocketrocket.pkgtools.PackageTool
 import com.pocketrocket.setup.SetupPhase
 import com.pocketrocket.setup.SetupState
@@ -8,14 +9,22 @@ import com.pocketrocket.updater.Outcome
 import kotlinx.coroutines.flow.Flow
 
 /**
- * What the Updates screen keeps current (decision 41), in the screen's order. Optional ones come from an optional
- * tool and show only while it's installed (Flutter and Rust, decisions 75 and 87; Python and Bun, decision 92; the
- * languages, decision 98). A [packageTool]'s row is its main package through apt.
+ * What the Updates screen keeps current (decision 41), in the screen's order: every tool in Settings › Tools that can
+ * get updates (decision 102). Optional ones show only while installed: the add-ons (Flutter and Rust, decisions 75 and
+ * 87; Python and Bun, decision 92; the languages and deploy CLIs, decision 98; Headless Chrome and Wrangler), and
+ * Node.js, whose row is Termux's nodejs-lts and goes if a terminal swapped it for another Node. A [packageTool]'s row is
+ * its main package through apt; an [npmTool]'s is its npm package against `npm view`.
  */
-enum class UpdateComponent(val label: String, val optional: Boolean = false, val packageTool: PackageTool? = null) {
+enum class UpdateComponent(
+    val label: String,
+    val optional: Boolean = false,
+    val packageTool: PackageTool? = null,
+    val npmTool: NpmTool? = null,
+) {
     PocketRocket("PocketRocket"),
     ClaudeCode("Claude Code"),
     Git("Git"),
+    Node("Node.js and npm", optional = true),
     Dockito("Dockito"),
     Flutter("Flutter", optional = true),
     Rust("Rust", optional = true),
@@ -28,11 +37,19 @@ enum class UpdateComponent(val label: String, val optional: Boolean = false, val
     Java("Java and Kotlin", optional = true, packageTool = PackageTool.Java),
     Aws("AWS CLI", optional = true, packageTool = PackageTool.Aws),
     Fly("flyctl", optional = true, packageTool = PackageTool.Fly),
+    Chromium("Headless Chrome", optional = true),
+    Wrangler("Wrangler", optional = true),
+    Vercel("Vercel CLI", optional = true, npmTool = NpmTool.Vercel),
+    Netlify("Netlify CLI", optional = true, npmTool = NpmTool.Netlify),
+    Firebase("Firebase CLI", optional = true, npmTool = NpmTool.Firebase),
     ;
 
     companion object {
         /** A package tool's row, or null for one without (the wasm target moves with Rust). */
         fun of(t: PackageTool): UpdateComponent? = entries.firstOrNull { it.packageTool == t }
+
+        /** An npm tool's row. */
+        fun of(t: NpmTool): UpdateComponent = entries.first { it.npmTool == t }
     }
 }
 
@@ -67,7 +84,7 @@ data class UpdateRow(
 
 /**
  * Where one component's versions and update come from. Each wraps the component's own module (AppUpdater,
- * ClaudeUpdater, GitUpdater, Dockito); the Updates screen only sees this.
+ * ClaudeUpdater, an AptUpdater, Dockito, FlutterRust, NpmTools, Wrangler); the Updates screen only sees this.
  */
 interface UpdateSource {
     val component: UpdateComponent

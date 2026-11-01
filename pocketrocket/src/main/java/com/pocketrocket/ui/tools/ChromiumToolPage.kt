@@ -12,6 +12,8 @@ import com.pocketrocket.browser.ChromiumMcp
 import com.pocketrocket.profiles.ClaudeAccounts
 import com.pocketrocket.ui.components.mockText
 import com.pocketrocket.ui.theme.PrTheme
+import com.pocketrocket.updates.UpdateComponent
+import com.pocketrocket.updates.Updates
 
 private val MEMORY = "About ${ChromiumMcp.MEMORY_MB} MB per running browser"
 
@@ -21,12 +23,16 @@ fun ChromiumToolPage(onBack: () -> Unit) {
     val context = LocalContext.current
     val s by Chromium.state.collectAsState()
     val accounts by ClaudeAccounts.state.collectAsState()
-    LaunchedEffect(Unit) { Chromium.refresh() }
+    val updates by Updates.state.collectAsState()
+    LaunchedEffect(Unit) {
+        Chromium.refresh()
+        Updates.onAppOpen(context, checkAfterMs = 10 * 60_000L)
+    }
     val n = accounts.accounts.size
 
     ToolPage(
         spec = Tool.Chromium.spec,
-        state = ToolStates.chromium(s),
+        state = ToolStates.chromium(s, updates.rows.firstOrNull { it.component == UpdateComponent.Chromium }),
         icon = Tool.Chromium.icon,
         purpose = "Claude opens and tests the pages it builds.",
         onBack = onBack,
@@ -40,6 +46,7 @@ fun ChromiumToolPage(onBack: () -> Unit) {
             confirmTitle = "Uninstall ${Tool.Chromium.spec.name}?",
             confirmBody = "Claude sessions lose the browser. ${ChromiumMcp.INSTALLED_MB} MB is freed.",
         ),
+        update = toolUpdate(context, updates, UpdateComponent.Chromium),
         storageRows = listOf("Memory" to MEMORY),
     ) {
         if (s.installed) {
@@ -63,7 +70,7 @@ fun ChromiumToolPage(onBack: () -> Unit) {
                 Text("Each session gets its own browser.", style = mockText(11.sp).copy(lineHeight = 16.sp), color = PrTheme.colors.textMuted)
             }
             ToolCard("WHAT IT IS") {
-                ToolText("Chromium from Termux's packages, plus the Chrome DevTools MCP server. The server is added to every Claude account.")
+                ToolText("Chromium from Termux's packages, updated from Settings › Updates, plus the Chrome DevTools MCP server. The server is added to every Claude account.")
             }
         }
     }

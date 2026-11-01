@@ -11,7 +11,7 @@ data class NpmPresence(val version: String?, val problem: String? = null)
 /**
  * The deploy CLIs that come from npm (decision 98): Vercel, Netlify and Firebase, installed globally with
  * `npm install -g`. The setup script's `--only <option>` / `<option>-remove` installs and removes them
- * (`npm_tool_*`). On the phone means npm's folder for the package is there, whoever ran the install, so a terminal's
+ * (`npm_tool_*`); `<option>-check` and `<option>-update` are their Updates row. On the phone means npm's folder for the package is there, whoever ran the install, so a terminal's
  * `npm i -g vercel` shows on the tile too. Sizes are from the run on the phone (docs/tool-sweep.md): each takes two to
  * three minutes.
  */
@@ -32,7 +32,12 @@ enum class NpmTool(
     ;
 
     val removeOption: String get() = "$option-remove"
+    /** `--only <option>-update`: `npm install -g <npm>@latest`, with the install's progress. */
+    val updateOption: String get() = "$option-update"
+    /** `--only <option>-check`: prints `npm view <npm> version`; no steps, no lock. */
+    val checkOption: String get() = "$option-check"
     val installSteps: List<String> get() = listOf("Checking the device", "Installing $title")
+    val updateSteps: List<String> get() = listOf("Checking the device", "Updating $title")
     val removeSteps: List<String> get() = listOf("Checking the device", "Removing $title")
 
     /**
