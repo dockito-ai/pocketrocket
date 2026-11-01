@@ -34,7 +34,8 @@
 #                     (0.0.1-beta.27 or newer),
 #                     POCKETROCKET_DOCKITO_URL and POCKETROCKET_DOCKITO_SHA256.
 #   --only android-build / android-build-remove  the optional Android build tool, Settings > Tools (decision 45)
-#   --only android-ndk / android-ndk-remove  the optional Android NDK tool, on top of it (decision 50)
+#   --only android-ndk / android-ndk-remove  the optional Android NDK tool, on top of it and C and C++ (decisions 50, 96)
+#   --only c-cpp / c-cpp-remove  the optional C and C++ tool: Termux's compilers and build tools (decision 96)
 #   --only wrangler / wrangler-remove  the optional Wrangler tool, Settings > Tools (decisions 49, 82)
 #   --only flutter-rust / flutter-rust-remove  the optional Flutter & Rust tool, all of it (decision 75)
 #   --only flutter [version]  add a Flutter version (newest stable by default; POCKETROCKET_FLUTTER_VERSION
@@ -938,7 +939,7 @@ step_chromium_mcp_remove() {
 # cmdline-tools 16111833 it hands off to an x86_64 binary that cannot run here. So the script writes the package.xml
 # sdkmanager would have, and the Android Gradle Plugin treats the packages as installed.
 ANDROID_BUILD_PACKAGES="openjdk-17 gradle aapt2 aapt aidl android-tools unzip"
-ANDROID_SDK_DIR="${PREFIX:-}/opt/android-sdk"
+ANDROID_SDK_DIR="${POCKETROCKET_ANDROID_SDK_DIR:-${PREFIX:-}/opt/android-sdk}" # the knob is for tests into a scratch folder
 ANDROID_JAVA_HOME="${PREFIX:-}/lib/jvm/java-17-openjdk"
 ANDROID_PLATFORM=android-37.0
 ANDROID_PLATFORM_ZIP=platform-37.0_r02.zip
@@ -1086,6 +1087,9 @@ step_android_wire() {
   mkdir -p "$(dirname "$ANDROID_PROFILE")"
   printf '%s\n' "# Written by PocketRocket's Android build tool. Removed on uninstall." \
     "export JAVA_HOME=$ANDROID_JAVA_HOME" "export ANDROID_HOME=$ANDROID_SDK_DIR" >"$ANDROID_PROFILE"
+  # The Gradle hook ships with this tool too (decision 96): without the NDK, native tasks fail plainly instead of the
+  # plugin downloading Google's x86_64 NDK, and Kotlin, Java and unit tests still run.
+  android_ndk_write_hook
   ok "ANDROID_HOME, JAVA_HOME and aapt2 set for every session"
   printf '[done]\n'
 }
@@ -1095,8 +1099,9 @@ step_android_remove_files() {
   # A running daemon would keep writing into the folders about to go.
   pkill -f GradleDaemon 2>/dev/null || true
   pkill -f KotlinCompileDaemon 2>/dev/null || true
-  # The NDK tool sits on top of this one, so it goes with it (decision 50).
+  # The NDK tool sits on top of this one, so it goes with it (decision 50), and so does the Gradle hook it owns.
   android_ndk_remove
+  android_ndk_remove_hook
   rm -rf "$ANDROID_SDK_DIR"; rmdir "$PREFIX/opt" 2>/dev/null || true
   rm -f "$ANDROID_PROFILE"
   android_gradle_props_remove "$HOME/.gradle/gradle.properties"
@@ -1146,206 +1151,160 @@ step_android_remove_packages() {
   printf '[done]\n'
 }
 
-# Android NDK, an optional tool on top of Android build (decision 50, docs/android-build.md). Google publishes no arm64
-# NDK, so Termux's clang, cmake, ninja and ndk-sysroot sit behind folders laid out the way the Android Gradle Plugin
-# expects. There is one shim; each version below is a folder that only claims that revision, so a project's ndkVersion
-# or its plugin's default is accepted. Every version is the same Termux compiler. docs/android-ndk-spike.md has the why.
-ANDROID_NDK_PACKAGES="clang cmake ninja ndk-sysroot"
-# The default NDK of each plugin: 8.0-8.3, 8.4-8.6, 8.7-8.13, 9.0-9.5. The one list of versions; the page reads the folders.
+# C and C++, an optional tool for any C or C++ project (decision 96, docs/android-build.md): Termux's compilers and build
+# tools. A package tool like Python and Bun (pkg_tool_* below; the app reads dpkg, CppTool.PACKAGES), with one twist:
+# the Android NDK tool builds on it, so removing C and C++ removes the NDK first.
+CPP_PACKAGES="clang lld llvm cmake ninja make pkg-config lldb"
+CPP_ADDED_FILE="$PR_HOME/c-cpp.packages"   # what its install brought in (pkg_tool_purge's list)
+
+# Every package is there, whoever installed it: the NDK install skips its C and C++ step.
+cpp_complete() {
+  # shellcheck disable=SC2086
+  [ -z "$(missing_packages $CPP_PACKAGES)" ]
+}
+
+step_cpp_install() { step_pkg_tool_install c-cpp; }
+
+step_cpp_remove() {
+  if android_ndk_present; then
+    step "Removing the Android NDK"
+    android_ndk_remove
+    ok "Android NDK removed"
+  fi
+  step_pkg_tool_remove c-cpp
+}
+
+# Android NDK, an optional tool on top of Android build and C and C++ (decisions 50 and 96, docs/android-build.md).
+# Google publishes no arm64 NDK, so the shim built by android-ndk.sh (beside this script) stands in: Termux's clang
+# behind folders laid out the way the Android Gradle Plugin expects, Google's ndk-build from AOSP, and four ABIs from
+# Termux's ndk-multilib. Each version below is a folder that only claims that revision, for builds that look the NDK
+# up by version without the Gradle hook; with the hook any ndkVersion goes to the shim. docs/android-ndk-gaps-spike.md.
+# shellcheck source=android-ndk.sh
+. "$(dirname "${BASH_SOURCE[0]}")/android-ndk.sh"
+# The default NDK of each plugin: 8.0-8.3, 8.4-8.6, 8.7-8.13, 9.0-9.5.
 ANDROID_NDK_VERSIONS="25.1.8937393 26.1.10909125 27.0.12077973 28.2.13676358"
 ANDROID_CMAKE_VERSION=3.22.1 # The plugin's default. Without this folder it would download Google's x86_64 CMake.
 ANDROID_NDK_DIR="$ANDROID_SDK_DIR/ndk"
 ANDROID_NDK_SHIM_DIR="$ANDROID_SDK_DIR/ndk-shim"
+ANDROID_NDK_PLACEHOLDER_DIR="$ANDROID_SDK_DIR/ndk-placeholder" # the Gradle hook's stand-in while no NDK is installed
 ANDROID_CMAKE_DIR="$ANDROID_SDK_DIR/cmake"
+# Installs before decision 96 brought the compilers in themselves and listed them here; C and C++ takes them over.
 ANDROID_NDK_ADDED_FILE="$PR_HOME/android-ndk.packages"
-ANDROID_NDK_BASELINE_FILE="$PR_HOME/android-ndk.baseline"
+ANDROID_NDK_WORK="${TMPDIR:-/tmp}/pocketrocket-ndk"
+# The Gradle hook. The Android tool writes it and owns it (with no NDK it fails native tasks plainly and keeps the
+# plugin from downloading Google's NDK); the NDK tool writes the same file, which then finds the shim.
 ANDROID_NDK_INIT_SCRIPT="$HOME/.gradle/init.d/pocketrocket-android-ndk.gradle"
 
-android_ndk_write_toolchain() {
-  cat >"$1" <<'EOF'
-# Written by PocketRocket's Android NDK tool. Stands in for the NDK's toolchain file: arm64-v8a only, on an arm64 Android host.
-get_filename_component(_NDK "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
-set(_TC "${_NDK}/toolchains/llvm/prebuilt/linux-x86_64")
+android_ndk_present() { [ -d "$ANDROID_NDK_SHIM_DIR" ] || [ -d "$ANDROID_NDK_SHIM_DIR.new" ] || [ -d "$ANDROID_NDK_DIR" ] || [ -f "$ANDROID_NDK_ADDED_FILE" ]; }
 
-if(NOT ANDROID_ABI)
-  set(ANDROID_ABI arm64-v8a)
-endif()
-if(NOT ANDROID_ABI STREQUAL "arm64-v8a")
-  message(FATAL_ERROR "PocketRocket's Android NDK tool builds arm64-v8a only; ${ANDROID_ABI} cannot be built on the phone.")
-endif()
-if(NOT ANDROID_PLATFORM)
-  set(ANDROID_PLATFORM android-24)
-endif()
-string(REPLACE "android-" "" _API "${ANDROID_PLATFORM}")
-if(NOT ANDROID_STL)
-  set(ANDROID_STL c++_shared)
-endif()
-if(ANDROID_STL STREQUAL "c++_static")
-  message(FATAL_ERROR "Termux ships no static libc++ (libc++_static.a). Set -DANDROID_STL=c++_shared in externalNativeBuild.")
-endif()
-
-set(ANDROID TRUE)
-set(CMAKE_SYSTEM_NAME Android)
-set(CMAKE_SYSTEM_VERSION ${_API})
-set(CMAKE_SYSTEM_PROCESSOR aarch64)
-set(CMAKE_ANDROID_ARCH_ABI arm64-v8a)
-set(ANDROID_NDK "${_NDK}")
-
-set(CMAKE_C_COMPILER "${_TC}/bin/clang")
-set(CMAKE_CXX_COMPILER "${_TC}/bin/clang++")
-set(CMAKE_C_COMPILER_TARGET aarch64-none-linux-android${_API})
-set(CMAKE_CXX_COMPILER_TARGET aarch64-none-linux-android${_API})
-set(CMAKE_AR "${_TC}/bin/llvm-ar" CACHE FILEPATH "")
-set(CMAKE_RANLIB "${_TC}/bin/llvm-ranlib" CACHE FILEPATH "")
-set(CMAKE_STRIP "${_TC}/bin/llvm-strip" CACHE FILEPATH "")
-set(CMAKE_SYSROOT "${_TC}/sysroot")
-
-set(CMAKE_FIND_ROOT_PATH "${_TC}/sysroot")
-set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
-set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
-set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
-set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
-
-set(_F "-DANDROID -fPIC -ffunction-sections -fdata-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security")
-set(CMAKE_C_FLAGS_INIT "${_F}")
-set(CMAKE_CXX_FLAGS_INIT "${_F}")
-set(_L "--ld-path=${_TC}/bin/ld-no-rpath -Wl,--build-id=sha1 -Wl,--no-undefined -Wl,-z,max-page-size=16384 -Qunused-arguments")
-set(CMAKE_SHARED_LINKER_FLAGS_INIT "${_L}")
-set(CMAKE_MODULE_LINKER_FLAGS_INIT "${_L}")
-set(CMAKE_EXE_LINKER_FLAGS_INIT "${_L}")
-
-# Passed through to try_compile runs, which re-read this file.
-set(CMAKE_TRY_COMPILE_PLATFORM_VARIABLES ANDROID_ABI ANDROID_PLATFORM ANDROID_STL)
-EOF
+android_ndk_write_hook() {
+  ndk_write_hook "$ANDROID_NDK_INIT_SCRIPT" "$ANDROID_NDK_SHIM_DIR" "$ANDROID_NDK_PLACEHOLDER_DIR" || fail "could not write $ANDROID_NDK_INIT_SCRIPT"
 }
 
-# android_ndk_write_init_script <file>: Gradle's side of the tool, run before the plugin looks for the NDK.
-# A project that names no STL gets c++_shared: the plugin packs libc++_shared.so only when the argument names it.
-# A version not served stops the build with a plain message. Without this the plugin downloads Google's x86_64 NDK
-# (2.4 GB on disk, measured) and then fails. Gradle still runs the plugin's own hook after a throw, so the throw alone
-# does not stop that download; the version is pointed at a served folder first.
-android_ndk_write_init_script() {
-  mkdir -p "$(dirname "$1")"
-  cat >"$1" <<EOF
-// Written by PocketRocket's Android NDK tool. Removed on uninstall.
-def served = "$ANDROID_NDK_VERSIONS".split(" ") as List
-allprojects { project ->
-    project.afterEvaluate {
-        def android = project.extensions.findByName("android")
-        if (android == null) return
-        def cmake, ndkBuild, version, path, arguments
-        try {
-            cmake = android.externalNativeBuild.cmake.path
-            ndkBuild = android.externalNativeBuild.ndkBuild.path
-            version = android.ndkVersion
-            path = android.ndkPath
-            arguments = android.defaultConfig.externalNativeBuild.cmake.arguments
-        } catch (MissingPropertyException ignored) {
-            return
-        }
-        if (path != null || (cmake == null && ndkBuild == null)) return
-        if (!served.contains(version)) android.ndkVersion = served.last()
-        if (ndkBuild != null) {
-            throw new GradleException("PocketRocket's Android NDK tool has no ndk-build. Move " + project.path + " to CMake, or build it off the phone.")
-        }
-        if (!served.contains(version)) {
-            throw new GradleException("PocketRocket's Android NDK tool does not serve NDK " + version + ". It accepts " + served.join(", ") + " (all the same Termux compiler). Change ndkVersion in " + project.path + " to one of them, or remove it.")
-        }
-        if (!arguments.any { it.startsWith("-DANDROID_STL=") }) arguments.add("-DANDROID_STL=c++_shared")
-    }
-}
-EOF
+android_ndk_remove_hook() {
+  rm -f "$ANDROID_NDK_INIT_SCRIPT"; rmdir "$(dirname "$ANDROID_NDK_INIT_SCRIPT")" 2>/dev/null || true
 }
 
-# android_ndk_make_shim: one shim, one folder per version, the CMake folder.
-android_ndk_make_shim() {
-  local shim="$ANDROID_NDK_SHIM_DIR" tc sr f b l v d
-  android_ndk_remove_folders
-  tc="$shim/toolchains/llvm/prebuilt/linux-x86_64"; sr="$tc/sysroot"
-  mkdir -p "$shim/meta" "$shim/build/cmake" "$tc/bin" "$tc/lib" "$sr/usr/lib"
-  # The plugin picks the host folder from the OS name, so an arm64 Linux-looking host still asks for linux-x86_64.
-  ln -s linux-x86_64 "$shim/toolchains/llvm/prebuilt/linux-arm64"
-  printf '{"min":21,"max":37,"aliases":{}}\n' >"$shim/meta/platforms.json"
-  printf '{"arm64-v8a":{"bitness":64,"default":true,"deprecated":false,"proc":"aarch64","arch":"arm64","triple":"aarch64-linux-android","llvm_triple":"aarch64-none-linux-android"}}\n' >"$shim/meta/abis.json"
-  printf '{}\n' >"$shim/meta/system_libs.json"
-  android_ndk_write_toolchain "$shim/build/cmake/android.toolchain.cmake"
-
-  # clang looks for its resource dir beside the path it was called by; the toolchain's -no-canonical-prefixes keeps that path.
-  ln -s "$PREFIX/lib/clang" "$tc/lib/clang"
-  for b in clang clang++ ld.lld llvm-strip llvm-objcopy llvm-ar llvm-ranlib llvm-nm llvm-readelf; do
-    ln -s "$PREFIX/bin/$b" "$tc/bin/$b"
-  done
-  # Termux's clang always adds -rpath=<sysroot>/usr/lib, a path that means nothing outside this app. No flag removes it.
-  cat >"$tc/bin/ld-no-rpath" <<EOF
-#!$PREFIX/bin/bash
-args=()
-for a in "\$@"; do case "\$a" in -rpath=*) ;; *) args+=("\$a") ;; esac; done
-exec "$PREFIX/bin/ld.lld" "\${args[@]}"
-EOF
-  chmod 700 "$tc/bin/ld-no-rpath"
-
-  # Headers from Termux. Libraries are only the crt objects and libc++ from Termux and the phone's own system libraries,
-  # so no other Termux library can be linked by accident.
-  ln -s "$PREFIX/include" "$sr/usr/include"
-  for f in crtbegin_so.o crtend_so.o crtbegin_dynamic.o crtend_android.o crt_pad_segment.o libunwind.a libatomic.a libcompiler_rt-extras.a libc++_shared.so; do
-    ln -s "$PREFIX/lib/$f" "$sr/usr/lib/$f"
-  done
-  for l in c m dl log z android EGL GLESv1_CM GLESv2 GLESv3 OpenSLES jnigraphics mediandk nativewindow vulkan aaudio binder_ndk; do
-    if [ -e "/system/lib64/lib$l.so" ]; then ln -s "/system/lib64/lib$l.so" "$sr/usr/lib/lib$l.so"; fi
-  done
-  ln -s . "$sr/usr/lib/aarch64-linux-android"
-
-  # The plugin reads the revision from the version folder, so that file is real; the rest points at the one shim.
+# android_ndk_version_folders: one folder per version claiming that revision, the rest links to the shim; and CMake.
+android_ndk_version_folders() {
+  local v d f b
   for v in $ANDROID_NDK_VERSIONS; do
     d="$ANDROID_NDK_DIR/$v"; mkdir -p "$d"
     printf 'Pkg.Desc = PocketRocket: Termux clang behind the NDK layout, not Google NDK %s\nPkg.Revision = %s\n' "$v" "$v" >"$d/source.properties"
-    for f in meta build toolchains; do ln -s "$shim/$f" "$d/$f"; done
+    for f in meta build toolchains ndk-build; do ln -sfn "$ANDROID_NDK_SHIM_DIR/$f" "$d/$f"; done
   done
-
   d="$ANDROID_CMAKE_DIR/$ANDROID_CMAKE_VERSION"; mkdir -p "$d/bin"
   printf 'Pkg.Desc = PocketRocket: Termux CMake\nPkg.Revision = %s\n' "$ANDROID_CMAKE_VERSION" >"$d/source.properties"
-  for b in cmake ctest cpack ninja; do ln -s "$PREFIX/bin/$b" "$d/bin/$b"; done
+  for b in cmake ctest cpack ninja; do ln -sfn "$PREFIX/bin/$b" "$d/bin/$b"; done
 }
 
 android_ndk_remove_folders() {
-  rm -rf "${ANDROID_NDK_SHIM_DIR:?}" "${ANDROID_NDK_DIR:?}" "${ANDROID_CMAKE_DIR:?}/${ANDROID_CMAKE_VERSION:?}"
+  rm -rf "${ANDROID_NDK_SHIM_DIR:?}" "${ANDROID_NDK_SHIM_DIR:?}.new" "${ANDROID_NDK_DIR:?}" "${ANDROID_CMAKE_DIR:?}/${ANDROID_CMAKE_VERSION:?}" "$ANDROID_NDK_WORK"
   rmdir "$ANDROID_CMAKE_DIR" 2>/dev/null || true
 }
 
-step_android_ndk_packages() {
-  step "Installing clang, CMake and Ninja"
+# The compilers an install before decision 96 brought in move to C and C++'s list, so removing the NDK leaves them.
+android_ndk_hand_over_packages() {
+  [ -f "$ANDROID_NDK_ADDED_FILE" ] || return 0
+  # shellcheck disable=SC2046
+  packages_hand_over "$ANDROID_NDK_ADDED_FILE" "$CPP_ADDED_FILE" $(cat "$ANDROID_NDK_ADDED_FILE")
+  [ -s "$ANDROID_NDK_ADDED_FILE" ] || rm -f "$ANDROID_NDK_ADDED_FILE"
+}
+
+step_android_ndk_build() {
+  step "Fetching ndk-build"
   android_sdk_ready || fail "Install the Android tool first."
+  cpp_complete || fail "Install C and C++ first."
+  rm -rf "$ANDROID_NDK_WORK/build"; mkdir -p "$ANDROID_NDK_WORK"
+  ndk_fetch_build "$ANDROID_NDK_WORK/build" 2>>"$PR_LOG" || fail "Could not fetch ndk-build from android.googlesource.com. Check the connection and try again."
+  ok "ndk-build from AOSP $NDK_BUILD_COMMIT, build/ tree $NDK_BUILD_TREE"
+}
+
+step_android_ndk_multilib() {
+  step "Downloading the other ABIs"
+  local name size pid rc=0
   apt_refresh
-  packages_baseline "$ANDROID_NDK_BASELINE_FILE" "$ANDROID_NDK_ADDED_FILE"
-  # shellcheck disable=SC2086
-  apt_install_progress $ANDROID_NDK_PACKAGES
-  local b
-  packages_record "$ANDROID_NDK_BASELINE_FILE" "$ANDROID_NDK_ADDED_FILE"
-  for b in bin/clang bin/cmake bin/ninja lib/crtbegin_so.o lib/libc++_shared.so; do
-    [ -e "$PREFIX/$b" ] || fail "$b is missing after install"
-  done
-  ok "packages installed"
+  read -r name size < <(ndk_multilib_info) || true
+  [ -n "${name:-}" ] || fail "$NDK_MULTILIB_PACKAGE is not in the package index"
+  ndk_multilib_download "$ANDROID_NDK_WORK" 2>>"$PR_LOG" &
+  pid=$!
+  watch_file "$pid" "$ANDROID_NDK_WORK/$name" "$size" "Downloading $NDK_MULTILIB_PACKAGE"
+  wait "$pid" || rc=$?
+  [ "$rc" -eq 0 ] || fail "The download of $NDK_MULTILIB_PACKAGE stopped. Check the connection and try again."
+  progress 100 "Unpacking $NDK_MULTILIB_PACKAGE"
+  ANDROID_NDK_MULTILIB="$(ndk_multilib_unpack "$ANDROID_NDK_WORK" 2>>"$PR_LOG")" || fail "could not unpack $NDK_MULTILIB_PACKAGE; see $PR_LOG"
+  ok "$NDK_MULTILIB_PACKAGE $(apt_policy_field "$NDK_MULTILIB_PACKAGE" Candidate), checked by apt"
 }
 
 step_android_ndk_wire() {
   step "Setting up the NDK folders"
-  android_ndk_make_shim
-  android_ndk_write_init_script "$ANDROID_NDK_INIT_SCRIPT"
-  ok "NDK versions ready: $ANDROID_NDK_VERSIONS"
-  printf '[done]\n'
+  progress 10 "Making stub libraries for four ABIs"
+  ndk_make_shim "$ANDROID_NDK_SHIM_DIR" "$ANDROID_NDK_WORK/build" "$ANDROID_NDK_MULTILIB" 2>>"$PR_LOG" || fail "could not set up the NDK folders; see $PR_LOG"
+  printf '%s\n' "$(apt_policy_field "$NDK_MULTILIB_PACKAGE" Candidate)" >"$ANDROID_NDK_SHIM_DIR/.ndk-multilib-version"
+  rm -rf "$ANDROID_NDK_WORK"
+  android_ndk_version_folders
+  android_ndk_write_hook
+  ok "NDK ready: ndk-build and CMake, arm64-v8a, armeabi-v7a, x86 and x86_64, any ndkVersion"
 }
 
-# Folders, the Gradle init script and exactly the packages this tool brought in. Uninstalling Android runs this first.
+# Folders and what an install before decision 96 brought in. The hook stays while the Android tool is installed (it
+# owns it) and now fails native tasks plainly. Removing Android or C and C++ runs this first.
 android_ndk_remove() {
   android_ndk_remove_folders
-  rm -f "$ANDROID_NDK_INIT_SCRIPT"; rmdir "$(dirname "$ANDROID_NDK_INIT_SCRIPT")" 2>/dev/null || true
-  # An install that stopped inside apt left a baseline but no list yet. (Only then: installs before the baseline was
-  # dropped after recording kept theirs, and it would now count what other tools added since.)
-  if [ -f "$ANDROID_NDK_BASELINE_FILE" ] && [ ! -f "$ANDROID_NDK_ADDED_FILE" ]; then
-    packages_record "$ANDROID_NDK_BASELINE_FILE" "$ANDROID_NDK_ADDED_FILE"
+  [ -d "$ANDROID_SDK_DIR" ] || android_ndk_remove_hook
+  if [ -f "$ANDROID_NDK_ADDED_FILE" ]; then
+    if pkg_installed clang; then android_ndk_hand_over_packages; fi
+    android_purge_added "$ANDROID_NDK_ADDED_FILE"
+    rm -f "$ANDROID_NDK_ADDED_FILE" "$PR_HOME/android-ndk.baseline"
   fi
-  android_purge_added "$ANDROID_NDK_ADDED_FILE"
-  rm -f "$ANDROID_NDK_ADDED_FILE" "$ANDROID_NDK_BASELINE_FILE"
+}
+
+# main_android_ndk <android-ndk|android-ndk-remove|c-cpp|c-cpp-remove>
+main_android_ndk() {
+  PR_LOG="$PR_HOME/$1.log"
+  case "$1" in
+    android-ndk) TOTAL_STEPS=4; cpp_complete || TOTAL_STEPS=5 ;;
+    android-ndk-remove) TOTAL_STEPS=2 ;;
+    c-cpp) TOTAL_STEPS=2 ;;
+    c-cpp-remove) TOTAL_STEPS=2; if android_ndk_present; then TOTAL_STEPS=3; fi ;;
+  esac
+  step "Checking the device"; preflight_checks; ok "Termux on aarch64"
+  case "$1" in
+    android-ndk)
+      android_sdk_ready || fail "Install the Android tool first."
+      cpp_complete || step_cpp_install
+      android_ndk_hand_over_packages
+      step_android_ndk_build
+      step_android_ndk_multilib
+      step_android_ndk_wire ;;
+    android-ndk-remove)
+      step "Removing the Android NDK"
+      android_ndk_remove
+      ok "Android NDK removed; C and C++ stay" ;;
+    c-cpp) step_cpp_install ;;
+    c-cpp-remove) step_cpp_remove ;;
+  esac
+  printf '[done]\n'
 }
 
 # Packages on the Updates screen (decision 41): Git, and Rust once the Flutter & Rust tool has it (decision 75).
@@ -1870,6 +1829,7 @@ pkg_tool_packages() {
     java) printf 'openjdk-21 kotlin' ;;
     aws) printf 'awscli' ;;       # the deploy CLIs from Termux's packages (decision 98)
     flyctl) printf 'flyctl' ;;
+    c-cpp) printf '%s' "$CPP_PACKAGES" ;;
     *) return 1 ;;
   esac
 }
@@ -1898,6 +1858,7 @@ pkg_tool_title() {
     java) printf 'Java 21 and Kotlin' ;;
     aws) printf 'the AWS CLI' ;;
     flyctl) printf 'flyctl' ;;
+    c-cpp) printf 'C and C++' ;;
   esac
 }
 
@@ -1916,6 +1877,8 @@ pkg_tool_check() {
     java) "$JAVA21_HOME/bin/java" -version 2>&1 | sed -n 1p && kotlinc -version 2>&1 | grep -o 'kotlinc-jvm [^ ]*' ;;
     aws) aws --version ;;
     flyctl) flyctl version ;;
+    c-cpp) for b in clang clang++ ld.lld cmake ninja make pkg-config lldb; do command -v "$b" >/dev/null 2>&1 || { printf '%s is missing' "$b"; return 1; }; done
+      clang --version 2>&1 | head -1 ;;
   esac
 }
 
@@ -2215,12 +2178,12 @@ main() {
     "") main_full ;;
     --only)
       case "${2:-}" in
-        claude|dockito|chromium|chromium-remove|android-build|android-build-remove|android-ndk|android-ndk-remove|wrangler|wrangler-remove|git-check|git-update) ;;
+        claude|dockito|chromium|chromium-remove|android-build|android-build-remove|android-ndk|android-ndk-remove|c-cpp|c-cpp-remove|wrangler|wrangler-remove|git-check|git-update) ;;
         flutter|flutter-default|flutter-remove-version|flutter-remove|rust|rust-remove|flutter-rust|flutter-rust-remove|rust-check|rust-update) ;;
         python|python-remove|bun|bun-remove|rust-wasm|rust-wasm-remove|python-check|python-update|bun-check|bun-update) ;;
         go|go-remove|deno|deno-remove|ruby|ruby-remove|php|php-remove|java|java-remove|golang-check|golang-update|deno-check|deno-update|ruby-check|ruby-update|php-check|php-update|openjdk-21-check|openjdk-21-update) ;;
         aws|aws-remove|flyctl|flyctl-remove|vercel|vercel-remove|netlify|netlify-remove|firebase|firebase-remove|awscli-check|awscli-update|flyctl-check|flyctl-update) ;;
-        *) fail "--only takes: aws, aws-remove, flyctl, flyctl-remove, vercel, vercel-remove, netlify, netlify-remove, firebase, firebase-remove, awscli-check, awscli-update, flyctl-check, flyctl-update,claude, dockito, chromium, chromium-remove, android-build, android-build-remove, android-ndk, android-ndk-remove, wrangler, wrangler-remove, flutter [version], flutter-default <version>, flutter-remove-version <version>, flutter-remove, rust, rust-remove, flutter-rust, flutter-rust-remove, python, python-remove, bun, bun-remove, rust-wasm, rust-wasm-remove, go, go-remove, deno, deno-remove, ruby, ruby-remove, php, php-remove, java, java-remove, git-check, git-update, rust-check, rust-update, python-check, python-update, bun-check, bun-update, golang-check, golang-update, deno-check, deno-update, ruby-check, ruby-update, php-check, php-update, openjdk-21-check or openjdk-21-update" ;;
+        *) fail "--only takes: aws, aws-remove, flyctl, flyctl-remove, vercel, vercel-remove, netlify, netlify-remove, firebase, firebase-remove, awscli-check, awscli-update, flyctl-check, flyctl-update,claude, dockito, chromium, chromium-remove, android-build, android-build-remove, android-ndk, android-ndk-remove, c-cpp, c-cpp-remove, wrangler, wrangler-remove, flutter [version], flutter-default <version>, flutter-remove-version <version>, flutter-remove, rust, rust-remove, flutter-rust, flutter-rust-remove, python, python-remove, bun, bun-remove, rust-wasm, rust-wasm-remove, go, go-remove, deno, deno-remove, ruby, ruby-remove, php, php-remove, java, java-remove, git-check, git-update, rust-check, rust-update, python-check, python-update, bun-check, bun-update, golang-check, golang-update, deno-check, deno-update, ruby-check, ruby-update, php-check, php-update, openjdk-21-check or openjdk-21-update" ;;
       esac
       case "$2" in
         git-check|rust-check) apt_check "${2%-check}"; return 0 ;;
@@ -2282,22 +2245,9 @@ main() {
         step_android_remove_packages
         return 0
       fi
-      if [ "$2" = android-ndk ]; then
-        TOTAL_STEPS=3; PR_LOG="$PR_HOME/android-ndk.log"
-        step "Checking the device"; preflight_checks; ok "Termux on aarch64"
-        step_android_ndk_packages
-        step_android_ndk_wire
-        return 0
-      fi
-      if [ "$2" = android-ndk-remove ]; then
-        TOTAL_STEPS=2; PR_LOG="$PR_HOME/android-ndk.log"
-        step "Checking the device"; preflight_checks; ok "Termux on aarch64"
-        step "Removing clang, CMake and Ninja"
-        android_ndk_remove
-        ok "NDK tool removed"
-        printf '[done]\n'
-        return 0
-      fi
+      case "$2" in
+        android-ndk|android-ndk-remove|c-cpp|c-cpp-remove) main_android_ndk "$2"; return 0 ;;
+      esac
       if [ "$2" = wrangler ]; then
         TOTAL_STEPS=4; PR_LOG="$PR_HOME/wrangler.log"
         step "Checking the device"; preflight_checks; ok "Termux on aarch64"

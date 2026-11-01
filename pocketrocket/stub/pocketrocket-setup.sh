@@ -59,19 +59,37 @@ if [ "${1:-}" = --only ] && [ "${2:-}" = android-build-remove ]; then
   step 3 "Removing Java, Gradle and build tools"; sleep 0.4
   echo "[done]"; exit 0
 fi
-# Settings > Tools: --only android-ndk / android-ndk-remove, with fake NDK folders.
-if [ "${1:-}" = --only ] && [ "${2:-}" = android-ndk ]; then
-  TOTAL=3
+# Settings > Tools: --only c-cpp / c-cpp-remove and android-ndk / android-ndk-remove, with fake markers. The NDK
+# install brings in C and C++ when it isn't there; removing C and C++ takes the NDK first.
+cpp_marker="$HOME/.pocketrocket/c-cpp.packages"; ndk_shim="$PREFIX/opt/android-sdk/ndk-shim"
+stub_cpp() { printf '[progress 30] Downloading clang · 31 of 105 MB\n'; sleep 0.6; mkdir -p "$HOME/.pocketrocket"; printf 'clang\n' > "$cpp_marker"; echo "[ok] clang version 21.1.8"; }
+if [ "${1:-}" = --only ] && [ "${2:-}" = c-cpp ]; then
+  TOTAL=2
   step 1 "Checking the device"; echo "[ok] Termux on aarch64"; sleep 0.4
-  step 2 "Installing clang, CMake and Ninja"; printf '[progress 60] Downloading clang · 58 of 96 MB\n'; sleep 0.6
-  step 3 "Setting up the NDK folders"
-  mkdir -p "$PREFIX/opt/android-sdk/ndk/28.2.13676358" "$PREFIX/opt/android-sdk/ndk-shim"; touch "$PREFIX/opt/android-sdk/ndk-shim/.pocketrocket-installed"
+  step 2 "Installing C and C++"; stub_cpp
+  echo "[done]"; exit 0
+fi
+if [ "${1:-}" = --only ] && [ "${2:-}" = c-cpp-remove ]; then
+  TOTAL=2; n=2; [ -d "$ndk_shim" ] && TOTAL=3
+  step 1 "Checking the device"; sleep 0.4
+  if [ -d "$ndk_shim" ]; then step 2 "Removing the Android NDK"; rm -rf "$PREFIX/opt/android-sdk/ndk" "$ndk_shim"; n=3; sleep 0.4; fi
+  step $n "Removing C and C++"; rm -f "$cpp_marker"; sleep 0.4
+  echo "[done]"; exit 0
+fi
+if [ "${1:-}" = --only ] && [ "${2:-}" = android-ndk ]; then
+  TOTAL=4; n=2; [ -f "$cpp_marker" ] || TOTAL=5
+  step 1 "Checking the device"; echo "[ok] Termux on aarch64"; sleep 0.4
+  if [ ! -f "$cpp_marker" ]; then step 2 "Installing C and C++"; stub_cpp; n=3; fi
+  step $n "Fetching ndk-build"; sleep 0.4
+  step $((n + 1)) "Downloading the other ABIs"; printf '[progress 60] Downloading ndk-multilib · 44 of 73 MB\n'; sleep 0.6
+  step $((n + 2)) "Setting up the NDK folders"
+  mkdir -p "$PREFIX/opt/android-sdk/ndk/28.2.13676358" "$ndk_shim"; touch "$ndk_shim/ndk-build" "$ndk_shim/.pocketrocket-installed"
   sleep 0.4; echo "[done]"; exit 0
 fi
 if [ "${1:-}" = --only ] && [ "${2:-}" = android-ndk-remove ]; then
   TOTAL=2
   step 1 "Checking the device"; sleep 0.4
-  step 2 "Removing clang, CMake and Ninja"; rm -rf "$PREFIX/opt/android-sdk/ndk" "$PREFIX/opt/android-sdk/ndk-shim"; sleep 0.4
+  step 2 "Removing the Android NDK"; rm -rf "$PREFIX/opt/android-sdk/ndk" "$ndk_shim"; sleep 0.4
   echo "[done]"; exit 0
 fi
 # Settings > Updates: --only git-check prints apt-cache policy; --only git-update fakes the apt phases.

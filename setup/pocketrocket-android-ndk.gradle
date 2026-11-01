@@ -1,0 +1,90 @@
+// Written by PocketRocket's Android and Android NDK add-ons (decision 96). Removed when the Android add-on is uninstalled.
+//
+// - A native project (CMake or ndk-build) with no ndkPath of its own is pointed at the phone's NDK, whatever
+//   ndkVersion it pins, so the Gradle plugin never downloads Google's x86_64 NDK.
+// - ABIs the phone's NDK has no libraries for (riscv64) are dropped from abiFilters and ABI splits, with a warning.
+// - Nothing is thrown while Gradle configures. When native code can't be built (no NDK add-on, or no ABI left), only
+//   the native tasks fail, when they run, with a plain message; compileDebugKotlin, unit tests and lint still run.
+//
+// -Ppocketrocket.ndk=<folder> uses another NDK folder; -Ppocketrocket.ndk=none acts as if the NDK add-on were absent.
+def installedShim = new File("@POCKETROCKET_NDK_SHIM@")
+def chosen = gradle.startParameter.projectProperties["pocketrocket.ndk"]
+def shim = chosen == null ? installedShim : (chosen == "none" ? null : new File(chosen))
+// An NDK folder needs its source.properties, and the installed shim its ndk-build too (one from before decision 96 has
+// none: it is treated as absent until Repair).
+if (shim != null && !new File(shim, "source.properties").isFile()) shim = null
+if (shim != null && chosen == null && !new File(shim, "ndk-build").isFile()) shim = null
+
+// With no NDK, a placeholder holding only source.properties and meta/ lets the plugin configure without downloading.
+def placeholder = new File("@POCKETROCKET_NDK_PLACEHOLDER@")
+def ndkDir = shim ?: placeholder
+def revision = "@POCKETROCKET_NDK_REVISION@"
+def servedAbis = ["arm64-v8a"]
+try {
+    if (shim == null && !new File(placeholder, "meta/abis.json").isFile()) {
+        new File(placeholder, "meta").mkdirs()
+        new File(placeholder, "source.properties").text = "Pkg.Desc = PocketRocket: no NDK installed\nPkg.Revision = ${revision}\n"
+        new File(placeholder, "meta/abis.json").text = '{"arm64-v8a":{"bitness":64,"default":true,"deprecated":false,"proc":"aarch64","arch":"arm64","triple":"aarch64-linux-android","llvm_triple":"aarch64-none-linux-android"}}\n'
+        new File(placeholder, "meta/platforms.json").text = '{"min":21,"max":37,"aliases":{}}\n'
+        new File(placeholder, "meta/system_libs.json").text = '{}\n'
+    }
+    def line = new File(ndkDir, "source.properties").readLines().find { it.startsWith("Pkg.Revision") }
+    if (line != null) revision = line.split("=")[1].trim()
+    servedAbis = new groovy.json.JsonSlurper().parse(new File(ndkDir, "meta/abis.json")).keySet() as List
+} catch (Exception e) {
+    logger.warn("PocketRocket NDK: could not read ${ndkDir}: ${e.message}")
+}
+
+allprojects { project ->
+    project.afterEvaluate {
+        try {
+            def android = project.extensions.findByName("android")
+            if (android == null) return
+            def cmake, ndkBuild
+            try {
+                cmake = android.externalNativeBuild.cmake.path
+                ndkBuild = android.externalNativeBuild.ndkBuild.path
+                if (android.ndkPath != null || (cmake == null && ndkBuild == null)) return
+            } catch (MissingPropertyException ignored) {
+                return
+            }
+            String why = null
+            if (android.ndkVersion != null && android.ndkVersion != revision) {
+                project.logger.lifecycle("PocketRocket NDK: ${project.path} asks for NDK ${android.ndkVersion}; using the phone's NDK (claims ${revision}).")
+            }
+            android.ndkVersion = revision
+            android.ndkPath = ndkDir.path
+
+            // ABIs come from ndk.abiFilters or, in an app with ABI splits, from splits.abi.
+            def filters = android.defaultConfig.ndk.abiFilters
+            def dropped = filters.findAll { !servedAbis.contains(it) }
+            filters.removeAll(dropped)
+            def kept = filters as List
+            def splits = android.hasProperty("splits") ? android.splits : null
+            if (splits != null && splits.abi.enable) {
+                def wanted = splits.abiFilters as List
+                def keep = wanted.findAll { servedAbis.contains(it) }
+                dropped += wanted - keep
+                splits.abi.reset()
+                if (keep.isEmpty()) splits.abi.enable = false else splits.abi.include(*keep)
+                kept = keep
+            }
+            if (!dropped.isEmpty()) {
+                project.logger.warn("PocketRocket NDK: ${project.path} cannot build ${dropped.unique().join(', ')} on the phone; building ${kept.join(', ') ?: 'nothing'}.")
+                if (kept.isEmpty()) why = "none of its ABIs can be built on the phone"
+            }
+            if (shim == null) why = "the Android NDK add-on is not installed (Settings > Tools > Android NDK)"
+
+            if (why != null) {
+                def message = "PocketRocket: ${project.path} has C/C++ code, and ${why}. Kotlin and Java tasks still work (compileDebugKotlin, testDebugUnitTest)."
+                project.tasks.configureEach { t ->
+                    if (t.name ==~ /(configure|build)(CMake|NdkBuild).*|externalNativeBuild.*|generateJsonModel.*/) {
+                        t.doFirst { throw new GradleException(message) }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            project.logger.warn("PocketRocket NDK: left ${project.path} as it is (${e.message}).")
+        }
+    }
+}

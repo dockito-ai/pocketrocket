@@ -6,6 +6,7 @@ import java.io.File
 
 /** The fixed facts of the Android build tool (decision 45). Sizes are measured on the emulator, docs/android-tools-spike.md. */
 object AndroidBuildTool {
+    const val ID = "android-build"
     const val SDK_RELATIVE = "opt/android-sdk"
     const val JAVA_RELATIVE = "lib/jvm/java-17-openjdk"
 
