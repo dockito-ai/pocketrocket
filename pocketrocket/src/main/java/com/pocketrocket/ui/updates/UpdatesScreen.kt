@@ -176,7 +176,7 @@ fun UpdatesScreen(onBack: () -> Unit, onClaudeCode: () -> Unit) {
             Text(foot, style = mockText(11.sp).copy(lineHeight = 16.sp), color = c.textMuted)
             when {
                 s.updating -> BusyButton("Updating…")
-                s.available >= 2 -> AccentButton("Update all (${s.available})", onClick = { start(Updates.pending()) }, height = 48.dp, radius = 12.dp)
+                s.ready >= 2 -> AccentButton("Update all (${s.ready})", onClick = { start(Updates.pending()) }, height = 48.dp, radius = 12.dp)
             }
         }
     }
@@ -224,10 +224,12 @@ private fun UpdateTile(row: UpdateRow, queued: Boolean, blocked: Boolean, checke
             when {
                 row.running -> Pill("Updating", c.blue)
                 queued -> Pill("Next", c.textMuted, c.iconTile)
+                row.available && row.signingIn -> Pill("Signing in", c.textMuted, c.iconTile)
                 row.failed && row.available && !blocked -> SmallButton("Retry", onUpdate)
                 row.available && !blocked -> SmallButton("Update", onUpdate)
                 row.available -> Unit
                 row.installed == null -> Unit
+                row.checkFailed && !row.checking -> Pill("Couldn't check", c.textMuted, c.iconTile)
                 row.latest != null -> Pill("Up to date", c.green)
                 row.checking -> Pill("Checking", c.textMuted, c.iconTile)
                 checkedOnce -> Pill("Couldn't check", c.textMuted, c.iconTile)

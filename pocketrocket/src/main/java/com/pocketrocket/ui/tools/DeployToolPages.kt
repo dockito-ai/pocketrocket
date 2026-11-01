@@ -159,7 +159,7 @@ private fun NpmToolPage(
             holdUninstall = ls.busy,
         ),
         update = toolUpdate(context, updates, component),
-        accounts ={ CliAccountCard(service, login, ls, why = why, blocked = s.running && mine) },
+        accounts = { CliAccountCard(service, login, ls, why = why, blocked = s.running && mine) },
     ) {
         if (installed) {
             howTo()

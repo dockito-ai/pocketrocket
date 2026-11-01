@@ -1373,17 +1373,31 @@ main_android_ndk() {
 }
 
 # Packages on the Updates screen (decision 41): Git, and Rust once the Flutter & Rust tool has it (decision 75).
-# apt-cache policy prints "Installed: X" and "Candidate: Y".
-apt_policy_field() { apt-cache policy "$1" 2>/dev/null | awk -v k="$2:" '$1 == k { print $2; exit }'; }
+# apt-cache policy prints "Installed: X" and "Candidate: Y". awk reads to the end: leaving early would hand apt-cache a
+# SIGPIPE, which pipefail turns into a failed assignment and set -e into a silent exit.
+apt_policy_field() { apt-cache policy "$1" 2>/dev/null | awk -v k="$2:" '$1 == k && !seen { print $2; seen = 1 }'; }
 
-# apt_check <package>: refreshes the index and prints the package's policy. Its own log (<package>-check.log, so a
-# check never wipes the install or update log); no lock, no steps.
+# apt_check <package> [packages its row follows too]: refreshes the index and prints their policy. Its own log
+# (<package>-check.log, so a check never wipes the install or update log); no lock, no steps. Check now refreshes the
+# index once for every row (--only apt-refresh, AptIndex in the app) and runs each check with POCKETROCKET_APT_FRESH=1,
+# which only reads it.
 apt_check() {
   PR_LOG="$PR_HOME/$1-check.log"; mkdir -p "$PR_HOME"; : >"$PR_LOG"
   export DEBIAN_FRONTEND=noninteractive
-  apt_refresh
-  apt-cache policy "$1" 2>/dev/null
+  [ "${POCKETROCKET_APT_FRESH:-}" = 1 ] || apt_refresh
+  apt-cache policy "$@" 2>/dev/null
 }
+
+# --only apt-refresh: one apt-get update for a whole Check now. Its own log, no lock, no steps.
+apt_index_refresh() {
+  PR_LOG="$PR_HOME/apt-refresh.log"; mkdir -p "$PR_HOME"; : >"$PR_LOG"
+  export DEBIAN_FRONTEND=noninteractive
+  apt_refresh
+}
+
+# The packages a row follows beyond the one it is named for (AptUpdater's list in the app): every JDK and Kotlin the
+# Java tile covers, never openjdk-17 (PackageTool.updated), and every C and C++ package (CppTool.PACKAGES).
+JAVA_UPDATED="openjdk-21 openjdk-25 kotlin"
 
 # main_apt_update <name> <version command> <package> [packages that move with it]: --only <package>-update, with the
 # device check, the package's own log and its version at the end.
@@ -1398,21 +1412,30 @@ main_apt_update() {
 }
 
 # step_apt_update <name> <package> [packages that move with it]: upgrades them alone, plus only what the new
-# versions need, then checks the package is at its candidate.
+# versions need, then checks each one that had a newer candidate is at it. Any of them may be the one that moved (Java
+# 25 without 21, CMake without clang); the ones not installed are skipped, and at least one has to be.
 step_apt_update() {
-  local name="$1" pkg="$2" have want
+  local name="$1" p have want any="" moved=()
   shift
   step "Updating $name"
   apt_refresh
-  have="$(apt_policy_field "$pkg" Installed)"; want="$(apt_policy_field "$pkg" Candidate)"
-  [ -n "$have" ] && [ "$have" != "(none)" ] || fail "$pkg is not installed (run the setup or install it first)"
-  if [ -z "$want" ] || [ "$want" = "(none)" ] || [ "$have" = "$want" ]; then
-    ok "$pkg $have is the newest"
+  for p in "$@"; do
+    have="$(apt_policy_field "$p" Installed)"; want="$(apt_policy_field "$p" Candidate)"
+    [ -n "$have" ] && [ "$have" != "(none)" ] || continue
+    any=1
+    if [ -n "$want" ] && [ "$want" != "(none)" ] && [ "$have" != "$want" ]; then
+      info "$p $have -> $want"; moved+=("$p=$want")
+    fi
+  done
+  [ -n "$any" ] || fail "$1 is not installed (run the setup or install it first)"
+  if [ "${#moved[@]}" -eq 0 ]; then
+    ok "$name is the newest"
   else
-    info "$pkg $have -> $want"
     apt_package_upgrade_progress "$@"
-    have="$(apt_policy_field "$pkg" Installed)"
-    [ "$have" = "$want" ] || fail "$pkg is still $have after the upgrade, expected $want"
+    for p in "${moved[@]}"; do
+      have="$(apt_policy_field "${p%%=*}" Installed)"
+      [ "$have" = "${p#*=}" ] || fail "${p%%=*} is still $have after the upgrade, expected ${p#*=}"
+    done
   fi
   hash -r 2>/dev/null || true
 }
@@ -1421,6 +1444,13 @@ step_apt_update() {
 # starting the browser to ask it needs more than a version check should.
 node_npm_versions() { printf 'Node.js %s, npm %s' "$(node --version)" "$(npm --version)"; }
 chromium_version() { dpkg-query -W -f='Chromium ${Version}' chromium; }
+# dpkg_versions <packages…>: the installed ones with their versions ("openjdk-25 25.0.1, kotlin 2.4.21"), for rows
+# that follow several packages.
+dpkg_versions() {
+  local p out=""
+  for p in "$@"; do if pkg_installed "$p"; then out="$out, $p $(dpkg-query -W -f='${Version}' "$p")"; fi; done
+  printf '%s' "${out#, }"
+}
 
 dockito_check() {
   local out
@@ -1440,6 +1470,7 @@ dockito_check() {
 # tool installs no packages. npm's download cache and the workerd download stay in temp folders and go when done.
 WRANGLER_VERSION="4.156.0"
 WRANGLER_NODE_MIN=22
+WRANGLER_NPM_MB=78   # npm's cache after the install, for the bar (WranglerTool.DOWNLOAD_MB less workerd)
 WRANGLER_DIR="${PREFIX:-}/lib/node_modules/wrangler"
 WRANGLER_CONFIG="$HOME/.config/.wrangler"   # Wrangler's own folder, with its login, logs and telemetry choice
 # The workerd that wrangler@WRANGLER_VERSION pins. Bumping Wrangler means building its workerd first: ports/workerd/README.md.
@@ -1470,17 +1501,11 @@ EOF
 
 step_wrangler_install() {
   step "Installing Wrangler"
-  local major cache="$TMPDIR/wrangler-npm-cache"
-  major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
-  [ "$major" -ge "$WRANGLER_NODE_MIN" ] || fail "Wrangler needs Node $WRANGLER_NODE_MIN or newer, found ${major}"
-  rm -rf "$cache"
-  log_run npm install -g --ignore-scripts --no-fund --no-audit --cache "$cache" "wrangler@${WRANGLER_VERSION}" \
-    || { rm -rf "$cache"; fail "npm install wrangler failed"; }
-  rm -rf "$cache"
+  # workerd's own install script is what can't run here (see above); step_wrangler_workerd stands in for it.
+  npm_global_install wrangler Wrangler "$WRANGLER_NODE_MIN" "$WRANGLER_NPM_MB" "wrangler@${WRANGLER_VERSION}" --ignore-scripts
   wrangler_patch_workerd "$WRANGLER_DIR/node_modules/workerd/lib/main.js" \
     || fail "wrangler ${WRANGLER_VERSION} has a workerd this setup does not know"
-  # The app's processes and Claude sessions don't all have termux-exec, so `#!/usr/bin/env node` can't be left to it.
-  sed -i "1s|^#!.*|#!$PREFIX/bin/node|" "$WRANGLER_DIR/bin/wrangler.js" || fail "could not fix wrangler's launcher"
+  npm_tool_fix_launcher wrangler
   ok "wrangler ${WRANGLER_VERSION}"
 }
 
@@ -2096,7 +2121,7 @@ pkg_tool_cleanup() {
   main="$(pkg_tool_packages "$1" | awk '{print $1}')"
   [ "$1" != python ] || uv_config_remove "$UV_CONFIG"
   # uv goes with the Python tool even while Headless Chrome keeps python itself.
-  if [ "$1" = python ] && ! pkg_installed uv; then rm -rf "$(dirname "$UV_CONFIG")" "$HOME/.cache/uv" "$HOME/.local/share/uv"; fi
+  if [ "$1" = python ] && ! pkg_installed uv; then rm -rf "$(dirname "$UV_CONFIG")" "${XDG_CACHE_HOME:-$HOME/.cache}/uv" "${XDG_DATA_HOME:-$HOME/.local/share}/uv"; fi
   ! pkg_installed "$main" || return 0
   # Go's module cache is read-only.
   [ "$1" != go ] || chmod -R u+w "$HOME/go/pkg" 2>/dev/null || true
@@ -2300,26 +2325,35 @@ step_npm_tool_install() {
   npm_tool_npm_install "$1" "$(npm_tool_package "$1")"
 }
 
-# npm_tool_npm_install <name> <package spec>: `npm install -g` with the download on the bar, then its --version. The
-# install and the update (npm_tool_update_*) both run it, so they show the same progress.
-npm_tool_npm_install() {
-  local name="$1" spec="$2" pkg bin cache="$TMPDIR/pocketrocket-npm-$1" major pid out
-  pkg="$(npm_tool_package "$name")"; bin="$(npm_tool_bin "$name")"
+# npm_global_install <name> <title> <Node major it needs> <download MB> <package spec> [npm options…]: `npm install -g`
+# with a throwaway cache and the download on the bar. Wrangler's install and the npm tools' install and update use it.
+npm_global_install() {
+  local name="$1" title="$2" min="$3" mb="$4" spec="$5" pkg="${5%@*}" cache major pid
+  shift 5
+  cache="$TMPDIR/pocketrocket-npm-$name"
   major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
-  [ "$major" -ge 20 ] || fail "$(npm_tool_title "$name") needs Node 20 or newer, found ${major}"
+  [ "$major" -ge "$min" ] || fail "$title needs Node $min or newer, found ${major}"
   rm -rf "$cache"
-  npm install -g --no-fund --no-audit --cache "$cache" "$spec" >>"$PR_LOG" 2>&1 &
+  npm install -g --no-fund --no-audit --cache "$cache" "$@" "$spec" >>"$PR_LOG" 2>&1 &
   pid=$!
-  watch_dir "$pid" "$cache" "$(npm_tool_download_mb "$name")" "Downloading $pkg"
+  watch_dir "$pid" "$cache" "$mb" "Downloading $pkg"
   if ! wait "$pid"; then rm -rf "$cache"; fail "npm install $pkg failed; see $PR_LOG"; fi
   rm -rf "$cache"
   hash -r 2>/dev/null || true
+}
+
+# npm_tool_npm_install <name> <package spec>: npm_global_install, then its launcher and --version. The install and the
+# update (npm_tool_update_*) both run it, so they show the same progress.
+npm_tool_npm_install() {
+  local name="$1" spec="$2" pkg bin out
+  pkg="$(npm_tool_package "$name")"; bin="$(npm_tool_bin "$name")"
+  npm_global_install "$name" "$(npm_tool_title "$name")" 20 "$(npm_tool_download_mb "$name")" "$spec"
   npm_tool_fix_launcher "$bin"
   out="$("$PREFIX/bin/$bin" --version 2>&1)" || fail "$bin --version failed: $out"
   ok "$pkg $(printf '%s' "$out" | tail -n 1)"
 }
 
-# npm_tool_fix_launcher <bin>: points the launcher's `#!/usr/bin/env node` at $PREFIX/bin/node, as for Wrangler. The
+# npm_tool_fix_launcher <bin>: points the launcher's `#!/usr/bin/env node` at $PREFIX/bin/node (Wrangler's too). The
 # exec helper only reaches this script's children, not its own exec, and the app's logins and some Claude sessions run
 # without it, so Android (no /usr/bin/env) would refuse the file. sed works on the file npm's link points at.
 npm_tool_fix_launcher() {
@@ -2429,14 +2463,14 @@ main() {
     "") main_full ;;
     --only)
       case "${2:-}" in
-        claude|dockito|chromium|chromium-remove|android-build|android-build-remove|android-ndk|android-ndk-remove|c-cpp|c-cpp-remove|wrangler|wrangler-remove|git-check|git-update) ;;
+        claude|dockito|chromium|chromium-remove|android-build|android-build-remove|android-ndk|android-ndk-remove|c-cpp|c-cpp-remove|wrangler|wrangler-remove|git-check|git-update|apt-refresh|clang-check|clang-update) ;;
         flutter|flutter-default|flutter-remove-version|flutter-remove|rust|rust-remove|flutter-rust|flutter-rust-remove|rust-check|rust-update) ;;
         python|python-remove|bun|bun-remove|rust-wasm|rust-wasm-remove|python-check|python-update|bun-check|bun-update) ;;
         go|go-remove|deno|deno-remove|ruby|ruby-remove|php|php-remove|java|java-remove|golang-check|golang-update|deno-check|deno-update|ruby-check|ruby-update|php-check|php-update|openjdk-21-check|openjdk-21-update) ;;
         aws|aws-remove|flyctl|flyctl-remove|vercel|vercel-remove|netlify|netlify-remove|firebase|firebase-remove|awscli-check|awscli-update|flyctl-check|flyctl-update) ;;
         java-17|java-17-remove|java-21|java-21-remove|java-25|java-25-remove|kotlin|kotlin-remove|java-setup) ;;
         vercel-check|vercel-update|netlify-check|netlify-update|firebase-check|firebase-update|nodejs-lts-check|nodejs-lts-update|chromium-check|chromium-update) ;;
-        *) fail "--only takes: vercel-check, vercel-update, netlify-check, netlify-update, firebase-check, firebase-update, nodejs-lts-check, nodejs-lts-update, chromium-check, chromium-update, aws, aws-remove, flyctl, flyctl-remove, vercel, vercel-remove, netlify, netlify-remove, firebase, firebase-remove, awscli-check, awscli-update, flyctl-check, flyctl-update, claude, dockito, chromium, chromium-remove, android-build, android-build-remove, android-ndk, android-ndk-remove, c-cpp, c-cpp-remove, wrangler, wrangler-remove, flutter [version], flutter-default <version>, flutter-remove-version <version>, flutter-remove, rust, rust-remove, flutter-rust, flutter-rust-remove, python, python-remove, bun, bun-remove, rust-wasm, rust-wasm-remove, go, go-remove, deno, deno-remove, ruby, ruby-remove, php, php-remove, java, java-remove, java-17, java-17-remove, java-21, java-21-remove, java-25, java-25-remove, kotlin, kotlin-remove, java-setup, git-check, git-update, rust-check, rust-update, python-check, python-update, bun-check, bun-update, golang-check, golang-update, deno-check, deno-update, ruby-check, ruby-update, php-check, php-update, openjdk-21-check or openjdk-21-update" ;;
+        *) fail "--only takes: vercel-check, vercel-update, netlify-check, netlify-update, firebase-check, firebase-update, nodejs-lts-check, nodejs-lts-update, chromium-check, chromium-update, aws, aws-remove, flyctl, flyctl-remove, vercel, vercel-remove, netlify, netlify-remove, firebase, firebase-remove, awscli-check, awscli-update, flyctl-check, flyctl-update, claude, dockito, chromium, chromium-remove, android-build, android-build-remove, android-ndk, android-ndk-remove, c-cpp, c-cpp-remove, wrangler, wrangler-remove, flutter [version], flutter-default <version>, flutter-remove-version <version>, flutter-remove, rust, rust-remove, flutter-rust, flutter-rust-remove, python, python-remove, bun, bun-remove, rust-wasm, rust-wasm-remove, go, go-remove, deno, deno-remove, ruby, ruby-remove, php, php-remove, java, java-remove, java-17, java-17-remove, java-21, java-21-remove, java-25, java-25-remove, kotlin, kotlin-remove, java-setup, git-check, git-update, rust-check, rust-update, python-check, python-update, bun-check, bun-update, golang-check, golang-update, deno-check, deno-update, ruby-check, ruby-update, php-check, php-update, openjdk-21-check, openjdk-21-update, clang-check, clang-update or apt-refresh" ;;
       esac
       case "$2" in
         git-check|rust-check) apt_check "${2%-check}"; return 0 ;;
@@ -2448,13 +2482,16 @@ main() {
         bun-update) main_apt_update Bun "bun --version" bun; return 0 ;;
         python|python-remove|bun|bun-remove|rust-wasm|rust-wasm-remove) main_pkg_tool "$2"; return 0 ;;
         # The language tiles (decision 98). Checks and updates go by package name, as AptUpdater asks.
-        golang-check|deno-check|ruby-check|php-check|openjdk-21-check) apt_check "${2%-check}"; return 0 ;;
+        golang-check|deno-check|ruby-check|php-check) apt_check "${2%-check}"; return 0 ;;
+        # The Java row follows 21, 25 and Kotlin, whichever are installed; never 17 (decision 103).
+        # shellcheck disable=SC2086
+        openjdk-21-check) apt_check $JAVA_UPDATED; return 0 ;;
         golang-update) main_apt_update Go "go version" golang; return 0 ;;
         deno-update) main_apt_update Deno "deno --version" deno; return 0 ;;
         ruby-update) main_apt_update Ruby "ruby --version" ruby; return 0 ;;
         php-update) main_apt_update PHP "php --version" php; return 0 ;;
-        # The java group stays set to 17 by hand (java_keep_17), so an update of 21 doesn't move it.
-        openjdk-21-update) main_apt_update "Java and Kotlin" "$JAVA21_HOME/bin/java -version" openjdk-21 openjdk-21-x kotlin; return 0 ;;
+        # The java group stays set to 17 by hand (java_keep_17), so an update of 21 or 25 doesn't move it.
+        openjdk-21-update) main_apt_update "Java and Kotlin" "dpkg_versions $JAVA_UPDATED" openjdk-21 openjdk-21-x openjdk-25 openjdk-25-x kotlin; return 0 ;;
         go|go-remove|deno|deno-remove|ruby|ruby-remove|php|php-remove|java|java-remove) main_pkg_tool "$2"; return 0 ;;
         # The deploy CLIs (decision 98): two package tools, three npm ones.
         awscli-check|flyctl-check) apt_check "${2%-check}"; return 0 ;;
@@ -2468,6 +2505,12 @@ main() {
         # Every tool that can get updates has an Updates row (decision 103): the npm CLIs, Node.js and Chromium.
         vercel-check|vercel-update|netlify-check|netlify-update|firebase-check|firebase-update) main_npm_tool "$2"; return 0 ;;
         nodejs-lts-check|chromium-check) apt_check "${2%-check}"; return 0 ;;
+        # C and C++ (decision 103): every package of the tool, through apt like the others.
+        # shellcheck disable=SC2086
+        clang-check) apt_check $CPP_PACKAGES; return 0 ;;
+        # shellcheck disable=SC2086
+        clang-update) main_apt_update "C and C++" "dpkg_versions $CPP_PACKAGES" $CPP_PACKAGES; return 0 ;;
+        apt-refresh) apt_index_refresh; return 0 ;;
         nodejs-lts-update) main_apt_update "Node.js and npm" node_npm_versions nodejs-lts; return 0 ;;
         chromium-update) main_apt_update "Headless Chrome" chromium_version chromium; return 0 ;;
       esac
