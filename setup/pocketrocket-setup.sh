@@ -2314,8 +2314,22 @@ npm_tool_npm_install() {
   if ! wait "$pid"; then rm -rf "$cache"; fail "npm install $pkg failed; see $PR_LOG"; fi
   rm -rf "$cache"
   hash -r 2>/dev/null || true
+  npm_tool_fix_launcher "$bin"
   out="$("$PREFIX/bin/$bin" --version 2>&1)" || fail "$bin --version failed: $out"
   ok "$pkg $(printf '%s' "$out" | tail -n 1)"
+}
+
+# npm_tool_fix_launcher <bin>: points the launcher's `#!/usr/bin/env node` at $PREFIX/bin/node, as for Wrangler. The
+# exec helper only reaches this script's children, not its own exec, and the app's logins and some Claude sessions run
+# without it, so Android (no /usr/bin/env) would refuse the file. sed works on the file npm's link points at.
+npm_tool_fix_launcher() {
+  local target first
+  target="$(readlink -f "$PREFIX/bin/$1")" || fail "$1 was not installed"
+  [ -f "$target" ] || fail "$1 was not installed"
+  IFS= read -r first <"$target" || true
+  if [[ "$first" == '#!'*'env node'* ]]; then
+    sed -i "1s|^#!.*|#!$PREFIX/bin/node|" "$target" || fail "could not fix $1's launcher"
+  fi
 }
 
 step_npm_tool_remove() {
