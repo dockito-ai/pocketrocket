@@ -180,11 +180,32 @@ class AndroidNdkTest {
         val shim = File(prefix, AndroidNdkTool.SHIM_RELATIVE)
         File(shim, AndroidNdkTool.TOOLCHAIN_RELATIVE).apply { parentFile!!.mkdirs(); writeText("") }
         File(prefix, "${AndroidNdkTool.VERSIONS_RELATIVE}/${AndroidNdkTool.REVISION}/source.properties").apply { parentFile!!.mkdirs(); writeText("") }
+        File(prefix, "${AndroidNdkTool.VERSIONS_RELATIVE}/${AndroidNdkTool.REVISION}/${AndroidNdkTool.PACKAGE_XML}").writeText("")
         File(home, AndroidNdkTool.INIT_SCRIPT_RELATIVE).apply { parentFile!!.mkdirs(); writeText("") }
         val pkgs = AndroidNdkTool.PACKAGES.associate { it.first to com.pocketrocket.termux.DpkgStatus.Package("1", null) }
         assertEquals("ndk-build missing", AndroidNdkTool.presence(prefix, home, pkgs).problem)
         File(shim, "ndk-build").writeText("")
         assertTrue(AndroidNdkTool.presence(prefix, home, pkgs).complete)
+    }
+
+    @Test fun versionFoldersWithoutPackageXmlNeedRepair() {
+        val prefix = File(dir, "p")
+        val shim = File(prefix, AndroidNdkTool.SHIM_RELATIVE)
+        File(shim, AndroidNdkTool.TOOLCHAIN_RELATIVE).apply { parentFile!!.mkdirs(); writeText("") }
+        File(shim, "ndk-build").writeText("")
+        File(home, AndroidNdkTool.INIT_SCRIPT_RELATIVE).apply { parentFile!!.mkdirs(); writeText("") }
+        val pkgs = AndroidNdkTool.PACKAGES.associate { it.first to com.pocketrocket.termux.DpkgStatus.Package("1", null) }
+        val versions = listOf(AndroidNdkTool.REVISION, "27.0.12077973").map { File(prefix, "${AndroidNdkTool.VERSIONS_RELATIVE}/$it") }
+        versions.forEach { File(it, "source.properties").apply { parentFile!!.mkdirs(); writeText("") } }
+        // Folders from before decision 104: no package.xml anywhere, then in one of the two.
+        assertEquals("NDK folders missing", AndroidNdkTool.presence(prefix, home, pkgs).problem)
+        File(versions[0], AndroidNdkTool.PACKAGE_XML).writeText("")
+        assertEquals("NDK folders missing", AndroidNdkTool.presence(prefix, home, pkgs).problem)
+        File(versions[1], AndroidNdkTool.PACKAGE_XML).writeText("")
+        assertTrue(AndroidNdkTool.presence(prefix, home, pkgs).complete)
+        // The script writes it under the same name.
+        assertEquals(0, shell("android_ndk_version_folders").first)
+        assertTrue(File(sdk, "ndk/${AndroidNdkTool.REVISION}/${AndroidNdkTool.PACKAGE_XML}").isFile)
     }
 
     @Test fun sizesIncludeCppOnlyWhenItIsMissing() {

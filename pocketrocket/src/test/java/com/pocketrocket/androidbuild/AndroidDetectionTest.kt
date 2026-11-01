@@ -82,6 +82,7 @@ class AndroidDetectionTest {
         file(File(prefix, "${AndroidNdkTool.SHIM_RELATIVE}/${AndroidNdkTool.TOOLCHAIN_RELATIVE}"))
         file(File(prefix, "${AndroidNdkTool.SHIM_RELATIVE}/ndk-build"))
         file(File(prefix, "${AndroidNdkTool.VERSIONS_RELATIVE}/28.2.13676358/source.properties"), "Pkg.Revision = 28.2.13676358\n")
+        file(File(prefix, "${AndroidNdkTool.VERSIONS_RELATIVE}/28.2.13676358/${AndroidNdkTool.PACKAGE_XML}"), "")
         file(File(home, AndroidNdkTool.INIT_SCRIPT_RELATIVE))
     }
 

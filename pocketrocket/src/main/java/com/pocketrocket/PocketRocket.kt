@@ -56,6 +56,8 @@ object PocketRocket {
         thread(name = "pocketrocket-launchers", isDaemon = true) { com.pocketrocket.setup.Launchers.refreshClaude(context) }
         // Build slots (decision 97): builds take turns so the phone keeps enough memory.
         thread(name = "pocketrocket-build-slots", isDaemon = true) { com.pocketrocket.builds.BuildSlots.refresh(context) }
+        // The flutter launcher, its shasum and Rust's rustup as this APK has them, while their add-ons are installed (decision 105).
+        thread(name = "pocketrocket-flutter-scripts", isDaemon = true) { com.pocketrocket.fluttertool.FlutterScripts.refresh(context) }
         // Gradle's Java hook (decision 101): modules asking for a newer Java than Gradle's (Capacitor's 21) get it.
         thread(name = "pocketrocket-gradle-java", isDaemon = true) { com.pocketrocket.pkgtools.GradleJdks.refreshHook(context) }
         thread(name = "pocketrocket-storage", isDaemon = true) { SharedStorage.linkIfNeeded(context) }

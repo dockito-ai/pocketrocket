@@ -29,6 +29,9 @@ object AndroidNdkTool {
     const val INIT_SCRIPT_RELATIVE = ".gradle/init.d/pocketrocket-android-ndk.gradle"
     const val TOOLCHAIN_RELATIVE = "build/cmake/android.toolchain.cmake"
 
+    /** In each version folder: the file sdkmanager writes beside an NDK, which cargokit looks for (decision 104). */
+    const val PACKAGE_XML = "package.xml"
+
     /** What the shim runs, from C and C++ (ndk-build needs make), as the tile names them. */
     val PACKAGES = listOf("clang" to "clang", "lld" to "lld", "cmake" to "CMake", "ninja" to "Ninja", "make" to "make", "ndk-sysroot" to "NDK sysroot")
 
@@ -52,13 +55,17 @@ object AndroidNdkTool {
      * The tool as it is now, whoever set it up (decision 93). It is on the phone while the shim folder is ([prefix]
      * holds it). It works when C and C++'s compilers and make are installed (dpkg), the shim has ndk-build and its
      * toolchain file, a version folder claims a revision, and Gradle has the init script ([home] holds it). A shim from
-     * before decision 96 has no ndk-build, so it reads "ndk-build missing" and Repair brings it up to date.
+     * before decision 96 has no ndk-build, so it reads "ndk-build missing" and Repair brings it up to date. Version
+     * folders from before decision 104 have no [PACKAGE_XML], so they read "NDK folders missing" and Repair writes it
+     * (decision 105).
      */
     fun presence(prefix: File, home: File, pkgs: Map<String, DpkgStatus.Package>): ToolPresence {
         val shim = File(prefix, SHIM_RELATIVE)
         if (!shim.isDirectory) return ToolPresence.Absent
-        val versions = File(prefix, VERSIONS_RELATIVE).listFiles()?.filter { File(it, "source.properties").isFile }?.map { it.name }.orEmpty()
-        val folders = File(shim, TOOLCHAIN_RELATIVE).isFile && servedVersions(versions).isNotEmpty()
+        val versionsDir = File(prefix, VERSIONS_RELATIVE)
+        val served = servedVersions(versionsDir.listFiles()?.filter { File(it, "source.properties").isFile }?.map { it.name }.orEmpty())
+        val folders = File(shim, TOOLCHAIN_RELATIVE).isFile && served.isNotEmpty() &&
+            served.all { File(versionsDir, "$it/$PACKAGE_XML").isFile }
         return ToolPresence.of(
             true,
             ToolPresence.missingPackages(pkgs, PACKAGES) + listOfNotNull(
