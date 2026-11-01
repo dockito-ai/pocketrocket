@@ -1,14 +1,17 @@
 package com.pocketrocket.updates
 
 import android.content.Context
+import com.pocketrocket.clilogin.CliLogins
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -28,6 +31,8 @@ data class UpdatesState(
     val done: Int = 0,
 ) {
     val available: Int get() = rows.count { it.available }
+    /** How many Update all would start now: out of date and not held by a sign-in. */
+    val ready: Int get() = rows.count { it.ready }
     val updating: Boolean get() = current != null
     val total: Int get() = done + queued.size + (if (current != null) 1 else 0)
     /** Every row has an answer from a check (cached or this run). */
@@ -45,14 +50,20 @@ object Updates {
 
     /** One per [UpdateComponent], in its order. */
     val sources: List<UpdateSource> = (
-        listOf(AppSource, ClaudeSource, GitSource, NodeSource, DockitoSource, FlutterSource, RustSource, ChromiumSource, WranglerSource) +
+        listOf(AppSource, ClaudeSource, GitSource, NodeSource, DockitoSource, FlutterSource, RustSource, CppSource, ChromiumSource, WranglerSource) +
             PackageToolSources + NpmSources
         ).sortedBy { it.component.ordinal }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val control = MutableStateFlow(UpdatesState())
 
-    private val rows = combine(sources.map { it.row }) { rows -> rows.filter { it.shown } }
+    /** The rows whose tool's login is running now ([UpdateComponent.login]). */
+    private val signingIn: Flow<Set<UpdateComponent>> = UpdateComponent.entries.mapNotNull { c ->
+        c.login?.let { spec -> CliLogins.of(spec).state.map { if (it.busy) c else null } }
+    }.let { flows -> combine(flows) { busy -> busy.filterNotNull().toSet() } }
+
+    private val rows = combine(sources.map { it.row }) { it.toList() }
+        .combine(signingIn) { rows, busy -> holdSigningIn(rows, busy).filter { it.shown } }
 
     val state: StateFlow<UpdatesState> = rows
         .combine(control) { rows, c -> c.copy(rows = rows) }
@@ -73,7 +84,7 @@ object Updates {
         if (System.currentTimeMillis() - control.value.checkedAt >= checkAfterMs) checkAll(app)
     }
 
-    /** Check now: asks every source in parallel. Not while updating. */
+    /** Check now: asks every source in parallel, the apt rows after one shared apt-get update ([AptIndex]). Not while updating. */
     fun checkAll(context: Context) {
         val app = context.applicationContext
         synchronized(this) {
@@ -81,7 +92,10 @@ object Updates {
             control.update { it.copy(checking = true) }
         }
         scope.launch {
-            sources.map { source -> async { runCatching { source.check(app) } } }.awaitAll()
+            val index = AptIndex.of(app)
+            sources.map { source ->
+                async { runCatching { if (source is AptSource) source.check(app, index) else source.check(app) } }
+            }.awaitAll()
             val now = System.currentTimeMillis()
             app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putLong(KEY_CHECKED_AT, now).apply()
             control.update { it.copy(checking = false, checkedAt = now) }
@@ -97,18 +111,22 @@ object Updates {
     /** Update on one row. Joins the queue when another update is running. */
     fun update(context: Context, component: UpdateComponent) = update(context, listOf(component))
 
-    /** Update all: every row that is out of date, PocketRocket last. */
-    fun updateAll(context: Context) = update(context, state.value.rows.filter { it.available }.map { it.component })
+    /** Update all: every row that is out of date and not held by a sign-in, PocketRocket last. */
+    fun updateAll(context: Context) = update(context, pending())
 
     /** The components [updateAll] would run, in order. */
-    fun pending(): List<UpdateComponent> = updateOrder(state.value.rows.filter { it.available }.map { it.component })
+    fun pending(): List<UpdateComponent> = updateOrder(state.value.rows.filter { it.ready }.map { it.component })
 
-    /** Runs [components] one at a time after anything already queued. The caller has asked about PocketRocket first. */
+    /**
+     * Runs [components] one at a time after anything already queued. The caller has asked about PocketRocket first.
+     * One whose login is running stays out: its tool's job wouldn't start, and the row says it's signing in.
+     */
     fun update(context: Context, components: List<UpdateComponent>) {
         val app = context.applicationContext
+        val held = signingInNow()
         synchronized(this) {
             control.update { c ->
-                val waiting = updateOrder((c.queued + components).distinct().filter { it != c.current })
+                val waiting = updateOrder((c.queued + components.filter { it !in held }).distinct().filter { it != c.current })
                 c.copy(queued = waiting)
             }
             if (runner?.isActive != true) runner = scope.launch { runQueue(app) }
@@ -128,8 +146,16 @@ object Updates {
                     head
                 }
             } ?: return
-            runCatching { sources.first { it.component == next }.update(context) }
+            // A sign-in that started while it waited holds it too; the row stays out of date and says why.
+            if (next !in signingInNow()) runCatching { sources.first { it.component == next }.update(context) }
             control.update { it.copy(done = it.done + 1) }
         }
     }
+
+    private fun signingInNow(): Set<UpdateComponent> =
+        UpdateComponent.entries.filter { c -> c.login?.let { CliLogins.of(it).state.value.busy } == true }.toSet()
 }
+
+/** [rows] with [busy]'s marked as signing in: their Update waits for the login. */
+internal fun holdSigningIn(rows: List<UpdateRow>, busy: Set<UpdateComponent>): List<UpdateRow> =
+    rows.map { if (it.component in busy) it.copy(signingIn = true) else it }

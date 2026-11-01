@@ -114,6 +114,12 @@ enum class PackageTool(
     /** [packages] and [extras]: what it is on the phone. */
     private val shown: List<Pair<String, String>> get() = packages + extras
 
+    /**
+     * What its Updates row follows, with names: its main package; for Java every JDK and Kotlin the tile covers (21, 25
+     * and Kotlin, whichever are installed), never Java 17, the Android tool's ([NEVER_REMOVED]).
+     */
+    val updated: List<Pair<String, String>> get() = if (this == Java) shown.filter { it.first !in NEVER_REMOVED } else packages.take(1)
+
     /** Every package worth reading from dpkg for this tool: its own, the one that holds part of it, and [alsoWatched]. */
     val watched: Set<String> get() = shown.map { it.first }.toSet() + listOfNotNull(heldBy?.pkg) + alsoWatched
 

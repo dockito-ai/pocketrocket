@@ -55,6 +55,16 @@ class UninstallLeftoversTest {
         )
     }
 
+    @Test fun uvsFoldersFollowXdgLikeTheRest() {
+        if (!script.exists()) return
+        val cache = file("xdg-cache/uv/a")
+        val data = file("xdg-data/uv/tools/ruff/a")
+        val (exit, out) = shell("XDG_CACHE_HOME=\"${'$'}HOME/xdg-cache\" XDG_DATA_HOME=\"${'$'}HOME/xdg-data\"; pkg_tool_cleanup python")
+        assertEquals(out, 0, exit)
+        assertFalse(cache.exists())
+        assertFalse(data.exists())
+    }
+
     @Test fun bunDenoAndPhpTakeTheirFolders() {
         if (!script.exists()) return
         cleanup("bun", file(".bun/install/cache/a"), file(".bun/bin/cowsay"), file(".bunfig.toml"))

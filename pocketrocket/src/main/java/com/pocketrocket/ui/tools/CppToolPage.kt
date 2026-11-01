@@ -11,6 +11,8 @@ import com.pocketrocket.androidbuild.AndroidNdk
 import com.pocketrocket.cpp.Cpp
 import com.pocketrocket.cpp.CppTool
 import com.pocketrocket.ui.components.OutlineButton
+import com.pocketrocket.updates.UpdateComponent
+import com.pocketrocket.updates.Updates
 
 /**
  * Settings → Tools → C and C++ (decision 96): Termux's compilers and build tools for any C or C++ project, with
@@ -21,14 +23,16 @@ fun CppToolPage(onBack: () -> Unit, onOpenNdk: () -> Unit) {
     val context = LocalContext.current
     val s by Cpp.state.collectAsState()
     val ndk by AndroidNdk.state.collectAsState()
+    val updates by Updates.state.collectAsState()
     LaunchedEffect(Unit) {
         Cpp.refresh()
         AndroidNdk.refresh()
+        Updates.onAppOpen(context, checkAfterMs = 10 * 60_000L)
     }
 
     ToolPage(
         spec = Tool.Cpp.spec,
-        state = ToolStates.scriptTool(s),
+        state = ToolStates.cpp(s, updates.rows.firstOrNull { it.component == UpdateComponent.Cpp }),
         icon = Tool.Cpp.icon,
         purpose = "Build C and C++ projects on this device.",
         onBack = onBack,
@@ -44,7 +48,8 @@ fun CppToolPage(onBack: () -> Unit, onOpenNdk: () -> Unit) {
                 (if (ndk.installed) " The Android NDK needs them, so it goes too." else "") + " Your projects and their build folders stay.",
             blocked = if (ndk.running) ({ BusyButton("Android NDK is busy…") }) else null,
         ),
-        storageRows = listOf("Packages" to CppTool.PACKAGES.joinToString(", ")),
+        update = toolUpdate(context, updates, UpdateComponent.Cpp),
+        storageRows = listOf("Packages" to CppTool.PACKAGES.joinToString(", ") { it.first }),
     ) {
         if (s.installed) {
             ToolCard("HOW TO BUILD") {
@@ -61,7 +66,7 @@ fun CppToolPage(onBack: () -> Unit, onOpenNdk: () -> Unit) {
                 )
             }
             ToolCard("WHAT IT IS") {
-                ToolText("Termux's packages: clang and LLVM, lld, CMake, Ninja, make, pkg-config and lldb. One version, moved by pkg upgrade. Programs it builds run on this phone (arm64 Android).")
+                ToolText("Termux's packages: clang and LLVM, lld, CMake, Ninja, make, pkg-config and lldb. One version of each, kept current from Settings › Updates. Programs it builds run on this phone (arm64 Android).")
             }
         }
         ToolCard("ANDROID APPS") {

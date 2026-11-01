@@ -30,7 +30,7 @@ class NpmSource(private val tool: NpmTool) : UpdateSource {
             component, installed = s.version(tool), latest = latest, available = s.updateAvailable(tool), checking = tool in s.checking,
             job = job, jobTitle = latest?.let { "Updating to $it" },
             outcome = if (job != null && s.failed) Outcome(s.outcome ?: "Stopped.", failed = true) else null,
-            steps = tool.updateSteps,
+            steps = tool.updateSteps, checkFailed = tool in s.checkFailed,
         )
     }
 

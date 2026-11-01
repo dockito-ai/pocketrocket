@@ -144,8 +144,9 @@ class SettingsTools(private val host: ToolHost) : ToolSet() {
     private fun describe(row: UpdateRow) = "${row.component.label}: " + when {
         row.running -> "updating"
         row.installed == null -> "not installed"
+        row.available && row.signingIn -> "${row.installed}, ${row.latest} is out; it can update once its sign-in ends"
         row.available -> "${row.installed}, ${row.latest} is out"
-        row.latest == null -> "${row.installed}, newest unknown"
+        row.latest == null || row.checkFailed -> "${row.installed}, newest unknown"
         else -> "${row.installed}, up to date"
     }
 
@@ -157,7 +158,7 @@ class SettingsTools(private val host: ToolHost) : ToolSet() {
             if (found.size != 1) throw ToolRefused("It's one of ${UpdateComponent.entries.joinToString { it.label }}, or all.")
             found
         }
-        val ready = named.filter { it.available }
+        val ready = named.filter { it.ready }
         if (ready.isEmpty()) return ok((named.firstOrNull()?.let { "${describe(it)}." } ?: "Everything's up to date.") + " check_updates looks again.")
         val updatingApp = ready.any { it.component == UpdateComponent.PocketRocket }
         // Android's permission screen is for him to open, and it's the Updates page that waits for the answer.

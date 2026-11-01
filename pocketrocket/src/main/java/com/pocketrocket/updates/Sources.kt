@@ -81,20 +81,24 @@ object ClaudeSource : UpdateSource {
     }
 }
 
-/** A Termux package through apt, `--only <package>-update`: Git, and Rust from the Rust tool. */
+/** Termux packages through apt, `--only <package>-update`: Git, Rust, Node.js, Chromium, C and C++, the package tools. */
 class AptSource(override val component: UpdateComponent, private val updater: AptUpdater) : UpdateSource {
     override val row = updater.state.map { s ->
-        val latest = AptPolicy.display(s.policy?.candidate)
+        val latest = s.policy?.shownCandidate
         UpdateRow(
-            component, installed = AptPolicy.display(s.policy?.installed), latest = latest,
+            component, installed = s.policy?.shownInstalled, latest = latest,
             available = s.policy?.updateAvailable == true, checking = s.checking,
             job = s.job, jobTitle = latest?.let { "Updating to $it" }, outcome = s.outcome, steps = updater.steps,
+            checkFailed = s.checkFailed,
         )
     }
 
     override fun load(context: Context) = updater.load(context)
 
-    override suspend fun check(context: Context) = withContext(Dispatchers.IO) { updater.checkBlocking(context) }
+    override suspend fun check(context: Context) = check(context, AptIndex.of(context))
+
+    /** A check that shares [index]'s one apt-get update with the other apt rows (Check now). */
+    suspend fun check(context: Context, index: AptIndex) = withContext(Dispatchers.IO) { updater.checkBlocking(context, index) }
 
     override suspend fun update(context: Context) {
         if (updater.state.value.policy?.updateAvailable != true) return
@@ -110,6 +114,9 @@ val NodeSource = AptSource(UpdateComponent.Node, NodeUpdater)
 
 /** Headless Chrome's Chromium (decision 103), while it's installed. */
 val ChromiumSource = AptSource(UpdateComponent.Chromium, ChromiumUpdater)
+
+/** C and C++ (decision 103), while clang is installed. */
+val CppSource = AptSource(UpdateComponent.Cpp, CppUpdater)
 
 /** Rust shows only while `rust` is installed (dpkg): no installed version otherwise, and Check now skips its apt-get update. */
 val RustSource = AptSource(UpdateComponent.Rust, RustUpdater)
@@ -173,7 +180,7 @@ object DockitoSource : UpdateSource {
     override val row = Dockito.state.map { s ->
         UpdateRow(
             component, installed = s.installed, latest = s.latest?.version, available = s.updateAvailable, checking = s.checking,
-            job = s.job, jobTitle = s.jobTitle, outcome = s.outcome, steps = STEPS,
+            job = s.job, jobTitle = s.jobTitle, outcome = s.outcome, steps = STEPS, checkFailed = s.checkFailed,
         )
     }
 

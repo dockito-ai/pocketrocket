@@ -67,7 +67,10 @@ enum class Tool(val spec: ToolSpec, val route: String, val pkg: PackageTool? = n
     ),
     Android(ToolSpec("Android", ToolKind.Optional, downloadMb = AndroidBuildTool.DOWNLOAD_MB, installedMb = AndroidBuildTool.INSTALLED_MB), Routes.TOOL_ANDROID_BUILD),
     AndroidNdk(ToolSpec("Android NDK", ToolKind.Optional, downloadMb = AndroidNdkTool.DOWNLOAD_MB, installedMb = AndroidNdkTool.INSTALLED_MB), Routes.TOOL_ANDROID_NDK),
-    Cpp(ToolSpec("C and C++", ToolKind.Optional, downloadMb = CppTool.DOWNLOAD_MB, installedMb = CppTool.INSTALLED_MB), Routes.TOOL_CPP),
+    Cpp(
+        ToolSpec("C and C++", ToolKind.Optional, hasVersion = true, canUpdate = true, downloadMb = CppTool.DOWNLOAD_MB, installedMb = CppTool.INSTALLED_MB),
+        Routes.TOOL_CPP,
+    ),
     Wrangler(
         ToolSpec("Wrangler", ToolKind.Optional, hasVersion = true, canUpdate = true, needsLogin = true, downloadMb = WranglerTool.DOWNLOAD_MB, installedMb = WranglerTool.INSTALLED_MB),
         Routes.TOOL_WRANGLER,
@@ -145,6 +148,7 @@ val UpdateComponent.tool: Tool? get() = when (this) {
     UpdateComponent.Dockito -> Tool.Dockito
     UpdateComponent.Flutter -> Tool.Flutter
     UpdateComponent.Rust -> Tool.Rust
+    UpdateComponent.Cpp -> Tool.Cpp
     UpdateComponent.Chromium -> Tool.Chromium
     UpdateComponent.Wrangler -> Tool.Wrangler
     else -> Tool.entries.first { (packageTool != null && it.pkg == packageTool) || (npmTool != null && it.npm == npmTool) }
@@ -197,7 +201,11 @@ object ToolStates {
         versions = listOfNotNull(row?.installed?.let { "Chromium" to it }, "Chrome DevTools MCP" to ChromiumMcp.MCP_VERSION),
     ).withRow(row)
 
-    /** A tool installed and removed by the setup script alone (Android, C and C++). */
+    /** C and C++: installed and removed by the setup script; its version and update from its Updates row ([row]). */
+    fun cpp(s: ScriptToolState, row: UpdateRow?) =
+        scriptTool(s).copy(versions = listOfNotNull(row?.installed?.let { "Installed" to it })).withRow(row)
+
+    /** A tool installed and removed by the setup script alone (Android, the Android NDK). */
     fun scriptTool(s: ScriptToolState) = ToolState(
         installed = s.installed,
         checked = s.checked,
@@ -368,7 +376,7 @@ fun rememberTools(): List<Pair<Tool, ToolState>> {
         Tool.Chromium to ToolStates.chromium(chromium, row(UpdateComponent.Chromium)),
         Tool.Android to ToolStates.scriptTool(android),
         Tool.AndroidNdk to ToolStates.ndk(ndk, android.installed),
-        Tool.Cpp to ToolStates.scriptTool(cpp),
+        Tool.Cpp to ToolStates.cpp(cpp, row(UpdateComponent.Cpp)),
         Tool.Wrangler to ToolStates.wrangler(wrangler, logins.getValue(Tool.Wrangler), row(UpdateComponent.Wrangler)),
         Tool.Flutter to ToolStates.flutter(flutter, row(UpdateComponent.Flutter)),
         Tool.Rust to ToolStates.rust(flutter, row(UpdateComponent.Rust), packages.running && packages.isFor(PackageTool.RustWasm)),

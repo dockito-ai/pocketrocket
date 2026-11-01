@@ -174,7 +174,7 @@
 <tr><td>Wrangler</td><td>The version this PocketRocket pins</td><td>The install again, once the pin is newer than the phone. The check asks nothing (decision 103)</td></tr>
 <tr><td>Vercel, Netlify, Firebase</td><td>npm's registry</td><td><code>npm view</code> on Check now, <code>npm install -g &lt;package&gt;@latest</code> on Update. Logins stay. Never a downgrade (decision 103)</td></tr>
 </table>
-<p class="note">All of them are on one Updates screen (decision 41). Every tool in Settings › Tools has a row except Android, the Android NDK and C and C++, whose pins move with the app (decision 103). Nothing installs on its own.</p>
+<p class="note">All of them are on one Updates screen (decision 41). Every tool in Settings › Tools has a row except Android and the Android NDK, whose pins move with the app (decision 103). The apt rows share one <code>apt-get update</code> per Check now (<code>AptIndex</code>, <code>--only apt-refresh</code>). Nothing installs on its own.</p>
 
 <h2>9. Design rules</h2>
 <ul>

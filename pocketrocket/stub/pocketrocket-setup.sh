@@ -94,6 +94,8 @@ if [ "${1:-}" = --only ] && [ "${2:-}" = android-ndk-remove ]; then
 fi
 # Settings > Updates: --only git-check prints apt-cache policy; --only git-update fakes the apt phases.
 # echo 2.51.1 > ~/.pocketrocket/stub-git-candidate offers an update (the stub's git is 2.51.0 until updated).
+# Check now refreshes apt's index once (--only apt-refresh) before the rows' checks; nothing to fake.
+if [ "${1:-}" = --only ] && [ "${2:-}" = apt-refresh ]; then exit 0; fi
 if [ "${1:-}" = --only ] && [ "${2:-}" = git-check ]; then
   have="$(cat "$HOME/.pocketrocket/stub-git-installed" 2>/dev/null || echo 2.51.0)"
   want="$(cat "$HOME/.pocketrocket/stub-git-candidate" 2>/dev/null || echo "$have")"
