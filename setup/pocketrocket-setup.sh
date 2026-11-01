@@ -943,7 +943,6 @@ ANDROID_REPO_URL=https://dl.google.com/android/repository
 ANDROID_PROFILE="${PREFIX:-}/etc/profile.d/pocketrocket-android-build.sh"
 ANDROID_ADDED_FILE="$PR_HOME/android-build.packages"   # what this tool installed, so uninstall removes only that
 ANDROID_BASELINE_FILE="$PR_HOME/android-build.baseline" # the packages before a run, until its apt step is recorded
-ANDROID_MARKER=.pocketrocket-installed                 # AndroidBuildTool.INSTALLED_MARKER: the app's "installed" test
 ANDROID_GRADLE_BEGIN="# >>> PocketRocket Android build (removed on uninstall)"
 ANDROID_GRADLE_END="# <<< PocketRocket Android build"
 
@@ -952,6 +951,18 @@ verify_sha1() {
   local have
   have="$(sha1sum "$1" 2>/dev/null | awk '{print $1}')"
   [ -n "$have" ] && [ "$have" = "$2" ]
+}
+
+# android_sdk_ready: the Android tool's SDK can build, whoever set it up: Java, a platform and build tools the plugin
+# recognises. No flag is written at install; the app reads the same pieces (AndroidBuildTool.presence).
+android_sdk_ready() {
+  local p b
+  [ -x "$ANDROID_JAVA_HOME/bin/java" ] || return 1
+  for p in "$ANDROID_SDK_DIR"/platforms/*/package.xml; do
+    [ -f "$p" ] || continue
+    for b in "$ANDROID_SDK_DIR"/build-tools/*/package.xml; do [ -f "$b" ] && return 0; done
+  done
+  return 1
 }
 
 # android_package_xml <dir> <sdk path> <major> <minor> <micro> <display name> [platform api level] [extension level]
@@ -1019,7 +1030,7 @@ step_android_packages() {
   step "Installing Java, Gradle and build tools"
   apt_refresh
   # The baseline goes once recorded, so a later run never counts what other tools (Flutter & Rust) added since.
-  packages_baseline "$ANDROID_BASELINE_FILE"
+  packages_baseline "$ANDROID_BASELINE_FILE" "$ANDROID_ADDED_FILE"
   # Java 17 goes first: gradle accepts any JDK, and on its own apt would pick 21.
   apt_install_progress openjdk-17
   apt_install_progress $ANDROID_BUILD_PACKAGES
@@ -1068,7 +1079,6 @@ step_android_wire() {
   mkdir -p "$(dirname "$ANDROID_PROFILE")"
   printf '%s\n' "# Written by PocketRocket's Android build tool. Removed on uninstall." \
     "export JAVA_HOME=$ANDROID_JAVA_HOME" "export ANDROID_HOME=$ANDROID_SDK_DIR" >"$ANDROID_PROFILE"
-  touch "$ANDROID_SDK_DIR/$ANDROID_MARKER"
   ok "ANDROID_HOME, JAVA_HOME and aapt2 set for every session"
   printf '[done]\n'
 }
@@ -1297,9 +1307,9 @@ android_ndk_remove_folders() {
 
 step_android_ndk_packages() {
   step "Installing clang, CMake and Ninja"
-  [ -f "$ANDROID_SDK_DIR/$ANDROID_MARKER" ] || fail "Install the Android tool first."
+  android_sdk_ready || fail "Install the Android tool first."
   apt_refresh
-  packages_baseline "$ANDROID_NDK_BASELINE_FILE"
+  packages_baseline "$ANDROID_NDK_BASELINE_FILE" "$ANDROID_NDK_ADDED_FILE"
   # shellcheck disable=SC2086
   apt_install_progress $ANDROID_NDK_PACKAGES
   local b
@@ -1314,7 +1324,6 @@ step_android_ndk_wire() {
   step "Setting up the NDK folders"
   android_ndk_make_shim
   android_ndk_write_init_script "$ANDROID_NDK_INIT_SCRIPT"
-  touch "$ANDROID_NDK_SHIM_DIR/$ANDROID_MARKER"
   ok "NDK versions ready: $ANDROID_NDK_VERSIONS"
   printf '[done]\n'
 }
@@ -1396,7 +1405,6 @@ dockito_check() {
 WRANGLER_VERSION="4.156.0"
 WRANGLER_NODE_MIN=22
 WRANGLER_DIR="${PREFIX:-}/lib/node_modules/wrangler"
-WRANGLER_MARKER=".pocketrocket-installed"
 WRANGLER_CONFIG="$HOME/.config/.wrangler"   # Wrangler's own folder, with its login, logs and telemetry choice
 # The workerd that wrangler@WRANGLER_VERSION pins. Bumping Wrangler means building its workerd first: ports/workerd/README.md.
 WORKERD_VERSION="1.20261023.1"
@@ -1491,7 +1499,6 @@ step_wrangler_check() {
   [ -s "$d/out/index.js" ] || { rm -rf "$d"; fail "wrangler deploy --dry-run built nothing"; }
   wrangler_dev_check "$d" || { rm -rf "$d"; fail "wrangler dev did not answer a request"; }
   rm -rf "$d"
-  : > "$WRANGLER_DIR/$WRANGLER_MARKER"
   ok "wrangler deploy --dry-run and wrangler dev work"
   printf '[done]\n'
 }
@@ -1526,7 +1533,6 @@ FLUTTER_RELEASES="https://storage.googleapis.com/flutter_infra_release/releases/
 FLUTTER_HOME="$HOME/fvm"                                # FVM's cache folder; FlutterTool.FVM_RELATIVE
 FLUTTER_VERSIONS="$FLUTTER_HOME/versions"
 FLUTTER_DEFAULT="$FLUTTER_HOME/default"                 # FVM's global version: a link to versions/<version>
-FLUTTER_MARKER="$FLUTTER_HOME/.pocketrocket-installed"  # FlutterTool.INSTALLED_MARKER
 FLUTTER_PACKAGES="which unzip"                          # flutter doctor needs which; the Dart SDK download needs unzip
 FLUTTER_ADDED_FILE="$PR_HOME/flutter.packages"
 FLUTTER_BASELINE_FILE="$PR_HOME/flutter.baseline"
@@ -1587,11 +1593,14 @@ watch_file() {
   done
 }
 
-# packages_baseline <file> / packages_record <baseline> <added>: what an install brings in, so its uninstall removes
-# only that. The baseline lives only from a run's apt step to its record (a Retry after apt stopped reuses it). The
-# record adds what this run brought to the list, never drops what an earlier run added, and deletes the baseline, so
-# a later run never counts what other tools installed in between. Same helpers as the Android tools.
-packages_baseline() { [ -f "$1" ] || android_installed_packages >"$1"; }
+# packages_baseline <file> [added] / packages_record <baseline> <added>: what an install brings in, so its uninstall
+# removes only that. The baseline lives only from a run's apt step to its record (a Retry after apt stopped reuses it).
+# The record adds what this run brought to the list, never drops what an earlier run added, and deletes the baseline,
+# so a later run never counts what other tools installed in between. Same helpers as the Android tools.
+packages_baseline() { [ -z "${2:-}" ] || packages_drop_stale "$1" "$2"; [ -f "$1" ] || android_installed_packages >"$1"; }
+# packages_drop_stale <baseline> <added>: a baseline older than the tool's list was left by an install from before the
+# record deleted it; a Repair or an uninstall using it would count every package added since as this tool's.
+packages_drop_stale() { if [ -f "$1" ] && [ "$2" -nt "$1" ]; then rm -f "$1"; fi; }
 packages_record() {
   local now="$TMPDIR/pocketrocket-packages.now" list="$TMPDIR/pocketrocket-packages.list"
   android_installed_packages >"$now"
@@ -1619,8 +1628,8 @@ packages_hand_over() {
 
 # Whether each tool is on the phone, finished or not, for packages_hand_over.
 android_build_present() { [ -d "$ANDROID_SDK_DIR" ] || [ -f "$ANDROID_ADDED_FILE" ]; }
-# FlutterRust.flutterInstalled: the marker, or what a failed install left (FVM, or the package list).
-flutter_present() { [ -f "$FLUTTER_MARKER" ] || [ -d "$FVM_DIR" ] || [ -f "$FLUTTER_ADDED_FILE" ] || [ -f "$FLUTTER_BASELINE_FILE" ]; }
+# Flutter is there, working or not (FlutterTool.presence reads the same pieces): versions, FVM, or a failed install's list.
+flutter_present() { [ -d "$FLUTTER_VERSIONS" ] || [ -d "$FVM_DIR" ] || [ -f "$FLUTTER_ADDED_FILE" ] || [ -f "$FLUTTER_BASELINE_FILE" ]; }
 
 # The launchers: flutter from setup/flutter, with dart and fvm links to it. As fvm it runs FVM's own Dart (prepared
 # like Flutter's) and makes ready the versions FVM installs or runs.
@@ -1636,7 +1645,7 @@ step_flutter_helpers() {
   local out tgz="$TMPDIR/fvm-$FVM_VERSION.tar.gz" d="$TMPDIR/fvm-unpack"
   # shellcheck disable=SC2086
   [ -z "$(missing_packages $FLUTTER_PACKAGES)" ] || apt_refresh
-  packages_baseline "$FLUTTER_BASELINE_FILE"
+  packages_baseline "$FLUTTER_BASELINE_FILE" "$FLUTTER_ADDED_FILE"
   # shellcheck disable=SC2086
   apt_install_progress $FLUTTER_PACKAGES
   packages_record "$FLUTTER_BASELINE_FILE" "$FLUTTER_ADDED_FILE"
@@ -1722,7 +1731,6 @@ step_flutter_setup() {
   if [ ! -e "$FLUTTER_DEFAULT/bin/flutter" ] || [ "${POCKETROCKET_FLUTTER_DEFAULT:-0}" = 1 ]; then
     flutter_set_default "$FLUTTER_VERSION"
   fi
-  : >"$FLUTTER_MARKER"
   # An update from Settings › Updates replaces the default: the old one goes once the new one works, only if it was
   # the default, and other versions stay. A project that pins it gets it back with `fvm install <version>`.
   if [ -n "$replace" ] && [ "$replace" = "$old" ] && [ "$replace" != "$FLUTTER_VERSION" ] && flutter_version_name_ok "$replace" \
@@ -1803,6 +1811,7 @@ step_flutter_remove() {
   while IFS= read -r p; do rm -rf "${p:?}"; done < <(flutter_remove_paths)
   rmdir "$PREFIX/opt" "$HOME/.config" 2>/dev/null || true
   # A run that stopped inside apt left a baseline it didn't record yet.
+  packages_drop_stale "$FLUTTER_BASELINE_FILE" "$FLUTTER_ADDED_FILE"
   if [ -f "$FLUTTER_BASELINE_FILE" ]; then packages_record "$FLUTTER_BASELINE_FILE" "$FLUTTER_ADDED_FILE"; fi
   # shellcheck disable=SC2086
   if android_build_present; then packages_hand_over "$FLUTTER_ADDED_FILE" "$ANDROID_ADDED_FILE" $ANDROID_BUILD_PACKAGES; fi
@@ -1815,7 +1824,7 @@ step_rust_install() {
   step "Installing Rust"
   local out
   apt_refresh
-  packages_baseline "$RUST_BASELINE_FILE"
+  packages_baseline "$RUST_BASELINE_FILE" "$RUST_ADDED_FILE"
   # shellcheck disable=SC2086
   apt_install_progress $RUST_PACKAGES
   hash -r 2>/dev/null || true
@@ -1919,6 +1928,7 @@ pkg_tool_kept_line() {
 pkg_tool_purge() {
   local name="$1" added="$PR_HOME/$1.packages" baseline="$PR_HOME/$1.baseline" list="$PR_HOME/$1.remove" p kept="" main sim
   local companions; companions="$(pkg_tool_companions "$name")"
+  packages_drop_stale "$baseline" "$added"
   if [ -f "$baseline" ]; then packages_record "$baseline" "$added"; fi
   # shellcheck disable=SC2046
   { if [ -f "$added" ]; then cat "$added"; fi; printf '%s\n' $(pkg_tool_packages "$name"); } | sed '/^$/d' | sort -u >"$list"
@@ -1941,7 +1951,7 @@ step_pkg_tool_install() {
   step "Installing $(pkg_tool_title "$name")"
   if [ "$name" = rust-wasm ] && ! pkg_installed rust; then fail "Rust isn't installed; install Rust first"; fi
   apt_refresh
-  packages_baseline "$PR_HOME/$name.baseline"
+  packages_baseline "$PR_HOME/$name.baseline" "$PR_HOME/$name.packages"
   # shellcheck disable=SC2046
   apt_install_progress $(pkg_tool_packages "$name")
   packages_record "$PR_HOME/$name.baseline" "$PR_HOME/$name.packages"

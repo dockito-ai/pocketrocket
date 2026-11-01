@@ -137,13 +137,18 @@ fun ToolPage(
             }
         }
 
-        Column(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 20.dp)) {
+        Column(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             when {
                 ToolSection.Install !in sections -> Note("Comes with PocketRocket. Setup installs it, and it stays.")
                 install == null -> Unit
                 state.job == ToolJob.Installing || state.job == ToolJob.Uninstalling -> BusyButton(if (install.removing) "Uninstalling…" else "Installing…")
                 install.blocked != null -> install.blocked.invoke()
                 failed -> AccentButton("Retry", onClick = install.onRetry, height = 48.dp, radius = 12.dp)
+                // Something was taken away (or never finished): Repair runs the install again, which puts back what's missing.
+                state.installed && state.problem != null -> {
+                    AccentButton("Repair", onClick = install.onInstall, height = 48.dp, radius = 12.dp)
+                    DangerButton("Uninstall", onClick = { if (!install.holdUninstall) confirm = true })
+                }
                 state.installed -> DangerButton("Uninstall", onClick = { if (!install.holdUninstall) confirm = true })
                 else -> AccentButton("Install", onClick = install.onInstall, height = 48.dp, radius = 12.dp, enabled = state.checked)
             }

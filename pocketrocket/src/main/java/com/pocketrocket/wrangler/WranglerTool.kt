@@ -1,19 +1,50 @@
 package com.pocketrocket.wrangler
 
+import com.pocketrocket.setup.ToolPresence
+import org.json.JSONObject
+import java.io.File
+
 /** The fixed facts of the Wrangler tool (decisions 49 and 82), and what its output means. Sizes are measured on the emulator. */
 object WranglerTool {
     /** The version the setup script pins; shown on the page. */
     const val VERSION = "4.156.0"
 
-    /** Inside the package folder; the setup script writes it last, so it means the whole install finished. */
-    const val INSTALLED_MARKER = ".pocketrocket-installed"
+    /** npm's global folder for it, under $PREFIX, whoever ran `npm install -g wrangler`. */
     const val PACKAGE_RELATIVE = "lib/node_modules/wrangler"
 
     /** The workerd Wrangler pins, built for Android with tcmalloc off (ports/workerd). */
     const val WORKERD_VERSION = "1.20261023.1"
 
-    /** The Android build of workerd inside the package folder, put there by the setup script. */
-    const val WORKERD_RELATIVE = "node_modules/workerd/lib/workerd-glibc"
+    /** workerd's npm package inside Wrangler's folder. */
+    const val WORKERD_PACKAGE_RELATIVE = "node_modules/workerd"
+
+    /** The Android build of workerd and the wrapper that runs it, put there by the setup script; and workerd's loader. */
+    const val WORKERD_RELATIVE = "$WORKERD_PACKAGE_RELATIVE/lib/workerd-glibc"
+    const val WORKERD_WRAPPER_RELATIVE = "$WORKERD_PACKAGE_RELATIVE/lib/workerd-android"
+    const val WORKERD_LOADER_RELATIVE = "$WORKERD_PACKAGE_RELATIVE/lib/main.js"
+
+    /** The line the setup script adds to workerd's loader (wrangler_patch_workerd). Without it Wrangler won't start on Android. */
+    const val LOADER_PATCH = "\"workerd-android\""
+
+    /**
+     * Wrangler as it is now, whoever installed it. It is on the phone while npm's folder for it is ([dir]). Wrangler
+     * from a plain `npm install -g wrangler` lacks the loader line, so it won't start here; with the line but without
+     * the Android workerd (an install from before local dev) it deploys but `wrangler dev` can't run. Repair runs the
+     * tool's install, which puts in its pinned version with both.
+     */
+    fun presence(dir: File): ToolPresence {
+        if (!File(dir, "package.json").isFile) return ToolPresence.Absent
+        val patched = runCatching { File(dir, WORKERD_LOADER_RELATIVE).readText() }.getOrNull()?.contains(LOADER_PATCH) == true
+        return when {
+            !patched -> ToolPresence(true, "won't start until repaired")
+            !File(dir, WORKERD_RELATIVE).isFile || !File(dir, WORKERD_WRAPPER_RELATIVE).isFile -> ToolPresence.of(true, listOf("local dev"))
+            else -> ToolPresence(true)
+        }
+    }
+
+    /** The version in an npm package's package.json ([dir]), or null. */
+    fun packageVersion(dir: File): String? =
+        runCatching { JSONObject(File(dir, "package.json").readText()).optString("version").takeIf { it.isNotBlank() } }.getOrNull()
 
     /** Wrangler's own config file under the home folder. The login lives here and nowhere else. */
     const val CONFIG_RELATIVE = ".config/.wrangler/config/default.toml"

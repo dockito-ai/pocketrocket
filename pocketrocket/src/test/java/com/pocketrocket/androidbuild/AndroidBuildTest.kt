@@ -44,7 +44,6 @@ class AndroidBuildTest {
         if (!script.exists()) return
         assertEquals("/tmp/pr-none/opt/android-sdk", shell("printf %s \"\$ANDROID_SDK_DIR\"").second)
         assertEquals("/tmp/pr-none/lib/jvm/java-17-openjdk", shell("printf %s \"\$ANDROID_JAVA_HOME\"").second)
-        assertEquals(AndroidBuildTool.INSTALLED_MARKER, shell("printf %s \"\$ANDROID_MARKER\"").second)
     }
 
     @Test fun gradlePropertiesKeepTheUsersOwnLines() {
