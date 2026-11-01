@@ -40,19 +40,31 @@ object Subagents {
             // Entries ever added never shrink, so the count keeps message ids unique.
             it.added(ChatItem.Assistant("${event.parentToolUseId}-m${it.dropped + it.log.size}", event.text))
         }
-        is StreamEvent.SubagentUpdate -> state.updateAgent(event.toolUseId) {
+        is StreamEvent.LiveAgents -> state.copy(
+            items = state.items.map { item ->
+                if (item is ChatItem.Tool && item.agent?.taskId?.let { it in event.taskIds } == true && !item.agentRunning) item.copy(agent = item.agent!!.revivedRun()) else item
+            },
+        )
+        is StreamEvent.SubagentUpdate -> state.updateAgent(event.toolUseId) { current ->
+            val run = if (event.started && current.ended) current.revivedRun() else current
             // Stopped or failed mid-step: that step will never answer, so it stops spinning.
             val cut = event.status in setOf("stopped", "killed", "failed")
-            val log = if (!cut) it.log else it.log.map { e -> if (e is ChatItem.Tool && e.result == null) e.copy(result = "Not finished", isError = true) else e }
-            it.copy(
+            val log = if (!cut) run.log else run.log.map { e -> if (e is ChatItem.Tool && e.result == null) e.copy(result = "Not finished", isError = true) else e }
+            run.copy(
                 log = log,
-                taskId = event.taskId ?: it.taskId,
-                activity = event.activity ?: it.activity, status = event.status ?: it.status, summary = event.summary ?: it.summary,
-                tokens = event.tokens ?: it.tokens, toolUses = event.toolUses ?: it.toolUses, durationMs = event.durationMs ?: it.durationMs,
+                taskId = event.taskId ?: run.taskId,
+                activity = event.activity ?: run.activity, status = event.status ?: run.status, summary = event.summary ?: run.summary,
+                tokens = event.tokens ?: run.tokens, toolUses = event.toolUses ?: run.toolUses, durationMs = event.durationMs ?: run.durationMs,
             )
         }
         else -> state
     }
+
+    private val AgentRun.ended: Boolean get() = status != null || endedAt != null
+
+    /** SendMessage brought an ended agent back: it runs again, under its first card, with its log kept. */
+    private fun AgentRun.revivedRun(): AgentRun =
+        copy(status = null, summary = null, startedAt = null, endedAt = null, durationMs = null, background = true, revived = true)
 
     private fun AgentRun.added(entry: ChatItem): AgentRun {
         val log = log + entry

@@ -35,7 +35,7 @@ private val EXTRA_ROWS = listOf(
     "Memory" to "About ${AndroidBuildTool.BUILD_MEMORY_GB} GB while building",
 )
 
-private const val NO_NDK = "Kotlin and Java apps. For native code (C or C++), add the Android NDK tile in Tools. There is no emulator on the phone."
+private const val NO_NDK = "Kotlin and Java apps. For native code (C or C++), add the Android NDK in Tools; until then a native project's C and C++ tasks stop with a message, and its Kotlin, Java and unit tests still build. There is no emulator on the phone."
 
 /** Settings → Tools → Android (decision 45): what it does, its sizes, the SDK license, and Install, Uninstall or Retry. */
 @Composable
@@ -51,7 +51,7 @@ fun AndroidBuildToolPage(onBack: () -> Unit) {
 
     ToolPage(
         spec = Tool.Android.spec,
-        state = ToolStates.android(s),
+        state = ToolStates.scriptTool(s),
         icon = Tool.Android.icon,
         purpose = "Android development environment on this device.",
         onBack = onBack,
@@ -65,7 +65,7 @@ fun AndroidBuildToolPage(onBack: () -> Unit) {
             onUninstall = { AndroidBuild.remove(context) },
             confirmTitle = "Uninstall the Android tools?",
             confirmBody = "Java, Gradle, the SDK and everything Gradle downloaded are removed." +
-                (if (ndk.installed) " The Android NDK tool needs them, so it goes too." else "") + " Your projects stay.",
+                (if (ndk.installed) " The Android NDK needs them, so it goes too; C and C++ stays." else "") + " Your projects stay.",
             blocked = if (ndk.running) ({ BusyButton("Android NDK tool is busy…") }) else null,
         ),
         storageRows = EXTRA_ROWS,

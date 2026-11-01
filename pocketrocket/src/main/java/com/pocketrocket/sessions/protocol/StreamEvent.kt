@@ -50,7 +50,8 @@ sealed interface StreamEvent {
      * `system/task_started`, `task_progress` and `task_notification` for the subagent started by tool use [toolUseId]:
      * its task [taskId] (what `stop_task` takes), what it is doing now ([activity]), and at the end its [status]
      * (`completed`, `failed`, `stopped`, `killed`) and [summary]. Its numbers so far when the line has them: [tokens],
-     * [toolUses] and, at the end, [durationMs].
+     * [toolUses] and, at the end, [durationMs]. [started] marks `task_started`, which also comes when SendMessage brings
+     * an ended agent back under its first tool use.
      */
     data class SubagentUpdate(
         val toolUseId: String,
@@ -61,7 +62,14 @@ sealed interface StreamEvent {
         val tokens: Long? = null,
         val toolUses: Int? = null,
         val durationMs: Long? = null,
+        val started: Boolean = false,
     ) : StreamEvent
+
+    /**
+     * `system/background_tasks_changed`: the ids of every subagent task working in the background now, sent whenever
+     * that set changes. The CLI's whole list, so it also shows an agent SendMessage brought back after it ended.
+     */
+    data class LiveAgents(val taskIds: Set<String>) : StreamEvent
 
     /** The CLI's answer to one of our control requests ([requestId]); [response] on success, [error] otherwise. */
     data class ControlResponse(val requestId: String, val response: JSONObject?, val error: String?) : StreamEvent

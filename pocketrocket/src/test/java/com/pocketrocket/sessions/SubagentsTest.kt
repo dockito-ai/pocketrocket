@@ -136,4 +136,51 @@ class SubagentsTest {
         )
         assertEquals("1 earlier step not kept", Subagents.earlier(1))
     }
+
+    private fun liveAgents(vararg tasks: Pair<String, String>) =
+        """{"type":"system","subtype":"background_tasks_changed","tasks":[${tasks.joinToString(",") { (id, type) -> """{"task_id":"$id","task_type":"$type","description":"x"}""" }}]}"""
+
+    private fun launched(id: String, agentId: String) = result(null, id, "Async agent launched successfully.\\nagentId: $agentId (internal ID)")
+
+    @Test fun anEndedAgentSentAMessageRunsAgainOnItsCard() {
+        var state = start().feed(
+            agentCall("toolu_A", "Sweep", "a", background = true), started("toolu_A", "a1"), launched("toolu_A", "a1"),
+            ended("toolu_A", "a1", "killed"),
+        )
+        assertEquals(AgentState.Stopped, state.tool("toolu_A").agentState)
+        assertEquals(0, state.runningAgents)
+
+        // SendMessage brings it back: the CLI starts the task again under the first tool use.
+        state = SessionReducer.timeAgents(state.feed(started("toolu_A", "a1")), now = 5_000)
+        val run = state.tool("toolu_A").agent!!
+        assertEquals(AgentState.Running, state.tool("toolu_A").agentState)
+        assertEquals(1, state.runningAgents)
+        assertNull(run.status)
+        assertEquals(5_000L, run.startedAt)
+
+        state = state.feed(ended("toolu_A", "a1", "completed"))
+        assertEquals(AgentState.Done, state.tool("toolu_A").agentState)
+        assertEquals(0, state.runningAgents)
+    }
+
+    @Test fun theLiveTaskListBringsBackAnAgentStoppedByARestart() {
+        // A restart stopped the card; its task id is only in the launch result.
+        val stopped = SessionReducer.stopAgents(
+            start().feed(agentCall("toolu_A", "Sweep", "a", background = true), launched("toolu_A", "a1")), now = 0,
+        )
+        assertEquals("a1", stopped.tool("toolu_A").agent!!.taskId)
+        assertEquals(0, stopped.runningAgents)
+
+        // A shell with that id, or another agent, does not count.
+        assertEquals(0, stopped.feed(liveAgents("a1" to "local_bash", "a2" to "local_agent")).runningAgents)
+
+        val live = stopped.feed(liveAgents("a1" to "local_agent"))
+        assertEquals(AgentState.Running, live.tool("toolu_A").agentState)
+        assertEquals(1, live.runningAgents)
+    }
+
+    @Test fun aRunningAgentIsLeftAsItIsByTheLiveTaskList() {
+        val running = start().feed(agentCall("toolu_A", "Sweep", "a", background = true), started("toolu_A", "a1"))
+        assertEquals(running, running.feed(liveAgents("a1" to "local_agent")))
+    }
 }
