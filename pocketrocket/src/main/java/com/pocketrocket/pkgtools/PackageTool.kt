@@ -18,8 +18,18 @@ data class HeldBy(val pkg: String, val name: String, val keeps: List<String>)
  */
 data class ShellSetting(val file: String, val binary: String, val environment: Map<String, String>, val label: String)
 
-/** What the phone says beyond dpkg, read with it: the profile.d files there, and where `$PREFIX/bin/java` leads. */
-data class PackageDisk(val profiles: Set<String> = emptySet(), val javaDefault: String? = null)
+/**
+ * What the phone says beyond dpkg, read with it: the profile.d files there, where `$PREFIX/bin/java` leads, and the
+ * JDKs Gradle should see against what `~/.gradle/gradle.properties` lists ([GradleJdks]).
+ */
+data class PackageDisk(
+    val profiles: Set<String> = emptySet(),
+    val javaDefault: String? = null,
+    val gradleJdks: GradleJdks = GradleJdks(),
+)
+
+/** A job other than install and remove: Java's Repair sets java and Gradle's JDK list without touching packages. */
+data class ToolRepair(val option: String, val step: String)
 
 /**
  * Add-ons that are only Termux packages (decision 92): Python with pip and uv, Bun, and Rust's wasm target (an option
@@ -43,6 +53,13 @@ enum class PackageTool(
     val alsoWatched: List<String> = emptyList(),
     /** Its own login, with Log in and Log out on its page (the deploy CLIs, decision 98). */
     val login: LoginSpec? = null,
+    /**
+     * Packages its install doesn't add but its page does (Java 25): they mean it's on the phone too, show with its
+     * versions and size, and its Uninstall takes them. The script's `pkg_tool_packages` lists only [packages].
+     */
+    val extras: List<Pair<String, String>> = emptyList(),
+    /** What Repair runs instead of the install, or null for the install. */
+    val repair: ToolRepair? = null,
 ) {
     Python(
         "python", "Python, pip and uv", listOf("python" to "Python", "python-pip" to "pip", "uv" to "uv"),
@@ -62,50 +79,70 @@ enum class PackageTool(
     ),
     /** Not composer: Termux's package fails its phar signature check once the prefix is rewritten. */
     Php("php", "PHP", listOf("php" to "PHP"), downloadMb = 13, installedMb = 101),
-    /** kotlin needs openjdk-21; Java 17 (the Android tool's) stays the default `java` while it is on the phone. */
+    /**
+     * Install puts in Java 21 and Kotlin (kotlin needs openjdk-21); the page adds and removes 17, 21, 25 and Kotlin on
+     * their own ([JAVA_PARTS], decision 101), so Java 25 alone is the tile too. Uninstall takes 21, 25 and Kotlin.
+     * Java 17 (the Android tool's) is never removed here and stays the default `java` while it is on the phone.
+     */
     Java(
-        "java", "Java 21 and Kotlin", listOf("openjdk-21" to "Java", "kotlin" to "Kotlin"), downloadMb = 196, installedMb = 350,
-        alsoWatched = listOf(OPENJDK_17),
+        "java", "Java 21 and Kotlin", listOf("openjdk-21" to "Java 21", "kotlin" to "Kotlin"),
+        downloadMb = 196, installedMb = 350,
+        alsoWatched = listOf(OPENJDK_17), extras = listOf("openjdk-25" to "Java 25"),
+        repair = ToolRepair("java-setup", "Setting up Java"),
     ),
 
     // The deploy CLIs that are Termux packages (decision 98); the npm ones are NpmTool.
     Aws("aws", "the AWS CLI", listOf("awscli" to "AWS CLI"), downloadMb = 36, installedMb = 204, login = AwsLogin),
     Fly("flyctl", "flyctl", listOf("flyctl" to "flyctl"), downloadMb = 16, installedMb = 77, login = FlyLogin),
+
+    // The Java page's parts (decision 101): one JDK, or Kotlin, at a time; no tile or Updates row of their own. apt's sizes.
+    Java17("java-17", "Java 17", listOf(OPENJDK_17 to "Java 17"), downloadMb = 104, installedMb = 227),
+    Java21("java-21", "Java 21", listOf("openjdk-21" to "Java 21"), downloadMb = 113, installedMb = 258),
+    Java25("java-25", "Java 25", listOf("openjdk-25" to "Java 25"), downloadMb = 123, installedMb = 267),
+    Kotlin("kotlin", "Kotlin", listOf("kotlin" to "Kotlin"), downloadMb = 84, installedMb = 93),
     ;
 
     val main: String get() = packages.first().first
     val removeOption: String get() = "$option-remove"
     val installSteps: List<String> get() = listOf("Checking the device", "Installing $title")
     val removeSteps: List<String> get() = listOf("Checking the device", "Removing $title")
+    val repairSteps: List<String> get() = repair?.let { listOf("Checking the device", it.step) } ?: installSteps
+
+    /** False for Java 17 alone: the script never removes it (`PKG_TOOL_NEVER`), so the page offers no Remove. */
+    val canRemove: Boolean get() = packages.any { it.first !in NEVER_REMOVED }
+
+    /** [packages] and [extras]: what it is on the phone. */
+    private val shown: List<Pair<String, String>> get() = packages + extras
 
     /** Every package worth reading from dpkg for this tool: its own, the one that holds part of it, and [alsoWatched]. */
-    val watched: Set<String> get() = packages.map { it.first }.toSet() + listOfNotNull(heldBy?.pkg) + alsoWatched
+    val watched: Set<String> get() = shown.map { it.first }.toSet() + listOfNotNull(heldBy?.pkg) + alsoWatched
 
-    /** On the phone: its main package is installed, whoever put it there. */
-    fun installed(pkgs: Map<String, DpkgStatus.Package>): Boolean = main in pkgs
+    /** On the phone: its main package (or one of [extras]) is installed, whoever put it there. */
+    fun installed(pkgs: Map<String, DpkgStatus.Package>): Boolean = main in pkgs || extras.any { it.first in pkgs }
 
     /**
      * What keeps it from working the way its tile installs it, read from the phone, or null: Ruby without its gems
-     * setting (after a `pkg install ruby` in a terminal), or `java` leading to 21 while 17 is there. Repair runs the
-     * install again, which puts it right.
+     * setting (after a `pkg install ruby` in a terminal), `java` leading elsewhere while 17 is there, or Gradle's JDK
+     * list behind the JDKs on the phone (a `pkg install openjdk-25` in a terminal). Repair puts it right.
      */
     fun problem(pkgs: Map<String, DpkgStatus.Package>, disk: PackageDisk): String? = when {
         !installed(pkgs) -> null
         shell != null && shell.file !in disk.profiles -> "${shell.label} missing"
-        this == Java && JAVA_17 in pkgs && disk.javaDefault?.contains("/java-21-openjdk/") == true -> "java isn't Java 17"
+        this == Java && JAVA_17 in pkgs && javaDefault(disk).let { it != null && it != "17" } -> "java isn't Java 17"
+        this == Java && !disk.gradleJdks.current -> "Gradle JDK list out of date"
         else -> null
     }
 
-    /** Its other packages that aren't there (Python without uv): their names, for "Add uv". */
+    /** Its other packages that aren't there (Python without uv): their names, for "Add uv". Java's page has a row each. */
     fun missing(pkgs: Map<String, DpkgStatus.Package>): List<String> =
-        if (!installed(pkgs)) emptyList() else packages.filter { it.first !in pkgs }.map { it.second }
+        if (!installed(pkgs) || this == Java) emptyList() else packages.filter { it.first !in pkgs }.map { it.second }
 
     /** Versions as the page lists them ("Python" to "3.14.8"), only for what is installed. */
     fun versions(pkgs: Map<String, DpkgStatus.Package>): List<Pair<String, String>> =
-        packages.mapNotNull { (pkg, label) -> pkgs[pkg]?.let { label to DpkgStatus.display(it.version) } }
+        shown.mapNotNull { (pkg, label) -> pkgs[pkg]?.let { label to DpkgStatus.display(it.version) } }
 
     /** Its installed packages' size in MB, from dpkg; null when none is there or dpkg gives no sizes. */
-    fun sizeMb(pkgs: Map<String, DpkgStatus.Package>): Int? = DpkgStatus.sizeMb(packages.mapNotNull { pkgs[it.first] })
+    fun sizeMb(pkgs: Map<String, DpkgStatus.Package>): Int? = DpkgStatus.sizeMb(shown.mapNotNull { pkgs[it.first] })
 
     /** What keeps part of it now (Headless Chrome is installed), or null. */
     fun held(pkgs: Map<String, DpkgStatus.Package>): HeldBy? = heldBy?.takeIf { it.pkg in pkgs }
@@ -113,13 +150,13 @@ enum class PackageTool(
     /** The names of its installed parts Uninstall would really take away; empty when everything stays. */
     fun removable(pkgs: Map<String, DpkgStatus.Package>): List<String> {
         val kept = held(pkgs)?.keeps.orEmpty()
-        return packages.filter { it.first in pkgs && it.first !in kept }.map { it.second }
+        return shown.filter { it.first in pkgs && it.first !in kept }.map { it.second }
     }
 
     /** The names of the parts that stay because of [held]. */
     fun kept(pkgs: Map<String, DpkgStatus.Package>): List<String> {
         val kept = held(pkgs)?.keeps.orEmpty()
-        return packages.filter { it.first in pkgs && it.first in kept }.map { it.second }
+        return shown.filter { it.first in pkgs && it.first in kept }.map { it.second }
     }
 
     /**
@@ -137,6 +174,15 @@ enum class PackageTool(
     companion object {
         /** The package the Android tool's builds use; no package tool ever removes it (`PKG_TOOL_NEVER`). */
         const val JAVA_17 = OPENJDK_17
+
+        /** What no package tool removes, the setup script's `PKG_TOOL_NEVER`: Java 17, which Android builds use. */
+        val NEVER_REMOVED: Set<String> = setOf(OPENJDK_17, "$OPENJDK_17-x")
+
+        /** The Java page's rows, oldest JDK first (decision 101). */
+        val JAVA_PARTS: List<PackageTool> get() = listOf(Java17, Java21, Java25, Kotlin)
+
+        /** The JDK `java` leads to now ("17"), from where `$PREFIX/bin/java` resolves; null when it leads to none. */
+        fun javaDefault(disk: PackageDisk): String? = disk.javaDefault?.let { Regex("""/java-(\d+)-openjdk/""").find(it)?.groupValues?.get(1) }
 
         /** Every package any tool watches, for one read of dpkg's status. */
         val allWatched: Set<String> get() = entries.flatMap { it.watched }.toSet()

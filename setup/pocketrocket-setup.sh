@@ -49,6 +49,9 @@
 #                     uninstall signs out first and removes ~/.aws or ~/.fly; awscli-check/-update, flyctl-check/-update
 #   --only vercel, netlify, firebase (and -remove)  the npm deploy CLIs (decision 98): npm install -g, 2 steps; uninstall
 #                     signs out and removes their config
+#   --only java-17, java-21, java-25, kotlin (and <name>-remove; java-17-remove keeps Java 17)  one JDK or Kotlin on
+#                     its own, from the Java page; java-setup only does the setup (Repair). Every Java job leaves Gradle
+#                     a list of the JDKs on the phone (decision 101)
 #   --only golang-check / deno-check / ruby-check / php-check / openjdk-21-check, and the same with -update: as below
 #   --only git-check / rust-check / python-check / bun-check  refresh the package index and print `apt-cache policy <package>` (its
 #                     Installed and Candidate lines) for the Updates screen; no steps, no lock, no [done]
@@ -987,6 +990,26 @@ android_package_xml() {
 EOF
 }
 
+# gradle_props_set <gradle.properties> <key> <value>: one key, replaced where it is (later copies go) or added at the
+# end; every other line stays as it was. For any tool that writes ~/.gradle/gradle.properties.
+gradle_props_set() {
+  mkdir -p "$(dirname "$1")"
+  [ -f "$1" ] || : >"$1"
+  awk -v k="$2" -v v="$3" '
+    { t = $0; sub(/^[ \t]+/, "", t) }
+    index(t, k) == 1 && substr(t, length(k) + 1) ~ /^[ \t]*[=:]/ { if (!done) print k "=" v; done = 1; next }
+    { print }
+    END { if (!done) print k "=" v }' "$1" >"$1.prtmp" && mv -f "$1.prtmp" "$1"
+}
+
+# gradle_props_unset <gradle.properties> <key>: takes the key out; deletes the file if nothing else is left.
+gradle_props_unset() {
+  [ -f "$1" ] || return 0
+  awk -v k="$2" '{ t = $0; sub(/^[ \t]+/, "", t) } index(t, k) == 1 && substr(t, length(k) + 1) ~ /^[ \t]*[=:]/ { next } { print }' \
+    "$1" >"$1.prtmp" && mv -f "$1.prtmp" "$1"
+  if ! grep -q '[^[:space:]]' "$1"; then rm -f "$1"; fi
+}
+
 # android_gradle_props_remove <gradle.properties>: takes out only our block; deletes the file if nothing else is left.
 android_gradle_props_remove() {
   [ -f "$1" ] || return 0
@@ -1870,6 +1893,8 @@ pkg_tool_packages() {
     java) printf 'openjdk-21 kotlin' ;;
     aws) printf 'awscli' ;;       # the deploy CLIs from Termux's packages (decision 98)
     flyctl) printf 'flyctl' ;;
+    java-17 | java-21 | java-25) printf 'openjdk-%s' "${1#java-}" ;;   # one JDK on the Java page (decision 101)
+    kotlin) printf 'kotlin' ;;
     *) return 1 ;;
   esac
 }
@@ -1881,6 +1906,8 @@ pkg_tool_companions() {
   case "$1" in
     python) printf 'python-ensurepip-wheels' ;;
     java) printf 'openjdk-21-x' ;;
+    java-21) printf 'openjdk-21-x kotlin' ;;   # kotlin depends on openjdk-21, so it goes with it
+    java-25) printf 'openjdk-25-x' ;;
     rust) dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 'rust-std-*' 2>/dev/null | awk '$1 == "ii" {print $2}' | tr '\n' ' ' ;;
   esac
 }
@@ -1898,6 +1925,8 @@ pkg_tool_title() {
     java) printf 'Java 21 and Kotlin' ;;
     aws) printf 'the AWS CLI' ;;
     flyctl) printf 'flyctl' ;;
+    java-17 | java-21 | java-25) printf 'Java %s' "${1#java-}" ;;
+    kotlin) printf 'Kotlin' ;;
   esac
 }
 
@@ -1916,6 +1945,8 @@ pkg_tool_check() {
     java) "$JAVA21_HOME/bin/java" -version 2>&1 | sed -n 1p && kotlinc -version 2>&1 | grep -o 'kotlinc-jvm [^ ]*' ;;
     aws) aws --version ;;
     flyctl) flyctl version ;;
+    java-17 | java-21 | java-25) "${PREFIX:-}/lib/jvm/java-${1#java-}-openjdk/bin/java" -version 2>&1 | sed -n 1p ;;
+    kotlin) kotlinc -version 2>&1 | grep -o 'kotlinc-jvm [^ ]*' ;;
   esac
 }
 
@@ -1946,14 +1977,64 @@ java_keep_17() {
   update-alternatives --set java "$ANDROID_JAVA_HOME/bin/java" >>"$PR_LOG" 2>&1 || fail "could not keep Java 17 as the default java"
 }
 
+# java_tool <name>: 0 for the Java tile's jobs (the tile, one JDK, Kotlin), which all end with java_settle.
+java_tool() { case "$1" in java | java-* | kotlin) return 0 ;; *) return 1 ;; esac; }
+
+# Several JDKs side by side (decision 101). Gradle toolchains (languageVersion = 21) only look in the usual Linux
+# folders, and their auto-download fetches glibc JDKs that can't run here. So Gradle gets the list of JDKs on the phone
+# in ~/.gradle/gradle.properties, kept current after every Java job, and auto-download off. JavaJdks.kt reads the same.
+JAVA_GRADLE_PATHS=org.gradle.java.installations.paths
+JAVA_GRADLE_AUTO=org.gradle.java.installations.auto-download
+
+# java_jdk_dirs: the JDK folders with a java in them, oldest first, comma-separated ("" when none).
+java_jdk_dirs() {
+  local d n
+  for d in "${PREFIX:-}"/lib/jvm/java-*-openjdk; do
+    [ -x "$d/bin/java" ] || continue
+    n="${d##*/java-}"; n="${n%-openjdk}"
+    case "$n" in '' | *[!0-9]*) continue ;; esac
+    printf '%s %s\n' "$n" "$d"
+  done | sort -n | cut -d' ' -f2- | paste -sd, -
+}
+
+# java_gradle_jdks [gradle.properties]: sets the two keys to the JDKs there now, or takes them out when there are none.
+java_gradle_jdks() {
+  local f="${1:-$HOME/.gradle/gradle.properties}" dirs
+  dirs="$(java_jdk_dirs)"
+  if [ -n "$dirs" ]; then
+    gradle_props_set "$f" "$JAVA_GRADLE_PATHS" "$dirs"
+    gradle_props_set "$f" "$JAVA_GRADLE_AUTO" false
+  else
+    gradle_props_unset "$f" "$JAVA_GRADLE_PATHS"
+    gradle_props_unset "$f" "$JAVA_GRADLE_AUTO"
+  fi
+}
+
+# java_settle: after any Java job, java stays on 17 while it's there and Gradle knows every JDK.
+java_settle() {
+  java_keep_17
+  java_gradle_jdks
+  if [ -x "$ANDROID_JAVA_HOME/bin/java" ]; then info "java stays on Java 17 for Android builds"; fi
+  info "Gradle sees: $(java_jdk_dirs | sed 's/,/, /g')"
+}
+
+# --only java-setup: Repair on the Java page; java_settle alone, no packages.
+main_java_setup() {
+  TOTAL_STEPS=2; PR_LOG="$PR_HOME/java.log"
+  step "Checking the device"; preflight_checks; ok "Termux on aarch64"
+  step "Setting up Java"
+  java_settle
+  ok "java and Gradle's JDK list set"
+  printf '[done]\n'
+}
+
 # pkg_tool_setup <name>: what the tool needs beyond its packages, once they're in. Repair runs it again.
 pkg_tool_setup() {
   case "$1" in
     python) uv_config_add "$UV_CONFIG" ;;
     ruby) mkdir -p "$(dirname "$RUBY_PROFILE")"
       printf '%s\n' "# Written by PocketRocket's Ruby tool. Removed on uninstall." "export RUBYOPT=-rrubygems" >"$RUBY_PROFILE" ;;
-    java) java_keep_17
-      if [ -x "$ANDROID_JAVA_HOME/bin/java" ]; then info "java stays on Java 17 for Android builds; Java 21 is in $JAVA21_HOME"; fi ;;
+    java | java-* | kotlin) java_settle ;;
   esac
 }
 
@@ -2045,7 +2126,7 @@ step_pkg_tool_install() {
   if [ "$name" = rust-wasm ] && ! pkg_installed rust; then fail "Rust isn't installed; install Rust first"; fi
   apt_refresh
   packages_baseline "$PR_HOME/$name.baseline" "$PR_HOME/$name.packages"
-  [ "$name" != java ] || java_keep_17
+  if java_tool "$name"; then java_keep_17; fi
   # shellcheck disable=SC2046
   apt_install_progress $(pkg_tool_packages "$name")
   packages_record "$PR_HOME/$name.baseline" "$PR_HOME/$name.packages"
@@ -2061,6 +2142,14 @@ step_pkg_tool_remove() {
   pkg_tool_signout "$name"
   pkg_tool_purge "$name"
   pkg_tool_cleanup "$name"
+  # The Java tile's Uninstall takes Java 25 too, and what the page's own adds brought in (Java 17 always stays).
+  if [ "$name" = java ]; then
+    local part kept="$PKG_TOOL_KEPT"
+    for part in kotlin java-21 java-25; do pkg_tool_purge "$part"; kept="$kept $PKG_TOOL_KEPT"; done
+    # shellcheck disable=SC2086
+    PKG_TOOL_KEPT="$(printf '%s\n' $kept | sort -u | paste -sd' ' -)"
+  fi
+  if java_tool "$name"; then java_settle; fi
   if [ -n "$PKG_TOOL_KEPT" ]; then ok "removed the rest; $PKG_TOOL_KEPT stayed"; else ok "$(pkg_tool_title "$name") removed"; fi
 }
 
@@ -2220,7 +2309,8 @@ main() {
         python|python-remove|bun|bun-remove|rust-wasm|rust-wasm-remove|python-check|python-update|bun-check|bun-update) ;;
         go|go-remove|deno|deno-remove|ruby|ruby-remove|php|php-remove|java|java-remove|golang-check|golang-update|deno-check|deno-update|ruby-check|ruby-update|php-check|php-update|openjdk-21-check|openjdk-21-update) ;;
         aws|aws-remove|flyctl|flyctl-remove|vercel|vercel-remove|netlify|netlify-remove|firebase|firebase-remove|awscli-check|awscli-update|flyctl-check|flyctl-update) ;;
-        *) fail "--only takes: aws, aws-remove, flyctl, flyctl-remove, vercel, vercel-remove, netlify, netlify-remove, firebase, firebase-remove, awscli-check, awscli-update, flyctl-check, flyctl-update,claude, dockito, chromium, chromium-remove, android-build, android-build-remove, android-ndk, android-ndk-remove, wrangler, wrangler-remove, flutter [version], flutter-default <version>, flutter-remove-version <version>, flutter-remove, rust, rust-remove, flutter-rust, flutter-rust-remove, python, python-remove, bun, bun-remove, rust-wasm, rust-wasm-remove, go, go-remove, deno, deno-remove, ruby, ruby-remove, php, php-remove, java, java-remove, git-check, git-update, rust-check, rust-update, python-check, python-update, bun-check, bun-update, golang-check, golang-update, deno-check, deno-update, ruby-check, ruby-update, php-check, php-update, openjdk-21-check or openjdk-21-update" ;;
+        java-17|java-17-remove|java-21|java-21-remove|java-25|java-25-remove|kotlin|kotlin-remove|java-setup) ;;
+        *) fail "--only takes: aws, aws-remove, flyctl, flyctl-remove, vercel, vercel-remove, netlify, netlify-remove, firebase, firebase-remove, awscli-check, awscli-update, flyctl-check, flyctl-update, claude, dockito, chromium, chromium-remove, android-build, android-build-remove, android-ndk, android-ndk-remove, wrangler, wrangler-remove, flutter [version], flutter-default <version>, flutter-remove-version <version>, flutter-remove, rust, rust-remove, flutter-rust, flutter-rust-remove, python, python-remove, bun, bun-remove, rust-wasm, rust-wasm-remove, go, go-remove, deno, deno-remove, ruby, ruby-remove, php, php-remove, java, java-remove, java-17, java-17-remove, java-21, java-21-remove, java-25, java-25-remove, kotlin, kotlin-remove, java-setup, git-check, git-update, rust-check, rust-update, python-check, python-update, bun-check, bun-update, golang-check, golang-update, deno-check, deno-update, ruby-check, ruby-update, php-check, php-update, openjdk-21-check or openjdk-21-update" ;;
       esac
       case "$2" in
         git-check|rust-check) apt_check "${2%-check}"; return 0 ;;
@@ -2246,6 +2336,9 @@ main() {
         flyctl-update) main_apt_update flyctl "flyctl version" flyctl; return 0 ;;
         aws|aws-remove|flyctl|flyctl-remove) main_pkg_tool "$2"; return 0 ;;
         vercel|vercel-remove|netlify|netlify-remove|firebase|firebase-remove) main_npm_tool "$2"; return 0 ;;
+        # One JDK or Kotlin on the Java page, and its Repair (decision 101).
+        java-17|java-17-remove|java-21|java-21-remove|java-25|java-25-remove|kotlin|kotlin-remove) main_pkg_tool "$2"; return 0 ;;
+        java-setup) main_java_setup; return 0 ;;
       esac
       case "$2" in
         flutter*|rust*)
