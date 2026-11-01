@@ -130,6 +130,41 @@ class JavaJdksTest {
         assertTrue(GradleJdks().current) // no JDK at all: nothing to tell Gradle
     }
 
+    @Test fun theJavaHookIsThereExactlyWhileAJdkIs() {
+        if (!script.exists()) return
+        val template = File("../setup/${GradleJdks.HOOK}")
+        val hook = File(home, GradleJdks.HOOK_RELATIVE)
+        File(home, ".gradle/init.d/pocketrocket-build-slots.gradle").apply { parentFile!!.mkdirs(); writeText("other hook") }
+        shell("java_gradle_jdks")
+        assertFalse(hook.exists()) // no JDK
+        jdk(17)
+        jdk(21)
+        assertEquals(0, shell("java_gradle_jdks").first)
+        assertEquals(template.readText(), hook.readText()) // the script copies the template as it is
+        hook.writeText("an older version")
+        GradleJdks.syncHook(prefix, home) { template.readText() }
+        assertEquals(template.readText(), hook.readText()) // app start writes the same file
+        File(prefix, "lib/jvm").deleteRecursively()
+        shell("java_gradle_jdks")
+        assertFalse(hook.exists())
+        hook.writeText("left over")
+        GradleJdks.syncHook(prefix, home) { error("not read when there is no JDK") }
+        assertFalse(hook.exists())
+        assertEquals("other hook", File(home, ".gradle/init.d/pocketrocket-build-slots.gradle").readText())
+    }
+
+    @Test fun theJavaHookOnlyActsOnAndroidModulesWithoutAToolchainAndNeverFails() {
+        val hook = File("../setup/${GradleJdks.HOOK}")
+        if (!hook.exists()) return
+        val text = hook.readText()
+        assertFalse(text.contains("@POCKETROCKET")) // copied as is: no placeholders
+        assertTrue(text.contains("findByName(\"android\")"))
+        assertTrue(text.contains("toolchain.languageVersion.present")) // a module's own toolchain wins
+        assertTrue(text.contains("java-\${asks}-openjdk/bin/java")) // only a JDK that is on the phone
+        assertTrue(text.contains("asks > running"))
+        assertFalse(text.contains("throw ")) // warnings only
+    }
+
     @Test fun seventeenStaysTheDefaultAfterEveryJavaJob() {
         if (!script.exists()) return
         jdk(25)

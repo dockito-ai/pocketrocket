@@ -1,0 +1,52 @@
+// Written by PocketRocket while a JDK is on the phone (decision 101); the app refreshes it at every start and the setup
+// script after every Java job.
+//
+// Gradle runs on Java 17, the default `java` that Android and Flutter builds use. An Android module that compiles for
+// a newer Java without a toolchain (Capacitor 7 and later: compileOptions on JavaVersion.VERSION_21) would fail with
+// "invalid source release: 21". Such a module's Java compiles get a toolchain for the Java it asks for, found among the
+// JDKs Gradle is told about (org.gradle.java.installations.paths), while Gradle itself stays on 17. Modules with their
+// own toolchain, or asking for no more than the Java Gradle runs on, are left as they are. When the JDK asked for is
+// not on the phone, a warning says how to add it. Nothing here ever fails a build.
+import org.gradle.jvm.toolchain.JavaLanguageVersion
+import org.gradle.jvm.toolchain.JavaToolchainService
+
+def running = JavaVersion.current().majorVersion as int
+// Termux's JDKs sit side by side: $PREFIX/lib/jvm/java-NN-openjdk.
+def jvmDir = new File(System.getProperty("java.home")).parentFile
+
+allprojects { project ->
+    // Android's compileOptions can't be read until the plugin has finalized them, and the plugin reads each Java
+    // compile's javaCompiler as it creates the task, so the compiler is a provider that looks only when asked.
+    project.tasks.withType(JavaCompile).configureEach { JavaCompile task ->
+        try {
+            def android = project.extensions.findByName("android")
+            def toolchains = project.extensions.findByType(JavaToolchainService)
+            def java = project.extensions.findByType(JavaPluginExtension)
+            if (android == null || toolchains == null || java == null) return
+            task.javaCompiler.set(project.provider {
+                // Gradle's own default: the module's toolchain, or the Java Gradle runs on.
+                def spec = java.toolchain
+                try {
+                    if (!java.toolchain.languageVersion.present) {
+                        def options = android.compileOptions
+                        def asks = [options.sourceCompatibility, options.targetCompatibility].findAll { it != null }
+                            .collect { it.majorVersion as int }.max()
+                        if (asks != null && asks > running) {
+                            if (new File(jvmDir, "java-${asks}-openjdk/bin/java").isFile()) {
+                                spec = { it.languageVersion.set(JavaLanguageVersion.of(asks)) } as Action
+                            } else if (project.extensions.extraProperties.has("pocketrocketJavaWarned") == false) {
+                                project.extensions.extraProperties.set("pocketrocketJavaWarned", true)
+                                project.logger.warn("PocketRocket: ${project.path} compiles for Java ${asks}, which is not on the phone. Add it in Settings > Tools > Java and Kotlin, or run Gradle with JAVA_HOME set to a Java ${asks}.")
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    project.logger.warn("PocketRocket: left ${task.path} on its own Java (${e.message}).")
+                }
+                spec
+            }.flatMap { toolchains.compilerFor(it) })
+        } catch (Exception e) {
+            project.logger.warn("PocketRocket: left ${task.path} on its own Java (${e.message}).")
+        }
+    }
+}

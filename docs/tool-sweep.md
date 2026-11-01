@@ -138,6 +138,19 @@ Best fit for the Wrangler-style tile (print a URL, app opens the browser, CLI ke
 
 Everything installed was removed and `dpkg -l` / `npm ls -g --depth=0` match the start. Traces to know: briefly the default `java` pointed at 21 (see Java); the `~/.cache/com.vercel.cli` and `~/.cache/gem` folders and `~/.aws`, `~/.fly`, `~/.config/netlify`, `~/.config/configstore`, `~/.cache/deno`, `~/go`, `~/.cache/go-build` and `~/.local/share/gem` created by the tests were deleted. `~/.npm` and the npm log folder were not touched (the installs used a throwaway cache).
 
+## Capacitor: Svelte to a debug APK (1 Nov 2026)
+
+A Svelte + Capacitor app builds into a debug APK on the phone with what PocketRocket installs: Node 24.22.1 and npm 12.2.1, the Android tool (Java 17, the SDK with platform 36 and build-tools 36.0.0, Termux's aapt2) and Java 21 from the Java tile. Throwaway sample outside the repo: `npm create vite@latest svelte-cap-sample -- --template svelte-ts`, `npm install`, `npm install @capacitor/core @capacitor/android`, `npm install -D @capacitor/cli` (Capacitor 8.6.0, Svelte 5.57, Vite 8.3), `npx cap init SvelteCap com.example.sveltecap --web-dir dist`, `npm run build`, `npx cap add android`, `npx cap sync android`, then `./gradlew assembleDebug` in `android/` (Gradle 8.14.3 from the wrapper, Android Gradle plugin 8.13.0, compile and target SDK 36). Result: `android/app/build/outputs/apk/debug/app-debug.apk`, 4.2 MB, with the Vite build under `assets/public/`; 1.5 minutes from clean once Gradle's caches had the dependencies, about 2.5 minutes the first time.
+
+What it hit:
+
+| Problem | Cause | Where it belongs | Fix |
+|---|---|---|---|
+| `error: invalid source release: 21` in `:capacitor-android:compileDebugJavaWithJavac` | Capacitor 7 and later compile for Java 21 (`compileOptions` on `VERSION_21`, no Gradle toolchain), and Gradle runs on Java 17, the default `java` Android builds use (decisions 98 and 101) | PocketRocket | New Gradle hook `~/.gradle/init.d/pocketrocket-java.gradle` (`setup/pocketrocket-java.gradle`): an Android module asking for a newer Java than Gradle runs on, with no toolchain of its own, compiles its Java with that JDK as a Gradle toolchain, found through `org.gradle.java.installations.paths`. Gradle stays on 17; other modules are untouched. If that Java is not on the phone it warns "Add it in Settings > Tools > Java and Kotlin". Before the hook: `JAVA_HOME=$PREFIX/lib/jvm/java-21-openjdk ./gradlew assembleDebug` works too |
+| The Gradle wrapper's download of `gradle-8.14.3-all.zip` timed out (`Connect timed out`, 10 s) | That network: one of GitHub's four release-asset addresses (185.199.109.133) didn't answer. Java tries only the first address it gets, curl moves on to the next | Neither (network) | Fetched the zip with curl into `~/.gradle/wrapper/dists/gradle-8.14.3-all/<hash>/gradle-8.14.3-all.zip` after checking it against `gradle-8.14.3-all.zip.sha256`; the wrapper then unpacked it. Retrying later, or on another network, is the usual fix |
+
+Nothing else needed attention: the env-shebang wrapper (Phase 0) runs `npx cap` and `vite`; Termux's aapt2 is used through the Android tool's `android.aapt2FromMavenOverride` (Gradle prints that the option is experimental, harmless); `ANDROID_HOME` comes from the Android tool, so no `local.properties` is needed; the memory caps and build slot (decision 97) apply as to any Gradle build. The build-slot hook queued this build behind others, as it should. Capacitor's `npx cap run android` / `cap open android` need a device or Android Studio and were not tried; install the APK from the chat card (decision 99) instead.
+
 ## Phase 2: decide per tool
 
 Using the results, each tool becomes one of:
