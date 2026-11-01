@@ -62,7 +62,7 @@ Open Settings → Tools. Four are already there after first run. The rest instal
 
 First run also installs the GitHub CLI (`gh`), OpenSSH, ripgrep, jq, curl and Zellij. They have no tile of their own.
 
-Settings → Updates keeps the tools that can move current. Android, the Android NDK, and C and C++ move only when the app does. The logos are the same marks the app shows, and they switch for a light or dark page. They belong to their owners; see `docs/third-party-icons.md`.
+Settings → Updates keeps the tools that can move current. Android and the Android NDK move only when the app does. The logos are the same marks the app shows, and they switch for a light or dark page. They belong to their owners; see `docs/third-party-icons.md`.
 
 #### Comes with the app
 

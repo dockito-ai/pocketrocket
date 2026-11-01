@@ -192,7 +192,9 @@ private fun VersionSection(spec: ToolSpec, state: ToolState, update: ToolUpdate?
             row.running -> BusyButton("Updating…")
             update.queued -> BusyButton("Waiting for another update…")
             row.available && update.blocked -> BusyButton("Another update is running…")
+            row.available && row.signingIn -> BusyButton("Finish signing in first…")
             row.available -> AccentButton(if (row.failed) "Retry" else "Update to ${row.latest}", onClick = update.onUpdate, height = 44.dp, radius = 12.dp)
+            row.checkFailed && !row.checking -> Note("Couldn't check for a newer version. Check now in Settings › Updates tries again.")
             row.latest != null -> Note("Up to date. Settings › Updates checks for every tool.")
         }
     }

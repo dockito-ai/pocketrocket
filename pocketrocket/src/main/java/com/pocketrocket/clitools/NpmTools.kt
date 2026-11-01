@@ -38,6 +38,8 @@ data class NpmToolsState(
     val latest: Map<NpmTool, String> = emptyMap(),
     /** The tools whose `npm view` is running now. */
     val checking: Set<NpmTool> = emptySet(),
+    /** The tools whose last `npm view` got no version (offline, npm's error): [latest] may be old. */
+    val checkFailed: Set<NpmTool> = emptySet(),
 ) {
     val running: Boolean get() = job?.phase == SetupPhase.Running
     val removing: Boolean get() = action == NpmAction.Remove
@@ -51,6 +53,13 @@ data class NpmToolsState(
 
     /** [t]'s update is running, or was the last job and failed. */
     fun updateJob(t: NpmTool): SetupState? = job?.takeIf { isFor(t) && updating }
+
+    /** After [t]'s `npm view`: its [latest] when npm answered, else a failed check that keeps the last answer. */
+    fun checked(t: NpmTool, latest: String?): NpmToolsState = copy(
+        checking = checking - t,
+        checkFailed = if (latest == null) checkFailed + t else checkFailed - t,
+        latest = if (latest != null) this.latest + (t to latest) else this.latest,
+    )
 }
 
 /**
@@ -111,7 +120,7 @@ object NpmTools {
         val exit = runCatching { SetupScript.run(app, listOf("--only", t.checkOption)) { synchronized(lines) { lines += it } } }.getOrDefault(-1)
         val latest = NpmGlobal.viewedVersion(synchronized(lines) { lines.toList() })?.takeIf { exit == 0 }
         if (latest != null) app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_LATEST + t.option, latest).apply()
-        _state.update { s -> s.copy(checking = s.checking - t, latest = if (latest != null) s.latest + (t to latest) else s.latest) }
+        _state.update { it.checked(t, latest) }
     }
 
     fun install(context: Context, t: NpmTool) = run(context, t, NpmAction.Install)

@@ -1,19 +1,22 @@
 package com.pocketrocket.updates
 
 import android.content.Context
+import com.pocketrocket.clilogin.LoginSpec
 import com.pocketrocket.clitools.NpmTool
 import com.pocketrocket.pkgtools.PackageTool
 import com.pocketrocket.setup.SetupPhase
 import com.pocketrocket.setup.SetupState
 import com.pocketrocket.updater.Outcome
+import com.pocketrocket.wrangler.WranglerLogin
 import kotlinx.coroutines.flow.Flow
 
 /**
  * What the Updates screen keeps current (decision 41), in the screen's order: every tool in Settings › Tools that can
  * get updates (decision 103). Optional ones show only while installed: the add-ons (Flutter and Rust, decisions 75 and
  * 87; Python and Bun, decision 92; the languages and deploy CLIs, decision 98; Headless Chrome and Wrangler), and
- * Node.js, whose row is Termux's nodejs-lts and goes if a terminal swapped it for another Node. A [packageTool]'s row is
- * its main package through apt; an [npmTool]'s is its npm package against `npm view`.
+ * Node.js, whose row is Termux's nodejs-lts and goes if a terminal swapped it for another Node; and C and C++. A
+ * [packageTool]'s row is its packages through apt ([PackageTool.updated]); an [npmTool]'s is its npm package against
+ * `npm view`. A tool with a [login] can't update while that login runs.
  */
 enum class UpdateComponent(
     val label: String,
@@ -28,6 +31,7 @@ enum class UpdateComponent(
     Dockito("Dockito"),
     Flutter("Flutter", optional = true),
     Rust("Rust", optional = true),
+    Cpp("C and C++", optional = true),
     Python("Python", optional = true, packageTool = PackageTool.Python),
     Bun("Bun", optional = true, packageTool = PackageTool.Bun),
     Go("Go", optional = true, packageTool = PackageTool.Go),
@@ -43,6 +47,9 @@ enum class UpdateComponent(
     Netlify("Netlify CLI", optional = true, npmTool = NpmTool.Netlify),
     Firebase("Firebase CLI", optional = true, npmTool = NpmTool.Firebase),
     ;
+
+    /** The tool's own login (decision 98), or null: its install and update don't start while it runs. */
+    val login: LoginSpec? get() = if (this == Wrangler) WranglerLogin else packageTool?.login ?: npmTool?.login
 
     companion object {
         /** A package tool's row, or null for one without (the wasm target moves with Rust). */
@@ -73,10 +80,17 @@ data class UpdateRow(
     val outcome: Outcome? = null,
     /** The steps the update prints, so they can be listed before they start. */
     val steps: List<String> = emptyList(),
+    /** The last check got no answer: what the row shows may be old. */
+    val checkFailed: Boolean = false,
+    /** The tool's login is running ([UpdateComponent.login]); Update waits for it to end. */
+    val signingIn: Boolean = false,
 ) {
     val running: Boolean get() = job?.phase == SetupPhase.Running
     /** The last update failed: the row keeps its steps, the log and Retry. */
     val failed: Boolean get() = !running && (job?.phase == SetupPhase.Failed || outcome?.failed == true)
+
+    /** Update can start now: out of date, and no sign-in holds the tool. */
+    val ready: Boolean get() = available && !signingIn
 
     /** On the screen: always, except an optional tool's row while that tool isn't installed. */
     val shown: Boolean get() = !component.optional || installed != null || running
