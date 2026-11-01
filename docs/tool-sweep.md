@@ -151,6 +151,18 @@ What it hit:
 
 Nothing else needed attention: the env-shebang wrapper (Phase 0) runs `npx cap` and `vite`; Termux's aapt2 is used through the Android tool's `android.aapt2FromMavenOverride` (Gradle prints that the option is experimental, harmless); `ANDROID_HOME` comes from the Android tool, so no `local.properties` is needed; the memory caps and build slot (decision 97) apply as to any Gradle build. The build-slot hook queued this build behind others, as it should. Capacitor's `npx cap run android` / `cap open android` need a device or Android Studio and were not tried; install the APK from the chat card (decision 99) instead.
 
+### A real-world monorepo app (1 Nov 2026)
+
+A production Svelte 5 + Capacitor 6 app inside a large pnpm workspace (137 packages, nx, a shared UI package and plugin front ends pulled in by relative imports; Vite 6 with Tailwind 4, Paraglide and Module Federation; Android Gradle plugin 8.2.1 on Gradle 8.2.1, compile SDK 35, two product flavors) built both flavors' debug APKs on the phone, about 6 MB each, in a throwaway clone. No PocketRocket change was needed. Steps: `corepack enable` (gives the `pnpm` version the repo pins in `packageManager`), `pnpm install --frozen-lockfile` with filters, `pnpm build --mode development`, `npx cap sync android`, then `./gradlew assembleDebug` in `android/` (7 minutes from clean, 413 tasks, nothing cached for that plugin version). The native npm pieces the web build needs (Rollup, Tailwind's oxide, lightningcss, esbuild) all have Android arm64 builds and ran as installed.
+
+| Problem | Cause | Where it belongs | Fix |
+|---|---|---|---|
+| `pnpm` not found | PocketRocket installs Node and npm only; the repo pins pnpm 10 in `packageManager` | Neither (per project) | `corepack enable` once; corepack then runs the pinned version. Termux's `pnpm` package is a newer major and would not match the lockfile |
+| `ERR_PNPM_FETCH_401` from `npm.pkg.github.com` | A workspace package the app doesn't bundle depends on a private GitHub Packages module, and no token was set up | The project (credentials) | With a token in `~/.npmrc` a full install should work. Without one: install only what the app needs, `pnpm install --filter '<app>...' --filter './<plugin front ends>' --filter '!<package needing the private module>'` |
+| Vite: `failed to resolve import "<sdk>/frontend"` | The app reaches plugin front ends through relative paths, not package dependencies, so a filter on the app alone leaves their `node_modules` uninstalled | The project | Add those front ends to the install filter (above) |
+
+Gradle 8.2.1's zip was fetched with curl ahead of the build (sha256 checked) because of the address timeout above, so the wrapper's own download was not tried this time. aapt2 prints several hundred `No package ID 7f found for resource ID` lines while linking library resources; Termux's aapt2 does the same on the sample, and the build succeeds. `npx cap sync` rewrites the committed `capacitor.settings.gradle` with pnpm's unshortened store paths; leave that change out of commits.
+
 ## Phase 2: decide per tool
 
 Using the results, each tool becomes one of:
