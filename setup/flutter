@@ -36,6 +36,8 @@
 # into LD_PRELOAD, so its children (bash, Java: bionic) get Termux's exec helper and other glibc tools stay as they were.
 # In newer Dart SDKs (Flutter 3.44, 3.47) `dart` is a small front end that starts its sibling `dartvm` to run a
 # program, so the `dart` wrapper passes the variable on and the `dartvm` wrapper uses it up (pr_wrap).
+# Commands plugins' build scripts expect and the phone lacks (shasum) come from PR_BIN_DIR, last on PATH so real ones win.
+# The Gradle heap for APK builds is twice the build-slot cap (decision 104): Jetifier on Flutter's engine jar needs more.
 # Builds are arm64 only unless --target-platform is given (the phone's NDK serves no other ABI), with Flutter's ABI
 # filter off. Release and profile builds stop with a message: Google publishes Flutter's Android AOT compiler
 # (gen_snapshot) only for x86_64 hosts.
@@ -50,8 +52,9 @@ PR_GLIBC_LD="$PREFIX/glibc/lib/ld-linux-aarch64.so.1"
 PR_FVM_HOME="$HOME/fvm"
 PR_STAMP=.pocketrocket-prepared   # in bin/cache, which git ignores
 PR_EXEC_DIR="$PREFIX/lib/pocketrocket-flutter-exec"   # the setup script's FLUTTER_EXEC_DIR
+PR_BIN_DIR="$PREFIX/lib/pocketrocket-flutter-bin"   # the setup script's FLUTTER_BIN_DIR: shasum (decision 104)
 PR_PRELOAD_VAR=POCKETROCKET_GLIBC_PRELOAD    # the one-shot glibc preload (pr_apk_setup, pr_wrap)
-PR_WRAPPER_MARK='PocketRocket wrapper 2'     # in every wrapper this launcher writes now; older ones are written again
+PR_WRAPPER_MARK='PocketRocket wrapper 3'     # in every wrapper this launcher writes now; older ones are written again
 PR_NAME="${0##*/}"
 PR_FVM_DIR="$PREFIX/opt/fvm"
 case "$PR_NAME" in dart*) PR_NAME=dart ;; fvm*) PR_NAME=fvm ;; *) PR_NAME=flutter ;; esac
@@ -163,11 +166,15 @@ pr_needs_prepare() {
 # pass it on). The one exception is Dart's front end: `dart` next to a `dartvm` (newer Dart SDKs) runs a program
 # by starting `dartvm`, through its wrapper, so it keeps the variable for that wrapper to use up. Dropping it there
 # cleared LD_PRELOAD before the Flutter tool ran, and gradlew could not start.
+# Inside an APK build, LD_PRELOAD already holding the helper pair is kept (decision 104): the build's bionic programs
+# pass it on, and a glibc program they start (a plugin's Dart build tool, such as cargokit's) needs it so that its own
+# bionic children (cargo, rustc) can start #!/usr/bin/env scripts (cargokit's linker).
 pr_wrap() {
   local use='unset %s'
   [ "${1##*/}" = dart ] && [ -e "${1%/*}/dartvm" ] && use=': keeps %s for dartvm'
-  printf "#!%s\n# %s, written by the flutter launcher: runs the glibc program without the bionic exec helper.\nif [ -n \"\${%s:-}\" ]; then export LD_PRELOAD=\"\$%s\"; $use; else unset LD_PRELOAD; fi\nexec %q \"\$@\"\n" \
-    "$PR_BASH" "$PR_WRAPPER_MARK" "$PR_PRELOAD_VAR" "$PR_PRELOAD_VAR" "$PR_PRELOAD_VAR" "$1.glibc" >"$1" || return 1
+  local pair="$PR_EXEC_DIR/\$PLATFORM/1.so:$PR_EXEC_DIR/\$PLATFORM/2.so"
+  printf "#!%s\n# %s, written by the flutter launcher: runs the glibc program without the bionic exec helper.\nif [ -n \"\${%s:-}\" ]; then export LD_PRELOAD=\"\$%s\"; $use; elif [ \"\${LD_PRELOAD:-}\" != %q ]; then unset LD_PRELOAD; fi\nexec %q \"\$@\"\n" \
+    "$PR_BASH" "$PR_WRAPPER_MARK" "$PR_PRELOAD_VAR" "$PR_PRELOAD_VAR" "$PR_PRELOAD_VAR" "$pair" "$1.glibc" >"$1" || return 1
   chmod 755 "$1"
 }
 
@@ -327,7 +334,22 @@ pr_apk_setup() {
   fi
   export "$PR_PRELOAD_VAR=$PR_EXEC_DIR/\$PLATFORM/1.so:$PR_EXEC_DIR/\$PLATFORM/2.so"
   PR_RUN_ENV+=("ORG_GRADLE_PROJECT_disable-abi-filtering=true")
+  pr_apk_heap
   pr_has_arg --target-platform "$@" || PR_EXTRA_ARGS+=(--target-platform android-arm64)
+}
+
+# pr_apk_heap: Gradle's heap for this APK build, twice the cap in ~/.gradle/gradle.properties (decision 97), at most 4 GB:
+# an APK build holds a whole build slot and runs one Gradle, and Jetifier (android.enableJetifier, common in older apps)
+# runs out of 1.5 GB on Flutter's engine jar. A -D system property wins over gradle.properties. GRADLE_OPTS that already
+# sets org.gradle.jvmargs is left alone.
+pr_apk_heap() {
+  local heap
+  case "${GRADLE_OPTS:-}" in *org.gradle.jvmargs*) return 0 ;; esac
+  [ -x "$PREFIX/bin/pocketrocket-build-slot" ] || return 0
+  heap="$("$PREFIX/bin/pocketrocket-build-slot" config 2>/dev/null | sed -n 's/^heap_mb=//p')"
+  case "$heap" in ''|*[!0-9]*) return 0 ;; esac
+  heap=$((heap * 2)); [ "$heap" -le 4096 ] || heap=4096
+  PR_RUN_ENV+=("GRADLE_OPTS=${GRADLE_OPTS:+$GRADLE_OPTS }-Dorg.gradle.jvmargs=-Xmx${heap}m -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8")
 }
 
 # pr_run <flutter root> <arguments>: the version's bin/flutter or bin/dart, with PR_RUN_ENV in its environment. Every
@@ -376,6 +398,7 @@ pr_flutter() {
   fi
 
   pr_bionic_preload
+  if [ -d "$PR_BIN_DIR" ]; then case ":$PATH:" in *":$PR_BIN_DIR:"*) ;; *) export PATH="$PATH:$PR_BIN_DIR" ;; esac; fi
   pr_dart_sdk "$root" || { pr_say "Could not download the Dart SDK for $root. Check the connection and try again."; return 1; }
   if pr_needs_prepare "$root"; then pr_prepare_root "$root" || return 1; fi
 

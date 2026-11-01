@@ -1,0 +1,16 @@
+#!/data/data/app.pocket/files/usr/bin/bash
+# PocketRocket's shasum for Flutter builds (decision 104): Perl's shasum, which build scripts of Flutter plugins call,
+# is not on the phone unless Termux's perl is. This runs coreutils' sha<N>sum with the same output. Only -a picks
+# the algorithm (1 by default); every other option goes to sha<N>sum as is (-c, -b, -t, --status work the same).
+# The Flutter launcher puts its folder on PATH, after Termux's bin, so a real shasum always wins.
+bits=1 args=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -a|--algorithm) bits="${2:-}"; shift 2 || break ;;
+    -a*) bits="${1#-a}"; shift ;;
+    --algorithm=*) bits="${1#*=}"; shift ;;
+    *) args+=("$1"); shift ;;
+  esac
+done
+case "$bits" in 1|224|256|384|512) ;; *) echo "shasum: unsupported algorithm: $bits" >&2; exit 1 ;; esac
+exec "${PREFIX:-/data/data/app.pocket/files/usr}/bin/sha${bits}sum" ${args[@]+"${args[@]}"}
