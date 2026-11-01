@@ -29,6 +29,15 @@
 # ready before and after: install, use and global finish their setup here, and run again once if FVM's own
 # setup failed before the version was ready.
 #
+# Debug APKs (decision 100, docs/flutter-apk-spike.md): `flutter build apk|appbundle` starts the project's gradlew
+# (#!/usr/bin/env bash) from the Flutter tool, a glibc program, through glibc's execvp, which Termux's
+# termux-exec-glibc never sees. For those commands the tool gets the exec helper the install built from
+# setup/flutter-exec.c (PR_EXEC_DIR): a one-shot POCKETROCKET_GLIBC_PRELOAD that only the next Dart wrapper turns into
+# LD_PRELOAD, so its children (bash, Java: bionic) get Termux's exec helper and other glibc tools stay as they were.
+# Builds are arm64 only unless --target-platform is given (the phone's NDK serves no other ABI), with Flutter's ABI
+# filter off. Release and profile builds stop with a message: Google publishes Flutter's Android AOT compiler
+# (gen_snapshot) only for x86_64 hosts.
+#
 # Internal modes for the setup script: POCKETROCKET_FLUTTER_PREPARE=<folder> prepares that folder and exits;
 # POCKETROCKET_FLUTTER_ROOT=<flutter folder> runs that Flutter whatever the pin.
 
@@ -38,6 +47,8 @@ PR_PATCHELF="$PREFIX/glibc/bin/patchelf"
 PR_GLIBC_LD="$PREFIX/glibc/lib/ld-linux-aarch64.so.1"
 PR_FVM_HOME="$HOME/fvm"
 PR_STAMP=.pocketrocket-prepared   # in bin/cache, which git ignores
+PR_EXEC_DIR="$PREFIX/lib/pocketrocket-flutter-exec"   # the setup script's FLUTTER_EXEC_DIR
+PR_WRAPPER_MARK=POCKETROCKET_GLIBC_PRELOAD   # in every wrapper this launcher writes now; older ones are written again
 PR_NAME="${0##*/}"
 PR_FVM_DIR="$PREFIX/opt/fvm"
 case "$PR_NAME" in dart*) PR_NAME=dart ;; fvm*) PR_NAME=fvm ;; *) PR_NAME=flutter ;; esac
@@ -137,19 +148,34 @@ pr_needs_prepare() {
   local cache="$1/bin/cache" saved=""
   pr_scripts_ready "$1" || return 0
   [ -e "$cache/dart-sdk/bin/dart" ] && [ ! -e "$cache/dart-sdk/bin/dart.glibc" ] && return 0
+  [ -e "$cache/dart-sdk/bin/dart.glibc" ] && ! grep -qF "$PR_WRAPPER_MARK" "$cache/dart-sdk/bin/dart" 2>/dev/null && return 0
   [ -f "$cache/$PR_STAMP" ] || return 0
   read -r saved <"$cache/$PR_STAMP" || true
   pr_signature "$1"
   [ "$saved" != "$PR_SIG" ]
 }
 
+# pr_wrap <program>: the wrapper that runs <program>.glibc without the bionic preload, or with the glibc one when the
+# caller asked for it once (POCKETROCKET_GLIBC_PRELOAD, which the wrapper drops, so the program's children don't
+# pass it on).
+pr_wrap() {
+  printf '#!%s\n# Written by PocketRocket: runs the glibc program without the bionic exec helper.\nif [ -n "${%s:-}" ]; then export LD_PRELOAD="$%s"; unset %s; else unset LD_PRELOAD; fi\nexec %q "$@"\n' \
+    "$PR_BASH" "$PR_WRAPPER_MARK" "$PR_WRAPPER_MARK" "$PR_WRAPPER_MARK" "$1.glibc" >"$1" || return 1
+  chmod 755 "$1"
+}
+
 # pr_prepare <folder>: every glibc program under it gets Termux's glibc loader and a wrapper without the bionic
-# preload. A program already done is a wrapper script, not an ELF file, so running this again changes nothing.
+# preload. A program already done is a wrapper script, not an ELF file, so running this again changes nothing, except
+# that a wrapper from an older launcher is written again.
 pr_prepare() {
   local f magic interp
   [ -x "$PR_PATCHELF" ] && [ -f "$PR_GLIBC_LD" ] || { pr_say "Termux's glibc is missing. Run PocketRocket setup again."; return 1; }
   while IFS= read -r -d '' f; do
-    case "$f" in *.glibc) continue ;; esac
+    case "$f" in
+      *.glibc)
+        if [ -f "${f%.glibc}" ] && ! grep -qF "$PR_WRAPPER_MARK" "${f%.glibc}" 2>/dev/null; then pr_wrap "${f%.glibc}" || return 1; fi
+        continue ;;
+    esac
     magic=""
     LC_ALL=C read -r -n 4 magic <"$f" 2>/dev/null || true
     [ "$magic" = $'\x7fELF' ] || continue
@@ -161,9 +187,7 @@ pr_prepare() {
       *) continue ;;
     esac
     mv -f "$f" "$f.glibc" || return 1
-    printf '#!%s\n# Written by PocketRocket: runs the glibc program without the bionic exec helper.\nunset LD_PRELOAD\nexec %q "$@"\n' \
-      "$PR_BASH" "$f.glibc" >"$f" || return 1
-    chmod 755 "$f"
+    pr_wrap "$f" || return 1
   done < <(find "$1" -type f -perm -u+x -print0 2>/dev/null)
 }
 
@@ -261,6 +285,69 @@ pr_fvm() {
   return "$rc"
 }
 
+# pr_apk_build <flutter arguments>: 0 when they build an Android app (flutter build apk or appbundle).
+pr_apk_build() {
+  local a words=()
+  for a in "$@"; do
+    case "$a" in -*) continue ;; esac
+    words+=("$a")
+    [ "${#words[@]}" -lt 2 ] || break
+  done
+  [ "${words[0]:-}" = build ] || return 1
+  case "${words[1]:-}" in apk|appbundle) return 0 ;; esac
+  return 1
+}
+
+# pr_has_arg <option> <arguments>: 0 when the option is among them, alone or as --option=value.
+pr_has_arg() {
+  local want="$1" a; shift
+  for a in "$@"; do case "$a" in "$want"|"$want"=*) return 0 ;; esac; done
+  return 1
+}
+
+# pr_apk_setup <flutter arguments>: for an APK or app bundle build, refuses release and profile builds, and when the
+# exec helper is there sets what the build needs: the one-shot glibc preload for the Flutter tool (pr_wrap), Flutter's
+# ABI filter off (as a Gradle project property in the environment), and arm64 unless a target platform is given, in
+# PR_EXTRA_ARGS. 1 with a message when the build can't run here.
+pr_apk_setup() {
+  if ! pr_has_arg --debug "$@"; then
+    pr_say "Release and profile builds don't run on the phone: Google publishes Flutter's Android AOT compiler (gen_snapshot) only for x86_64 computers. Add --debug for a debug APK, or build releases on a Mac or in CI."
+    return 1
+  fi
+  if [ ! -f "$PR_EXEC_DIR/aarch64/2.so" ] || [ ! -e "$PR_EXEC_DIR/\$PLATFORM/1.so" ]; then
+    pr_say "Debug APK builds need Android and C and C++ from Settings → Tools, then Repair on Flutter & Dart."
+    return 1
+  fi
+  export POCKETROCKET_GLIBC_PRELOAD="$PR_EXEC_DIR/\$PLATFORM/1.so:$PR_EXEC_DIR/\$PLATFORM/2.so"
+  PR_RUN_ENV+=("ORG_GRADLE_PROJECT_disable-abi-filtering=true")
+  pr_has_arg --target-platform "$@" || PR_EXTRA_ARGS+=(--target-platform android-arm64)
+}
+
+# pr_run <flutter root> <arguments>: the version's bin/flutter or bin/dart, with PR_RUN_ENV in its environment. Every
+# run of the tool starts here. Commands that compile run in a build slot (decision 97), taken here and only here, after
+# pr_apk_setup has refused what can't build: `flutter build apk --debug` holds one slot, and the Gradle it starts shares
+# it (POCKETROCKET_BUILD_SLOT, or the parent walk), so nothing waits on itself.
+PR_RUN_ENV=()
+pr_run() {
+  local root="$1" slot=()
+  shift
+  if pr_compiles "$@" && [ -x "$PREFIX/bin/pocketrocket-build-slot" ]; then
+    slot=("$PREFIX/bin/pocketrocket-build-slot" run "$PR_NAME $*" --)
+  fi
+  ${slot[@]+"${slot[@]}"} env ${PR_RUN_ENV[@]+"${PR_RUN_ENV[@]}"} "$PR_BASH" "$root/bin/$PR_NAME" "$@"
+}
+
+# pr_compiles <arguments>: the flutter or dart command builds or analyses code, so it waits for a build slot (decision
+# 97). pub, doctor, --version and the like never wait. Checks (analyze, test) take a slot only while they run.
+pr_compiles() {
+  local a sub=""
+  for a in "$@"; do case "$a" in -*) ;; *) sub="$a"; break ;; esac; done
+  case "$PR_NAME:$sub" in
+    flutter:build|flutter:run|flutter:test|flutter:drive|flutter:analyze|dart:compile|dart:test|dart:analyze) return 0 ;;
+  esac
+  return 1
+}
+
 # pr_flutter <arguments>: flutter or dart, from the pinned or default version.
 pr_flutter() {
   local root rc=0 head=""
@@ -297,9 +384,12 @@ pr_flutter() {
     pr_restore_scripts "$root" || { pr_say "could not put back Flutter's scripts in $root/bin for git"; return 1; }
   fi
 
+  PR_EXTRA_ARGS=()
+  if [ "$PR_NAME" = flutter ] && pr_apk_build "$@"; then pr_apk_setup "$@" || return 1; fi
+
   # Not exec: Flutter may download engine tools during this run and start them at once, before they are
   # prepared. Afterwards they are, and the next run works.
-  "$PR_BASH" "$root/bin/$PR_NAME" "$@" || rc=$?
+  pr_run "$root" "$@" ${PR_EXTRA_ARGS[@]+"${PR_EXTRA_ARGS[@]}"} || rc=$?
   if [ -n "$head" ] && [ "$rc" != 0 ] && [ "$(git -C "$root" rev-parse HEAD 2>/dev/null)" != "$head" ]; then
     # The checkout moved, then Flutter's second half (bin/flutter started from Dart) failed: finish it here.
     pr_say "Setting up the new Flutter for this phone"

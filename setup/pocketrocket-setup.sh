@@ -1021,11 +1021,30 @@ android_gradle_props_remove() {
 
 # android_gradle_props_add <gradle.properties> <aapt2 path>: the plugin's own aapt2 is x86_64, so point it at Termux's.
 # A daemon idles for 3 hours by default, holding over 1 GB; on a phone it goes after 10 minutes.
+# Memory caps sized from the phone's RAM (decision 97): this file wins over a project's gradle.properties, so a project
+# asking for -Xmx4g gets a quarter of its build slot's share (1536 MB on a 12 GB phone), two workers, and Kotlin
+# compiled inside Gradle's own JVM instead of a second daemon.
 android_gradle_props_add() {
+  local heap
+  heap="$(bash "$(dirname "${BASH_SOURCE[0]}")/pocketrocket-build-slot" config 2>/dev/null | sed -n 's/^heap_mb=//p')"
+  case "$heap" in ''|*[!0-9]*) heap=1536 ;; esac
   android_gradle_props_remove "$1"
   mkdir -p "$(dirname "$1")"
   printf '%s\n' "$ANDROID_GRADLE_BEGIN" "android.aapt2FromMavenOverride=$2" \
-    "org.gradle.daemon.idletimeout=600000" "$ANDROID_GRADLE_END" >>"$1"
+    "org.gradle.daemon.idletimeout=600000" \
+    "org.gradle.jvmargs=-Xmx${heap}m -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8" \
+    "org.gradle.workers.max=2" \
+    "kotlin.compiler.execution.strategy=in-process" "$ANDROID_GRADLE_END" >>"$1"
+}
+
+# The build-slot Gradle hook (decision 97), from the template beside this script; the app refreshes the same file at
+# every start (BuildSlots.kt) and removes it once the Android tool is gone.
+ANDROID_SLOTS_INIT_SCRIPT="$HOME/.gradle/init.d/pocketrocket-build-slots.gradle"
+android_slots_write_hook() {
+  local tmp="$ANDROID_SLOTS_INIT_SCRIPT.tmp"
+  mkdir -p "$(dirname "$ANDROID_SLOTS_INIT_SCRIPT")"
+  sed -e "s|@POCKETROCKET_BUILD_SLOT@|$PREFIX/bin/pocketrocket-build-slot|g" \
+    "$(dirname "${BASH_SOURCE[0]}")/pocketrocket-build-slots.gradle" >"$tmp" && mv -f "$tmp" "$ANDROID_SLOTS_INIT_SCRIPT"
 }
 
 # android_installed_packages: packages really installed. `dpkg-query -W` alone also lists removed ones that kept their
@@ -1113,7 +1132,9 @@ step_android_wire() {
   # The Gradle hook ships with this tool too (decision 96): without the NDK, native tasks fail plainly instead of the
   # plugin downloading Google's x86_64 NDK, and Kotlin, Java and unit tests still run.
   android_ndk_write_hook
-  ok "ANDROID_HOME, JAVA_HOME and aapt2 set for every session"
+  # Builds take turns in the phone's build slots (decision 97); the app installs pocketrocket-build-slot itself.
+  android_slots_write_hook || fail "could not write $ANDROID_SLOTS_INIT_SCRIPT"
+  ok "ANDROID_HOME, JAVA_HOME and aapt2 set for every session, builds take turns"
   printf '[done]\n'
 }
 
@@ -1124,6 +1145,7 @@ step_android_remove_files() {
   pkill -f KotlinCompileDaemon 2>/dev/null || true
   # The NDK tool sits on top of this one, so it goes with it (decision 50), and so does the Gradle hook it owns.
   android_ndk_remove
+  rm -f "$ANDROID_SLOTS_INIT_SCRIPT"
   android_ndk_remove_hook
   rm -rf "$ANDROID_SDK_DIR"; rmdir "$PREFIX/opt" 2>/dev/null || true
   rm -f "$ANDROID_PROFILE"
@@ -1522,13 +1544,17 @@ FLUTTER_RELEASES="https://storage.googleapis.com/flutter_infra_release/releases/
 FLUTTER_HOME="$HOME/fvm"                                # FVM's cache folder; FlutterTool.FVM_RELATIVE
 FLUTTER_VERSIONS="$FLUTTER_HOME/versions"
 FLUTTER_DEFAULT="$FLUTTER_HOME/default"                 # FVM's global version: a link to versions/<version>
-FLUTTER_PACKAGES="which unzip"                          # flutter doctor needs which; the Dart SDK download needs unzip
+FLUTTER_PACKAGES="which unzip termux-exec-glibc"        # flutter doctor needs which; the Dart SDK download needs unzip;
+                                                        # debug APK builds need termux-exec-glibc (base has it already)
 FLUTTER_ADDED_FILE="$PR_HOME/flutter.packages"
 FLUTTER_BASELINE_FILE="$PR_HOME/flutter.baseline"
 FVM_VERSION=4.3.2
 FVM_SHA256=df05c7682eeac21b08939e7be131687dc3d54fd5575b5e4bca931717ddeb0a01   # GitHub's published digest of the asset
 FVM_URL="https://github.com/leoafarias/fvm/releases/download/$FVM_VERSION/fvm-$FVM_VERSION-linux-arm64.tar.gz"
 FVM_DIR="${PREFIX:-}/opt/fvm"
+# Debug APK builds (decision 100): the exec helper the Flutter tool needs to start gradlew. FlutterTool.EXEC_RELATIVE
+# and the launcher's PR_EXEC_DIR name the same folder.
+FLUTTER_EXEC_DIR="${PREFIX:-}/lib/pocketrocket-flutter-exec"
 RUST_PACKAGES="rust"                                    # brings rust-std-aarch64-linux-android with it
 # What the install added, for Uninstall (pkg_tool_purge rust reads these same two names). The app reads "installed"
 # from dpkg, so these are not markers: a `pkg install rust` from a terminal has none and still shows as installed.
@@ -1650,11 +1676,47 @@ step_flutter_helpers() {
     printf '%s\n' "$FVM_VERSION" >"$FVM_DIR/.version"
   fi
   flutter_launchers
+  flutter_exec_build
   POCKETROCKET_FLUTTER_PREPARE="$FVM_DIR/src" "$PREFIX/bin/flutter" >>"$PR_LOG" 2>&1 || fail "could not prepare FVM for this phone"
   out="$(fvm --version 2>&1)" || fail "fvm --version failed: $out"
   # Versions come from the tool page; FVM's mirror of the whole Flutter history would add gigabytes.
   log_run fvm config --no-use-git-cache --no-update-check || warn "could not turn off FVM's git cache"
   ok "FVM $out"
+}
+
+# flutter_exec_build: the exec helper for `flutter build apk --debug` (decision 100, docs/flutter-apk-spike.md), built
+# here from setup/flutter-exec.c with the C and C++ add-on's clang; no binary ships. The Flutter tool is a glibc
+# program and starts gradlew (#!/usr/bin/env bash) with glibc's execvp, which Termux's termux-exec-glibc never sees.
+# One LD_PRELOAD value serves both C libraries: glibc's loader reads $PLATFORM as "aarch64", bionic's takes it as is.
+#   aarch64/1.so    termux-exec-glibc            aarch64/2.so    flutter-exec.c (execvp on top of execve)
+#   $PLATFORM/1.so  Termux's bionic exec helper  $PLATFORM/2.so  an empty library
+# Without clang Flutter still works for compile checks; the launcher says what APK builds need, and the tile offers
+# Repair once clang is on the phone. Never fails the install.
+flutter_exec_build() {
+  local here src d="$FLUTTER_EXEC_DIR" new="$FLUTTER_EXEC_DIR.new" glibc_exec="$PREFIX/glibc/lib/libtermux-exec.so" bionic_exec="" lib
+  here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; src="$here/flutter-exec.c"
+  if ! command -v clang >/dev/null 2>&1; then
+    info "debug APK builds need clang: add C and C++ (and Android) from Tools, then Repair Flutter & Dart"
+    return 0
+  fi
+  for lib in "$PREFIX/lib/libtermux-exec-ld-preload.so" "$PREFIX/lib/libtermux-exec.so"; do
+    if [ -f "$lib" ]; then bionic_exec="$lib"; break; fi
+  done
+  [ -f "$src" ] && [ -f "$glibc_exec" ] && [ -n "$bionic_exec" ] \
+    || { warn "debug APK builds are not set up: flutter-exec.c, termux-exec-glibc or Termux's exec helper is missing"; return 0; }
+  rm -rf "$new"; mkdir -p "$new/aarch64" "$new/\$PLATFORM"
+  if ! log_run clang --target=aarch64-linux-gnu -O2 -fPIC -shared -nostdlib -fno-stack-protector -o "$new/libflutter-exec-glibc.so" "$src" \
+    || ! printf 'void pocketrocket_flutter_exec_empty(void) {}\n' >"$new/empty.c" \
+    || ! log_run clang -O2 -fPIC -shared -nostdlib -o "$new/libempty-bionic.so" "$new/empty.c"; then
+    rm -rf "$new"; warn "could not build the exec helper for debug APK builds; Repair tries again"; return 0
+  fi
+  rm -f "$new/empty.c"
+  ln -s "$glibc_exec" "$new/aarch64/1.so"
+  ln -s "$d/libflutter-exec-glibc.so" "$new/aarch64/2.so"
+  ln -s "$bionic_exec" "$new/\$PLATFORM/1.so"
+  ln -s "$d/libempty-bionic.so" "$new/\$PLATFORM/2.so"
+  rm -rf "$d"; mv "$new" "$d"
+  ok "debug APK builds set up (exec helper in $d)"
 }
 
 # step_flutter_download [version]: sets FLUTTER_VERSION and FLUTTER_ROOT.
@@ -1788,7 +1850,7 @@ step_flutter_remove_version() {
 
 # What uninstalling Flutter removes, besides the packages it added. The one list; the tests read it.
 flutter_remove_paths() {
-  printf '%s\n' "$FLUTTER_HOME" "$FVM_DIR" "$PREFIX/bin/flutter" "$PREFIX/bin/dart" "$PREFIX/bin/fvm" \
+  printf '%s\n' "$FLUTTER_HOME" "$FVM_DIR" "$FLUTTER_EXEC_DIR" "$PREFIX/bin/flutter" "$PREFIX/bin/dart" "$PREFIX/bin/fvm" \
     "$HOME/.pub-cache" "$HOME/.dart-tool" "$HOME/.dartServer" "$HOME/.dart" "$HOME/.flutter" "$HOME/.flutter-devtools" \
     "$HOME/.config/flutter" "$HOME/.config/fvm" "$HOME/.fvm"
 }

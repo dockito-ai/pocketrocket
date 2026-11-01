@@ -39,7 +39,7 @@ class AndroidDetectionTest {
         file(File(sdk, "platforms/android-37.0/package.xml"))
         file(File(sdk, "build-tools/36.0.0/package.xml"))
         file(File(sdk, "licenses/android-sdk-license"), "\nabc")
-        file(gradleProperties, "org.gradle.parallel=true\n# >>> PocketRocket\n${AndroidBuildTool.AAPT2_SETTING}/usr/bin/aapt2\n# <<<\n")
+        file(gradleProperties, "org.gradle.parallel=true\n# >>> PocketRocket\n${AndroidBuildTool.AAPT2_SETTING}/usr/bin/aapt2\n${AndroidBuildTool.LIMITS_SETTING}2\n# <<<\n")
     }
 
     private fun android(p: Map<String, DpkgStatus.Package> = androidPkgs) = AndroidBuildTool.presence(sdk, gradleProperties, p)
@@ -60,7 +60,7 @@ class AndroidDetectionTest {
         File(sdk, "platforms").deleteRecursively()
         assertEquals("SDK platform missing", android().problem)
         gradleProperties.writeText("org.gradle.parallel=true\n")
-        assertEquals("SDK platform, aapt2 setting missing", android().problem)
+        assertEquals("SDK platform, aapt2 setting, build limits missing", android().problem)
         // `rm -rf $PREFIX/opt/android-sdk`: gone, whatever packages stay.
         sdk.deleteRecursively()
         assertFalse(android().present)
@@ -70,7 +70,7 @@ class AndroidDetectionTest {
         File(sdk, "licenses").mkdirs() // the SDK step stopped before any download
         val p = android(pkgs("openjdk-17", "gradle", "aapt2", "aapt", "aidl"))
         assertTrue(p.present)
-        assertEquals("SDK platform, SDK build tools, SDK license, aapt2 setting missing", p.problem)
+        assertEquals("SDK platform, SDK build tools, SDK license, aapt2 setting, build limits missing", p.problem)
         val state = ToolStates.scriptTool(ScriptToolState(installed = p.present, problem = p.problem, checked = true))
         assertTrue(state.installed)
         val status = ToolModel.status(Tool.Android.spec, state)
