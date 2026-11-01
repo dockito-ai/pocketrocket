@@ -48,7 +48,12 @@ import com.pocketrocket.ui.tools.GitToolPage
 import com.pocketrocket.ui.tools.RustToolPage
 import com.pocketrocket.ui.tools.PythonToolPage
 import com.pocketrocket.ui.tools.BunToolPage
+import com.pocketrocket.ui.tools.AwsToolPage
 import com.pocketrocket.ui.tools.DenoToolPage
+import com.pocketrocket.ui.tools.FirebaseToolPage
+import com.pocketrocket.ui.tools.FlyToolPage
+import com.pocketrocket.ui.tools.NetlifyToolPage
+import com.pocketrocket.ui.tools.VercelToolPage
 import com.pocketrocket.ui.tools.GoToolPage
 import com.pocketrocket.ui.tools.JavaToolPage
 import com.pocketrocket.ui.tools.PhpToolPage
@@ -194,6 +199,11 @@ fun PocketRocketApp(startScreen: AppScreen, onOpenTerminal: () -> Unit, showSess
             r == Routes.TOOL_RUBY -> RubyToolPage(onBack = ::pop)
             r == Routes.TOOL_PHP -> PhpToolPage(onBack = ::pop)
             r == Routes.TOOL_JAVA -> JavaToolPage(onBack = ::pop)
+            r == Routes.TOOL_AWS -> AwsToolPage(onBack = ::pop)
+            r == Routes.TOOL_FLY -> FlyToolPage(onBack = ::pop)
+            r == Routes.TOOL_VERCEL -> VercelToolPage(onBack = ::pop)
+            r == Routes.TOOL_NETLIFY -> NetlifyToolPage(onBack = ::pop)
+            r == Routes.TOOL_FIREBASE -> FirebaseToolPage(onBack = ::pop)
             r == Routes.TOOL_GIT -> GitToolPage(onBack = ::pop)
             r == Routes.CLAUDE_CODE -> ClaudeCodeScreen(onBack = ::pop)
             r == Routes.UPDATES -> UpdatesScreen(onBack = ::pop, onClaudeCode = { push(Routes.CLAUDE_CODE) })

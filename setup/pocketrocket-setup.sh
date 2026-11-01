@@ -45,6 +45,10 @@
 #                     Termux packages only, 2 steps; Python's uninstall leaves what Headless Chrome needs
 #   --only go, deno, ruby, php, java (and <name>-remove)  the language tiles, package tools too (decision 98); java is
 #                     openjdk-21 with kotlin and keeps Java 17 the default java while it is installed
+#   --only aws, flyctl (and -remove)  the deploy CLIs from Termux's packages, package tools too (decision 98); their
+#                     uninstall signs out first and removes ~/.aws or ~/.fly; awscli-check/-update, flyctl-check/-update
+#   --only vercel, netlify, firebase (and -remove)  the npm deploy CLIs (decision 98): npm install -g, 2 steps; uninstall
+#                     signs out and removes their config
 #   --only golang-check / deno-check / ruby-check / php-check / openjdk-21-check, and the same with -update: as below
 #   --only git-check / rust-check / python-check / bun-check  refresh the package index and print `apt-cache policy <package>` (its
 #                     Installed and Candidate lines) for the Updates screen; no steps, no lock, no [done]
@@ -1864,6 +1868,8 @@ pkg_tool_packages() {
     ruby) printf 'ruby' ;;
     php) printf 'php' ;;          # not composer: its package's phar fails its signature check after the prefix rewrite
     java) printf 'openjdk-21 kotlin' ;;
+    aws) printf 'awscli' ;;       # the deploy CLIs from Termux's packages (decision 98)
+    flyctl) printf 'flyctl' ;;
     *) return 1 ;;
   esac
 }
@@ -1890,6 +1896,8 @@ pkg_tool_title() {
     ruby) printf 'Ruby' ;;
     php) printf 'PHP' ;;
     java) printf 'Java 21 and Kotlin' ;;
+    aws) printf 'the AWS CLI' ;;
+    flyctl) printf 'flyctl' ;;
   esac
 }
 
@@ -1906,7 +1914,19 @@ pkg_tool_check() {
     ruby) RUBYOPT=-rrubygems ruby -e 'require "json"; print "ruby #{RUBY_VERSION}, gem #{Gem::VERSION}"' ;;
     php) php -r 'echo "PHP " . PHP_VERSION;' ;;
     java) "$JAVA21_HOME/bin/java" -version 2>&1 | sed -n 1p && kotlinc -version 2>&1 | grep -o 'kotlinc-jvm [^ ]*' ;;
+    aws) aws --version ;;
+    flyctl) flyctl version ;;
   esac
+}
+
+# pkg_tool_signout <name>: a deploy CLI's own sign-out before it goes, so the login doesn't outlive the tool. Offline
+# it can't revoke; the local copy still goes with its folder (pkg_tool_cleanup).
+pkg_tool_signout() {
+  case "$1" in
+    aws) if [ -x "$PREFIX/bin/aws" ]; then timeout 20 aws logout --all </dev/null >>"$PR_LOG" 2>&1 || true; fi ;;
+    flyctl) if [ -x "$PREFIX/bin/flyctl" ]; then timeout 20 flyctl auth logout </dev/null >>"$PR_LOG" 2>&1 || true; fi ;;
+  esac
+  return 0
 }
 
 # Ruby (decision 98): Termux's ruby doesn't load RubyGems by itself, so `require "<gem>"` fails until it does. Terminals
@@ -1949,6 +1969,9 @@ pkg_tool_cleanup() {
       chmod -R u+w "$HOME/go/pkg" 2>/dev/null || true
       rm -rf "$HOME/go/pkg"; rmdir "$HOME/go" 2>/dev/null || true ;;
     deno) rm -rf "$HOME/.cache/deno" ;;
+    # Their config, credentials and caches (flyctl ignores FLY_CONFIG_DIR and always uses ~/.fly).
+    aws) rm -rf "$HOME/.aws" ;;
+    flyctl) rm -rf "$HOME/.fly" ;;
     ruby) rm -f "$RUBY_PROFILE"
       # Gems installed into the prefix, and the launchers RubyGems wrote for them.
       rm -rf "${PREFIX:-}/lib/ruby" "$HOME/.local/share/gem" "$HOME/.cache/gem"
@@ -2035,6 +2058,7 @@ step_pkg_tool_install() {
 step_pkg_tool_remove() {
   local name="$1"
   step "Removing $(pkg_tool_title "$name")"
+  pkg_tool_signout "$name"
   pkg_tool_purge "$name"
   pkg_tool_cleanup "$name"
   if [ -n "$PKG_TOOL_KEPT" ]; then ok "removed the rest; $PKG_TOOL_KEPT stayed"; else ok "$(pkg_tool_title "$name") removed"; fi
@@ -2046,6 +2070,109 @@ main_pkg_tool() {
   TOTAL_STEPS=2; PR_LOG="$PR_HOME/$name.log"
   step "Checking the device"; preflight_checks; ok "Termux on aarch64"
   if [ "$option" = "$name" ]; then step_pkg_tool_install "$name"; else step_pkg_tool_remove "$name"; fi
+  printf '[done]\n'
+}
+
+# The npm deploy CLIs (decision 98): Vercel, Netlify and Firebase, global npm installs of their newest release.
+# NpmTool.kt holds the same names. The app reads "installed" from npm's folder for the package, so an
+# `npm i -g vercel` from a terminal shows on the tile too. npm 12 skips their install scripts with an allow-scripts
+# warning; they run without them. npm's download cache stays in a temp folder and goes when done.
+npm_tool_package() {
+  case "$1" in
+    vercel) printf 'vercel' ;;
+    netlify) printf 'netlify-cli' ;;
+    firebase) printf 'firebase-tools' ;;
+    *) return 1 ;;
+  esac
+}
+
+npm_tool_title() {
+  case "$1" in
+    vercel) printf 'the Vercel CLI' ;;
+    netlify) printf 'the Netlify CLI' ;;
+    firebase) printf 'the Firebase CLI' ;;
+  esac
+}
+
+# npm_tool_bin <name>: its program in $PREFIX/bin; npm_tool_download_mb: npm's cache after an install, for the bar.
+npm_tool_bin() { case "$1" in vercel) printf vercel ;; netlify) printf netlify ;; firebase) printf firebase ;; esac; }
+npm_tool_download_mb() { case "$1" in vercel) printf 197 ;; netlify) printf 263 ;; firebase) printf 140 ;; esac; }
+
+# npm_tool_config <name>: where the CLI keeps its login and settings, removed with it.
+npm_tool_config() {
+  case "$1" in
+    vercel) printf '%s ' "${XDG_DATA_HOME:-$HOME/.local/share}/com.vercel.cli" "${XDG_CACHE_HOME:-$HOME/.cache}/com.vercel.cli" ;;
+    netlify) printf '%s ' "${XDG_CONFIG_HOME:-$HOME/.config}/netlify" ;;
+    firebase) printf '%s ' "${XDG_CONFIG_HOME:-$HOME/.config}/configstore/firebase-tools.json" "${XDG_CACHE_HOME:-$HOME/.cache}/firebase" ;;
+  esac
+}
+
+# npm_tool_logout <name>: its own sign-out, so the login doesn't outlive the tool. Offline it can't revoke; the local
+# copy still goes with npm_tool_config.
+npm_tool_logout() {
+  case "$1" in
+    vercel) printf 'logout' ;;
+    netlify) printf 'logout' ;;
+    firebase) printf 'logout --non-interactive' ;;
+  esac
+}
+
+# watch_dir <pid> <dir> <total MB> <label>: the folder's size on the bar while the process runs (npm's cache fills as it
+# downloads). Never past 95: unpacking comes after.
+watch_dir() {
+  local pid="$1" dir="$2" total="$3" label="$4" have pct last=-1
+  while kill -0 "$pid" 2>/dev/null; do
+    have="$(du -sk "$dir" 2>/dev/null | awk '{print $1 * 1024}')"; have="${have:-0}"
+    if [ "$have" -gt 0 ]; then
+      pct=$(( have * 100 / (total * 1048576) )); [ "$pct" -gt 95 ] && pct=95
+      [ "$pct" = "$last" ] || { last="$pct"; progress "$pct" "$label · $(mb "$have") of about $total MB"; }
+    fi
+    sleep 2
+  done
+}
+
+step_npm_tool_install() {
+  local name="$1" pkg bin cache="$TMPDIR/pocketrocket-npm-$1" major pid out
+  pkg="$(npm_tool_package "$name")"; bin="$(npm_tool_bin "$name")"
+  step "Installing $(npm_tool_title "$name")"
+  major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+  [ "$major" -ge 20 ] || fail "$(npm_tool_title "$name") needs Node 20 or newer, found ${major}"
+  rm -rf "$cache"
+  npm install -g --no-fund --no-audit --cache "$cache" "$pkg" >>"$PR_LOG" 2>&1 &
+  pid=$!
+  watch_dir "$pid" "$cache" "$(npm_tool_download_mb "$name")" "Downloading $pkg"
+  if ! wait "$pid"; then rm -rf "$cache"; fail "npm install $pkg failed; see $PR_LOG"; fi
+  rm -rf "$cache"
+  hash -r 2>/dev/null || true
+  out="$("$PREFIX/bin/$bin" --version 2>&1)" || fail "$bin --version failed: $out"
+  ok "$pkg $(printf '%s' "$out" | tail -n 1)"
+}
+
+step_npm_tool_remove() {
+  local name="$1" pkg bin dir
+  pkg="$(npm_tool_package "$name")"; bin="$(npm_tool_bin "$name")"
+  step "Removing $(npm_tool_title "$name")"
+  if [ -x "$PREFIX/bin/$bin" ]; then
+    # shellcheck disable=SC2046
+    timeout 20 "$PREFIX/bin/$bin" $(npm_tool_logout "$name") </dev/null >>"$PR_LOG" 2>&1 || true
+  fi
+  if [ -e "$PREFIX/lib/node_modules/$pkg" ]; then
+    log_run npm uninstall -g "$pkg" || fail "npm uninstall $pkg failed"
+  fi
+  rm -f "$PREFIX/bin/$bin"   # a failed install can leave it with nothing to point at
+  # shellcheck disable=SC2046
+  for dir in $(npm_tool_config "$name"); do rm -rf "$dir"; done
+  rmdir "$HOME/.config/configstore" "$HOME/.config" "$HOME/.local/share" "$HOME/.local" 2>/dev/null || true
+  ok "$pkg removed"
+}
+
+# --only <name> / <name>-remove for an npm tool: 2 steps, its own log.
+main_npm_tool() {
+  local option="$1" name="${1%-remove}"
+  TOTAL_STEPS=2; PR_LOG="$PR_HOME/$name.log"
+  step "Checking the device"; preflight_checks; ok "Termux on aarch64"
+  export LD_PRELOAD="${LD_PRELOAD:-$PREFIX/lib/libtermux-exec.so}"   # their launchers start with #!/usr/bin/env node
+  if [ "$option" = "$name" ]; then step_npm_tool_install "$name"; else step_npm_tool_remove "$name"; fi
   printf '[done]\n'
 }
 
@@ -2092,7 +2219,8 @@ main() {
         flutter|flutter-default|flutter-remove-version|flutter-remove|rust|rust-remove|flutter-rust|flutter-rust-remove|rust-check|rust-update) ;;
         python|python-remove|bun|bun-remove|rust-wasm|rust-wasm-remove|python-check|python-update|bun-check|bun-update) ;;
         go|go-remove|deno|deno-remove|ruby|ruby-remove|php|php-remove|java|java-remove|golang-check|golang-update|deno-check|deno-update|ruby-check|ruby-update|php-check|php-update|openjdk-21-check|openjdk-21-update) ;;
-        *) fail "--only takes: claude, dockito, chromium, chromium-remove, android-build, android-build-remove, android-ndk, android-ndk-remove, wrangler, wrangler-remove, flutter [version], flutter-default <version>, flutter-remove-version <version>, flutter-remove, rust, rust-remove, flutter-rust, flutter-rust-remove, python, python-remove, bun, bun-remove, rust-wasm, rust-wasm-remove, go, go-remove, deno, deno-remove, ruby, ruby-remove, php, php-remove, java, java-remove, git-check, git-update, rust-check, rust-update, python-check, python-update, bun-check, bun-update, golang-check, golang-update, deno-check, deno-update, ruby-check, ruby-update, php-check, php-update, openjdk-21-check or openjdk-21-update" ;;
+        aws|aws-remove|flyctl|flyctl-remove|vercel|vercel-remove|netlify|netlify-remove|firebase|firebase-remove|awscli-check|awscli-update|flyctl-check|flyctl-update) ;;
+        *) fail "--only takes: aws, aws-remove, flyctl, flyctl-remove, vercel, vercel-remove, netlify, netlify-remove, firebase, firebase-remove, awscli-check, awscli-update, flyctl-check, flyctl-update,claude, dockito, chromium, chromium-remove, android-build, android-build-remove, android-ndk, android-ndk-remove, wrangler, wrangler-remove, flutter [version], flutter-default <version>, flutter-remove-version <version>, flutter-remove, rust, rust-remove, flutter-rust, flutter-rust-remove, python, python-remove, bun, bun-remove, rust-wasm, rust-wasm-remove, go, go-remove, deno, deno-remove, ruby, ruby-remove, php, php-remove, java, java-remove, git-check, git-update, rust-check, rust-update, python-check, python-update, bun-check, bun-update, golang-check, golang-update, deno-check, deno-update, ruby-check, ruby-update, php-check, php-update, openjdk-21-check or openjdk-21-update" ;;
       esac
       case "$2" in
         git-check|rust-check) apt_check "${2%-check}"; return 0 ;;
@@ -2112,6 +2240,12 @@ main() {
         # The java group stays set to 17 by hand (java_keep_17), so an update of 21 doesn't move it.
         openjdk-21-update) main_apt_update "Java and Kotlin" "$JAVA21_HOME/bin/java -version" openjdk-21 openjdk-21-x kotlin; return 0 ;;
         go|go-remove|deno|deno-remove|ruby|ruby-remove|php|php-remove|java|java-remove) main_pkg_tool "$2"; return 0 ;;
+        # The deploy CLIs (decision 98): two package tools, three npm ones.
+        awscli-check|flyctl-check) apt_check "${2%-check}"; return 0 ;;
+        awscli-update) main_apt_update "AWS CLI" "aws --version" awscli; return 0 ;;
+        flyctl-update) main_apt_update flyctl "flyctl version" flyctl; return 0 ;;
+        aws|aws-remove|flyctl|flyctl-remove) main_pkg_tool "$2"; return 0 ;;
+        vercel|vercel-remove|netlify|netlify-remove|firebase|firebase-remove) main_npm_tool "$2"; return 0 ;;
       esac
       case "$2" in
         flutter*|rust*)

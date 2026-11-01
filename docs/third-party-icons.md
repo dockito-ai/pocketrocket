@@ -26,6 +26,11 @@ endorsement or affiliation.
 | Ruby | `ic_tool_ruby.xml` | Simple Icons 16.36.0, `ruby` | `#CC342D` | CC BY-SA 2.5 (per Simple Icons) |
 | PHP | `ic_tool_php.xml` | Simple Icons 16.36.0, `php` | `#777BB4` | CC BY-SA 4.0 (per Simple Icons) |
 | Java and Kotlin | `ic_tool_openjdk.xml` | Simple Icons 16.36.0, `openjdk` | `#000000` | BSD 3-Clause (per Simple Icons) |
+| Vercel CLI | `ic_tool_vercel.xml` | Simple Icons 16.36.0, `vercel` | `#000000` | CC0 1.0 (Simple Icons) |
+| Netlify CLI | `ic_tool_netlify.xml` | Simple Icons 16.36.0, `netlify` | `#00C7B7` | CC0 1.0 (Simple Icons) |
+| Firebase CLI | `ic_tool_firebase.xml` | Simple Icons 16.36.0, `firebase` | `#DD2C00` | CC0 1.0 (Simple Icons) |
+| flyctl | `ic_tool_flydotio.xml` | Simple Icons 16.36.0, `flydotio` | `#24175B` | CC0 1.0 (Simple Icons) |
+| AWS CLI | `ic_tool_awscli.xml` | Material Icons `cloud` (Google), in AWS's orange: Simple Icons no longer carries AWS's marks | `#FF9900` | Apache 2.0 (Google) |
 
 Simple Icons' collection is CC0; where Simple Icons records a licence for a single icon, that licence is listed above
 and applies to that file. Brand guidelines: Android, Cloudflare, Flutter, Google Chrome, Node.js, Python and Rust publish

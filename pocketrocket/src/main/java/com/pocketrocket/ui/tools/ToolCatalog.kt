@@ -38,15 +38,23 @@ import com.pocketrocket.wrangler.WranglerState
 import com.pocketrocket.wrangler.WranglerTool
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.pocketrocket.clilogin.CliLogins
+import com.pocketrocket.clilogin.LoginSpec
+import com.pocketrocket.clilogin.LoginState
+import com.pocketrocket.clitools.NpmTool
+import com.pocketrocket.clitools.NpmTools
+import com.pocketrocket.clitools.NpmToolsState
+import com.pocketrocket.wrangler.WranglerLogin
 import java.io.File
 
 /**
  * Every tool in Settings → Tools (decisions 64 and 87): what it declares and how its module's state reads as a
  * [ToolState]. Included (built in): Claude Code, Dockito, Git, Node.js and npm. Add-ons (optional): Android,
- * Android NDK, Bun, Deno, Flutter & Dart, Go, Headless Chrome, Java and Kotlin, PHP, Python, Ruby, Rust, Wrangler. The
- * screen orders them by name. A tool with a [pkg] is a package tool (decisions 92 and 98), read from dpkg.
+ * Android NDK, AWS CLI, Bun, Deno, Firebase CLI, flyctl, Flutter & Dart, Go, Headless Chrome, Java and Kotlin, Netlify
+ * CLI, PHP, Python, Ruby, Rust, Vercel CLI, Wrangler. The screen orders them by name. A tool with a [pkg] is a package
+ * tool (decisions 92 and 98), read from dpkg; one with an [npm] is a global npm CLI (decision 98).
  */
-enum class Tool(val spec: ToolSpec, val route: String, val pkg: PackageTool? = null) {
+enum class Tool(val spec: ToolSpec, val route: String, val pkg: PackageTool? = null, val npm: NpmTool? = null) {
     ClaudeCode(ToolSpec("Claude Code", ToolKind.BuiltIn, hasVersion = true, canUpdate = true), Routes.CLAUDE_CODE),
     Git(ToolSpec("Git", ToolKind.BuiltIn, hasVersion = true, canUpdate = true), Routes.TOOL_GIT),
     Node(ToolSpec("Node.js and npm", ToolKind.BuiltIn, hasVersion = true), Routes.TOOL_NODE),
@@ -82,7 +90,15 @@ enum class Tool(val spec: ToolSpec, val route: String, val pkg: PackageTool? = n
     Ruby(PackageTool.Ruby.spec("Ruby"), Routes.TOOL_RUBY, PackageTool.Ruby),
     Php(PackageTool.Php.spec("PHP"), Routes.TOOL_PHP, PackageTool.Php),
     Java(PackageTool.Java.spec("Java and Kotlin"), Routes.TOOL_JAVA, PackageTool.Java),
+    Aws(PackageTool.Aws.spec("AWS CLI"), Routes.TOOL_AWS, PackageTool.Aws),
+    Fly(PackageTool.Fly.spec("flyctl"), Routes.TOOL_FLY, PackageTool.Fly),
+    Vercel(NpmTool.Vercel.spec("Vercel CLI"), Routes.TOOL_VERCEL, npm = NpmTool.Vercel),
+    Netlify(NpmTool.Netlify.spec("Netlify CLI"), Routes.TOOL_NETLIFY, npm = NpmTool.Netlify),
+    Firebase(NpmTool.Firebase.spec("Firebase CLI"), Routes.TOOL_FIREBASE, npm = NpmTool.Firebase),
     ;
+
+    /** Its own login, shown on its page and as who's signed in on its tile (decision 98). */
+    val login: LoginSpec? get() = if (this == Wrangler) WranglerLogin else pkg?.login ?: npm?.login
 
     /** Its brand mark (decision 87), bundled as a VectorDrawable; sources in docs/third-party-icons.md. */
     val icon: ToolGlyph get() = when (this) {
@@ -102,6 +118,11 @@ enum class Tool(val spec: ToolSpec, val route: String, val pkg: PackageTool? = n
         Ruby -> ToolGlyph(R.drawable.ic_tool_ruby, 0xFFCC342D)
         Php -> ToolGlyph(R.drawable.ic_tool_php, 0xFF777BB4)
         Java -> ToolGlyph(R.drawable.ic_tool_openjdk, 0xFF000000)
+        Aws -> ToolGlyph(R.drawable.ic_tool_awscli, 0xFFFF9900)
+        Fly -> ToolGlyph(R.drawable.ic_tool_flydotio, 0xFF24175B)
+        Vercel -> ToolGlyph(R.drawable.ic_tool_vercel, 0xFF000000)
+        Netlify -> ToolGlyph(R.drawable.ic_tool_netlify, 0xFF00C7B7)
+        Firebase -> ToolGlyph(R.drawable.ic_tool_firebase, 0xFFDD2C00)
     }
 }
 
@@ -121,7 +142,16 @@ val UpdateComponent.icon: ToolGlyph get() = when (this) {
 
 /** A package tool's tile (decision 92): an add-on with its versions, updated from Updates. */
 private fun PackageTool.spec(name: String) =
-    ToolSpec(name, ToolKind.Optional, hasVersion = true, canUpdate = true, downloadMb = downloadMb, installedMb = installedMb)
+    ToolSpec(name, ToolKind.Optional, hasVersion = true, canUpdate = true, needsLogin = login != null, downloadMb = downloadMb, installedMb = installedMb)
+
+/** An npm CLI's tile (decision 98): its version from npm's folder, its login, and how long the install takes. */
+private fun NpmTool.spec(name: String) = ToolSpec(
+    name, ToolKind.Optional, hasVersion = true, needsLogin = true,
+    downloadMb = downloadMb, installedMb = installedMb, installMinutes = installMinutes,
+)
+
+/** Who a login's tile says is signed in, or null. */
+private fun LoginState.who(): String? = if (signedIn) account ?: "Signed in" else null
 
 /** How each module's state reads as a [ToolState]. */
 object ToolStates {
@@ -169,7 +199,7 @@ object ToolStates {
         blockedBy = if (androidInstalled) null else "Needs the Android tool",
     )
 
-    fun wrangler(s: WranglerState) = ToolState(
+    fun wrangler(s: WranglerState, login: LoginState = LoginState()) = ToolState(
         installed = s.installed,
         checked = s.checked,
         job = ToolModel.job(s.running, s.failed, s.removing),
@@ -177,8 +207,26 @@ object ToolStates {
         // What npm installed, which a terminal may have changed; the pinned versions until it has been read.
         versions = listOf("Wrangler" to (s.version ?: WranglerTool.VERSION), "workerd" to (s.workerdVersion ?: WranglerTool.WORKERD_VERSION)),
         problem = s.problem,
-        signedIn = if (s.signedIn) s.account ?: "Signed in" else null,
+        signedIn = login.who(),
     )
+
+    /**
+     * A deploy CLI from npm (decision 98): installed while npm's folder for it is there, its version from there, Repair
+     * when its command is missing, and who is signed in from its own config.
+     */
+    fun npmTool(t: NpmTool, s: NpmToolsState, login: LoginState = LoginState()): ToolState {
+        val mine = s.isFor(t)
+        val here = s.present[t]
+        return ToolState(
+            installed = here != null,
+            checked = s.checked,
+            job = if (mine) ToolModel.job(s.running, s.failed, s.removing) else ToolJob.None,
+            progress = if (mine) s.job?.progress else null,
+            versions = listOfNotNull(here?.version?.let { t.npm to it }),
+            problem = here?.problem,
+            signedIn = login.who(),
+        )
+    }
 
     /** A tool that is only an Updates row (Claude Code, Git): its versions and update come from the row. */
     fun fromRow(row: UpdateRow?) = ToolState(
@@ -216,7 +264,7 @@ object ToolStates {
      * A package tool (decision 92): installed when its main package is on the phone, read from dpkg; its versions and
      * size from dpkg too, its update from its Updates row.
      */
-    fun packageTool(t: PackageTool, s: PackageToolsState, row: UpdateRow?): ToolState {
+    fun packageTool(t: PackageTool, s: PackageToolsState, row: UpdateRow?, login: LoginState = LoginState()): ToolState {
         val mine = s.isFor(t)
         return ToolState(
             installed = s.installed(t),
@@ -229,6 +277,7 @@ object ToolStates {
             updating = row?.running == true,
             sizeMb = t.sizeMb(s.packages),
             problem = s.problem(t),
+            signedIn = login.who(),
         )
     }
 
@@ -274,6 +323,9 @@ fun rememberTools(): List<Pair<Tool, ToolState>> {
     val wrangler by Wrangler.state.collectAsState()
     val flutter by FlutterRust.state.collectAsState()
     val packages by PackageTools.state.collectAsState()
+    val npm by NpmTools.state.collectAsState()
+    // One collector per tool with a login; Tool.entries is fixed, so the order of these calls never changes.
+    val logins = Tool.entries.associateWith { t -> t.login?.let { CliLogins.of(it).state.collectAsState().value } ?: LoginState() }
     LaunchedEffect(Unit) { refreshAll(context) }
     val dockitoSize by produceState<Int?>(null, dockito.installed) { value = withContext(Dispatchers.IO) { ToolStates.dockitoSizeMb(dockito.installed) } }
     fun row(c: UpdateComponent) = updates.rows.firstOrNull { it.component == c }
@@ -285,11 +337,13 @@ fun rememberTools(): List<Pair<Tool, ToolState>> {
         Tool.Chromium to ToolStates.chromium(chromium),
         Tool.Android to ToolStates.android(android),
         Tool.AndroidNdk to ToolStates.ndk(ndk, android.installed),
-        Tool.Wrangler to ToolStates.wrangler(wrangler),
+        Tool.Wrangler to ToolStates.wrangler(wrangler, logins.getValue(Tool.Wrangler)),
         Tool.Flutter to ToolStates.flutter(flutter, row(UpdateComponent.Flutter)),
         Tool.Rust to ToolStates.rust(flutter, row(UpdateComponent.Rust), packages.running && packages.isFor(PackageTool.RustWasm)),
     ) + Tool.entries.mapNotNull { tool ->
-        tool.pkg?.let { tool to ToolStates.packageTool(it, packages, UpdateComponent.of(it)?.let(::row)) }
+        val login = logins.getValue(tool)
+        tool.pkg?.let { tool to ToolStates.packageTool(it, packages, UpdateComponent.of(it)?.let(::row), login) }
+            ?: tool.npm?.let { tool to ToolStates.npmTool(it, npm, login) }
     }
 }
 
@@ -304,4 +358,5 @@ fun refreshAll(context: Context) {
     Wrangler.refresh()
     FlutterRust.refresh()
     PackageTools.refresh()
+    NpmTools.refresh()
 }

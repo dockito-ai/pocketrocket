@@ -1,7 +1,8 @@
 package com.pocketrocket.wrangler
 
+import com.pocketrocket.clilogin.LoginText
+import com.pocketrocket.node.NpmGlobal
 import com.pocketrocket.setup.ToolPresence
-import org.json.JSONObject
 import java.io.File
 
 /** The fixed facts of the Wrangler tool (decisions 49 and 82), and what its output means. Sizes are measured on the emulator. */
@@ -43,8 +44,7 @@ object WranglerTool {
     }
 
     /** The version in an npm package's package.json ([dir]), or null. */
-    fun packageVersion(dir: File): String? =
-        runCatching { JSONObject(File(dir, "package.json").readText()).optString("version").takeIf { it.isNotBlank() } }.getOrNull()
+    fun packageVersion(dir: File): String? = NpmGlobal.version(dir)
 
     /** Wrangler's own config file under the home folder. The login lives here and nowhere else. */
     const val CONFIG_RELATIVE = ".config/.wrangler/config/default.toml"
@@ -56,18 +56,17 @@ object WranglerTool {
     val INSTALL_STEPS = listOf("Checking the device", "Installing Wrangler", "Downloading the local runtime", "Checking Wrangler")
     val REMOVE_STEPS = listOf("Checking the device", "Removing Wrangler")
 
-    private val ANSI = Regex("\u001B\\[[0-9;]*[A-Za-z]")
-    private val OAUTH_URL = Regex("https://dash\\.cloudflare\\.com/oauth2/auth\\?\\S+")
-    private val ANY_OAUTH_QUERY = Regex("https?://\\S*oauth2?\\S*")
+    /** The address `wrangler login --browser=false` prints ([WranglerLogin]). */
+    val OAUTH_URL = Regex("https://dash\\.cloudflare\\.com/oauth2/auth\\?\\S+")
     private val EMAIL = Regex("associated with the email\\s+(\\S+@\\S+?)\\.?\\s*$")
 
-    fun clean(line: String): String = line.replace(ANSI, "")
+    fun clean(line: String): String = LoginText.clean(line)
 
     /** The address to open in the browser, if this line of `wrangler login --browser=false` has it. */
     fun oauthUrl(line: String): String? = OAUTH_URL.find(clean(line))?.value
 
     /** The line with any sign-in address taken out, for what stays on the page after the sign-in ends. */
-    fun withoutUrl(line: String): String = clean(line).replace(ANY_OAUTH_QUERY, "(link removed)")
+    fun withoutUrl(line: String): String = LoginText.withoutUrl(line)
 
     /** Whether Wrangler's config has a login. Only tests for the key: the token's value is never kept or shown. */
     fun hasLogin(configText: String?): Boolean =

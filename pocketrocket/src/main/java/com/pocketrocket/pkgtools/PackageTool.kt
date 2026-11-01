@@ -1,5 +1,8 @@
 package com.pocketrocket.pkgtools
 
+import com.pocketrocket.clilogin.LoginSpec
+import com.pocketrocket.clitools.AwsLogin
+import com.pocketrocket.clitools.FlyLogin
 import com.pocketrocket.termux.DpkgStatus
 
 /** Java 17's package; the enum's entries can't read their companion while they're built. */
@@ -38,6 +41,8 @@ enum class PackageTool(
     val shell: ShellSetting? = null,
     /** Other packages its state depends on (Java 17, for Java's default). */
     val alsoWatched: List<String> = emptyList(),
+    /** Its own login, with Log in and Log out on its page (the deploy CLIs, decision 98). */
+    val login: LoginSpec? = null,
 ) {
     Python(
         "python", "Python, pip and uv", listOf("python" to "Python", "python-pip" to "pip", "uv" to "uv"),
@@ -62,6 +67,10 @@ enum class PackageTool(
         "java", "Java 21 and Kotlin", listOf("openjdk-21" to "Java", "kotlin" to "Kotlin"), downloadMb = 196, installedMb = 350,
         alsoWatched = listOf(OPENJDK_17),
     ),
+
+    // The deploy CLIs that are Termux packages (decision 98); the npm ones are NpmTool.
+    Aws("aws", "the AWS CLI", listOf("awscli" to "AWS CLI"), downloadMb = 36, installedMb = 204, login = AwsLogin),
+    Fly("flyctl", "flyctl", listOf("flyctl" to "flyctl"), downloadMb = 16, installedMb = 77, login = FlyLogin),
     ;
 
     val main: String get() = packages.first().first
