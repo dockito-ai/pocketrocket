@@ -10,6 +10,12 @@ import java.util.Locale
 data class FlutterRelease(val version: String, val date: String)
 
 /**
+ * Release builds, the opt-in piece of Flutter & Dart (decision 108): [Off] when it was never added (or was removed),
+ * [Installed] when the emulator and the x86_64 C library are both there, [Missing] when only part of it is (Repair).
+ */
+enum class ReleaseBuilds { Off, Installed, Missing }
+
+/**
  * The fixed facts of the Flutter & Dart and Rust tools (decisions 75 and 87, docs/flutter-tool.md), and the pure parts: Flutter's release
  * list, version order, sizes, and which script option each action runs. Sizes are from the spike (docs/flutter-spike.md).
  */
@@ -36,6 +42,40 @@ object FlutterTool {
     const val EXEC_GLIBC_RELATIVE = "$EXEC_RELATIVE/aarch64/2.so"
     const val CLANG_RELATIVE = "bin/clang"
 
+    /**
+     * Release builds (decision 108): Termux's qemu-x86_64 and the x86_64 C library the setup script unpacks, under
+     * $PREFIX (the setup script's FLUTTER_RELEASE_QEMU and FLUTTER_RELEASE_SYSROOT, the launcher's PR_QEMU and
+     * PR_X64_SYSROOT), and the list of what its install added, under home, which only that install writes.
+     */
+    const val RELEASE_QEMU_RELATIVE = "bin/qemu-x86_64"
+    const val RELEASE_SYSROOT_RELATIVE = "opt/flutter-x64-sysroot"
+    const val RELEASE_LOADER_RELATIVE = "$RELEASE_SYSROOT_RELATIVE/lib64/ld-linux-x86-64.so.2"
+    const val RELEASE_RECORD_RELATIVE = ".pocketrocket/flutter-release.packages"
+
+    /** How the tile names the piece when it needs Repair ("Release builds missing"). */
+    const val RELEASE_PART = "Release builds"
+
+    /** What it takes: qemu with its libraries (about 4 MB), and the C library (a 10 MB package, of which 4 MB is kept). */
+    const val RELEASE_DOWNLOAD_MB = 14
+    const val RELEASE_INSTALLED_MB = 8
+
+    /**
+     * Release builds as they are now. Installed needs both pieces. A qemu-x86_64 alone is someone else's (a `pkg install`
+     * from a terminal) unless this piece's install recorded itself; the C library alone is always this piece's.
+     */
+    fun releaseBuilds(prefix: File, home: File): ReleaseBuilds {
+        val qemu = File(prefix, RELEASE_QEMU_RELATIVE).isFile
+        val loader = File(prefix, RELEASE_LOADER_RELATIVE).isFile
+        return when {
+            qemu && loader -> ReleaseBuilds.Installed
+            File(prefix, RELEASE_SYSROOT_RELATIVE).exists() || File(home, RELEASE_RECORD_RELATIVE).exists() -> ReleaseBuilds.Missing
+            else -> ReleaseBuilds.Off
+        }
+    }
+
+    /** Whether Repair only has Release builds to put back, so it runs their install instead of Flutter's. */
+    fun repairsOnlyReleaseBuilds(problem: String?): Boolean = problem == ToolPresence.of(true, listOf(RELEASE_PART)).problem
+
     /** The package list taken before the install's apt step, under home; only a run that stopped there leaves it. */
     const val BASELINE_RELATIVE = ".pocketrocket/flutter.baseline"
 
@@ -46,6 +86,7 @@ object FlutterTool {
      * SDK. `rm -rf ~/fvm` from a terminal leaves FVM, so it shows "Flutter SDK missing" with Repair and Uninstall.
      * With clang on the phone but no exec helper (Flutter installed before C and C++, or before decision 100) it shows
      * "APK builds missing", and Repair builds the helper. Without clang APK builds aren't expected, so nothing is missing.
+     * Release builds half there ([releaseBuilds] Missing) show as "Release builds missing".
      */
     fun presence(prefix: File, home: File): ToolPresence {
         val versions = File(home, "$FVM_RELATIVE/versions").listFiles()?.filter { File(it, VERSION_FLUTTER).isFile }.orEmpty()
@@ -63,6 +104,7 @@ object FlutterTool {
                     else -> null
                 },
                 "APK builds".takeIf { File(prefix, CLANG_RELATIVE).exists() && !File(prefix, EXEC_GLIBC_RELATIVE).exists() },
+                RELEASE_PART.takeIf { releaseBuilds(prefix, home) == ReleaseBuilds.Missing },
             ),
         )
     }
@@ -126,6 +168,8 @@ object FlutterTool {
     val RUST_STEPS = listOf("Checking the device", "Installing Rust")
     val RUST_REMOVE_STEPS = listOf("Checking the device", "Removing Rust")
     val FLUTTER_REMOVE_STEPS = listOf("Checking the device", "Removing Flutter, Dart and FVM")
+    val RELEASE_STEPS = listOf("Checking the device", "Installing the x86_64 emulator", "Setting up release builds")
+    val RELEASE_REMOVE_STEPS = listOf("Checking the device", "Removing release builds")
     fun removeVersionSteps(version: String) = listOf("Checking the device", "Removing Flutter $version")
     fun defaultSteps(version: String) = listOf("Checking the device", "Making Flutter $version the default")
 

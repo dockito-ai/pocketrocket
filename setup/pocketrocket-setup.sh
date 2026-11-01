@@ -41,6 +41,9 @@
 #   --only flutter [version]  add a Flutter version (newest stable by default; POCKETROCKET_FLUTTER_VERSION
 #                     also works, POCKETROCKET_FLUTTER_DEFAULT=1 makes it the default)
 #   --only flutter-default <version> / flutter-remove-version <version> / flutter-remove
+#   --only flutter-release / flutter-release-remove  Release builds, the opt-in piece of Flutter & Dart (decision 108):
+#                     Termux's qemu-user-x86-64 and an x86_64 C library, so release and profile APKs build; 3 steps
+#                     (remove: 2). Uninstall of Flutter takes it too
 #   --only rust / rust-remove  Rust alone, Termux's package (rust-remove takes the wasm target too)
 #   --only python / python-remove, bun / bun-remove, rust-wasm / rust-wasm-remove  the package tools (decision 92):
 #                     Termux packages only, 2 steps; Python's uninstall leaves what Headless Chrome needs
@@ -1771,6 +1774,12 @@ step_flutter_helpers() {
   fi
   flutter_launchers
   flutter_exec_build
+  # Repair: Release builds that are half there (the emulator or the C library taken away) are put back.
+  if flutter_release_partial; then
+    info "putting back what release builds need"
+    flutter_release_packages
+    flutter_release_sysroot
+  fi
   POCKETROCKET_FLUTTER_PREPARE="$FVM_DIR/src" "$PREFIX/bin/flutter" >>"$PR_LOG" 2>&1 || fail "could not prepare FVM for this phone"
   out="$(fvm --version 2>&1)" || fail "fvm --version failed: $out"
   # Versions come from the tool page; FVM's mirror of the whole Flutter history would add gigabytes.
@@ -1953,6 +1962,8 @@ step_flutter_remove() {
   step "Removing Flutter, Dart and FVM"
   local p
   pkill -f "$FLUTTER_VERSIONS/" 2>/dev/null || true   # an analysis server left running would keep writing
+  # Release builds go with Flutter: their wrappers, the x86_64 C library and the emulator the piece added.
+  flutter_release_remove
   while IFS= read -r p; do rm -rf "${p:?}"; done < <(flutter_remove_paths)
   rmdir "$PREFIX/opt" "$HOME/.config" 2>/dev/null || true
   # A run that stopped inside apt left a baseline it didn't record yet.
@@ -1963,6 +1974,179 @@ step_flutter_remove() {
   android_purge_added "$FLUTTER_ADDED_FILE"
   rm -f "$FLUTTER_ADDED_FILE" "$FLUTTER_BASELINE_FILE"
   ok "Flutter removed"
+}
+
+# Release builds (decision 108, docs/flutter-tool.md): an opt-in piece of Flutter & Dart for `flutter build apk` in
+# release and profile mode. Google publishes Flutter's Android AOT compiler, gen_snapshot, only for x86_64 hosts. Flutter
+# downloads it anyway (android-<arch>-<mode>/linux-x64/gen_snapshot) and on this linux-arm64 host looks for it in
+# android-<arch>-<mode>/linux-arm64/, so the launcher writes a wrapper there that runs the x86_64 one under Termux's
+# qemu-x86_64, with an x86_64 C library as its root (-L). That library is the x86_64 build of Termux's own `glibc`
+# package from the glibc repository (the one glibc-repo adds), fetched the way apt checks it: the InRelease signed by a
+# key in apt's trusted.gpg.d, the Packages index's SHA-256 from that signed text, the .deb's SHA-256 from the index. It
+# is unpacked, never installed: only the five files gen_snapshot needs are kept, in the package's own layout (its
+# loader looks for them there), with lib64/ld-linux-x86-64.so.2 a relative link to the loader (qemu's -L doesn't follow
+# an absolute one). The launcher's PR_X64_SYSROOT and PR_AOT_MARK, and FlutterTool.RELEASE_*, name the same things.
+FLUTTER_RELEASE_SYSROOT="${PREFIX:-}/opt/flutter-x64-sysroot"
+FLUTTER_RELEASE_QEMU="${PREFIX:-}/bin/qemu-x86_64"
+FLUTTER_RELEASE_PACKAGES="qemu-user-x86-64"
+FLUTTER_RELEASE_ADDED_FILE="$PR_HOME/flutter-release.packages"
+FLUTTER_RELEASE_BASELINE_FILE="$PR_HOME/flutter-release.baseline"
+FLUTTER_RELEASE_MARK="PocketRocket gen_snapshot wrapper"
+FLUTTER_RELEASE_REPO="https://packages-cf.termux.dev/apt/termux-glibc"   # glibc-repo's source: dist glibc, component stable
+FLUTTER_RELEASE_LIBS="ld-linux-x86-64.so.2 libc.so.6 libm.so.6 libdl.so.2 libpthread.so.0"
+
+# termux_deb_fetch <repo> <dist> <component> <arch> <package> <empty dir>: downloads the package's .deb for any
+# architecture without adding it to dpkg, checked as apt checks it (above). Sets TERMUX_DEB (its path), TERMUX_DEB_SHA256
+# and TERMUX_DEB_VERSION; the download's progress goes to stdout, problems to stderr.
+termux_deb_fetch() {
+  local repo="$1" dist="$2" comp="$3" arch="$4" pkg="$5" out="$6" k keys=() idx want file="" sha="" version=""
+  TERMUX_DEB=""; TERMUX_DEB_SHA256=""; TERMUX_DEB_VERSION=""
+  mkdir -p "$out/index"
+  curl -fsSL --retry 3 --max-time 60 "$repo/dists/$dist/InRelease" -o "$out/index/InRelease" \
+    || { echo "could not download $repo/dists/$dist/InRelease" >&2; return 1; }
+  for k in "${PREFIX:-}"/etc/apt/trusted.gpg.d/*.gpg "${PREFIX:-}"/etc/apt/trusted.gpg; do
+    if [ -f "$k" ]; then keys+=(--keyring "$k"); fi
+  done
+  [ "${#keys[@]}" -gt 0 ] || { echo "apt has no trusted keys to check $repo with" >&2; return 1; }
+  # Only the signed text is read from here on. (Termux's gpgv writes --output <file> as <file>.part, so stdout it is.)
+  gpgv "${keys[@]}" --output - "$out/index/InRelease" >"$out/index/Release" 2>"$out/index/gpgv.log" \
+    || { cat "$out/index/gpgv.log" >&2; echo "$repo's InRelease is not signed by a key apt trusts" >&2; return 1; }
+  idx="$comp/binary-$arch/Packages"
+  want="$(awk -v f="$idx" '/^SHA256:/ { s = 1; next } /^[^ ]/ { s = 0 } s && $3 == f { print $1; exit }' "$out/index/Release")"
+  [ -n "$want" ] || { echo "the signed Release lists no $idx" >&2; return 1; }
+  curl -fsSL --retry 3 --max-time 120 "$repo/dists/$dist/$idx" -o "$out/index/Packages" || { echo "could not download $idx" >&2; return 1; }
+  verify_sha256 "$out/index/Packages" "$want" || { echo "$idx does not match the signed Release" >&2; return 1; }
+  read -r file sha version < <(awk -v p="$pkg" '
+    /^Package: / { cur = $2; f = ""; s = ""; v = "" }
+    cur == p && /^Filename: / { f = $2 } cur == p && /^SHA256: / { s = $2 } cur == p && /^Version: / { v = $2 }
+    /^$/ && cur == p && f != "" { print f, s, v; found = 1; exit }
+    END { if (!found && cur == p && f != "") print f, s, v }' "$out/index/Packages") || true
+  [ -n "${file:-}" ] && [ -n "${sha:-}" ] || { echo "$pkg is not in $idx" >&2; return 1; }
+  case "$file" in /* | *..* | *[!A-Za-z0-9._+~/-]*) echo "unexpected file name in $idx: $file" >&2; return 1 ;; esac
+  download_with_progress "$repo/$file" "$out/${file##*/}" || { echo "the download of $pkg stopped" >&2; return 1; }
+  verify_sha256 "$out/${file##*/}" "$sha" >&2 || { echo "$pkg does not match the signed index" >&2; return 1; }
+  TERMUX_DEB="$out/${file##*/}"; TERMUX_DEB_SHA256="$sha"; TERMUX_DEB_VERSION="$version"
+}
+
+flutter_release_ready() { [ -x "$FLUTTER_RELEASE_QEMU" ] && [ -e "$FLUTTER_RELEASE_SYSROOT/lib64/ld-linux-x86-64.so.2" ]; }
+
+# flutter_release_sysroot: the x86_64 C library at FLUTTER_RELEASE_SYSROOT, from Termux's x86_64 glibc package. Built
+# beside it and swapped in once qemu runs its loader, so a failed run leaves the old one.
+flutter_release_sysroot() {
+  local work="$TMPDIR/pocketrocket-flutter-release" new="$FLUTTER_RELEASE_SYSROOT.new" deb sha version members=() lib libdir rel out
+  rm -rf "$work" "$new"; mkdir -p "$work/download" "$work/unpack"
+  termux_deb_fetch "$FLUTTER_RELEASE_REPO" glibc stable x86_64 glibc "$work/download" 2>>"$PR_LOG" \
+    || { rm -rf "$work"; fail "could not download Termux's x86_64 C library: $(tail -n 1 "$PR_LOG")"; }
+  deb="$TERMUX_DEB"; sha="$TERMUX_DEB_SHA256"; version="$TERMUX_DEB_VERSION"
+  info "glibc $version for x86_64, SHA-256 $sha, as the signed index of Termux's glibc repository lists it"
+  for lib in $FLUTTER_RELEASE_LIBS; do members+=("*/glibc/lib/$lib"); done
+  # Only the libraries come out of the archive; nothing in it is run, and its control scripts are never unpacked.
+  dpkg-deb --fsys-tarfile "$deb" | tar -x --no-same-owner --no-same-permissions --wildcards -C "$work/unpack" "${members[@]}" 2>>"$PR_LOG" \
+    || { rm -rf "$work"; fail "could not unpack the x86_64 C library"; }
+  libdir=""
+  for lib in "$work"/unpack/*/*/*/*/*/glibc/lib/ld-linux-x86-64.so.2; do if [ -f "$lib" ]; then libdir="${lib%/*}"; break; fi; done
+  [ -n "$libdir" ] || { rm -rf "$work"; fail "the x86_64 C library is not laid out as expected"; }
+  for lib in $FLUTTER_RELEASE_LIBS; do
+    [ -f "$libdir/$lib" ] && [ ! -L "$libdir/$lib" ] || { rm -rf "$work"; fail "the x86_64 C library has no $lib"; }
+  done
+  rel="${libdir#"$work/unpack/"}"
+  mkdir -p "$new/$rel" "$new/lib64"
+  for lib in $FLUTTER_RELEASE_LIBS; do install -m 0644 "$libdir/$lib" "$new/$rel/$lib" || fail "could not set up the x86_64 C library"; done
+  chmod 0755 "$new/$rel/ld-linux-x86-64.so.2"
+  ln -s "../$rel/ld-linux-x86-64.so.2" "$new/lib64/ld-linux-x86-64.so.2"
+  printf 'glibc %s x86_64 %s %s\n' "$version" "$sha" "$FLUTTER_RELEASE_REPO" >"$new/.pocketrocket-source"
+  rm -rf "$work"
+  out="$(env -u LD_PRELOAD -u LD_LIBRARY_PATH "$FLUTTER_RELEASE_QEMU" -L "$new" "$new/lib64/ld-linux-x86-64.so.2" --version 2>&1)" \
+    && [ -n "$out" ] || { rm -rf "$new"; fail "qemu-x86_64 could not run the x86_64 C library: $out"; }
+  out="${out%%$'\n'*}"
+  rm -rf "$FLUTTER_RELEASE_SYSROOT"; mkdir -p "$(dirname "$FLUTTER_RELEASE_SYSROOT")"; mv "$new" "$FLUTTER_RELEASE_SYSROOT"
+  ok "x86_64 C library: $out"
+}
+
+# flutter_release_wrappers: every installed version gets its gen_snapshot wrappers now (the launcher's prepare writes
+# them); a version whose Android tools aren't downloaded yet gets them at its first APK build.
+flutter_release_wrappers() {
+  local d n=0
+  for d in "$FLUTTER_VERSIONS"/*/; do
+    d="${d%/}"
+    case "${d##*/}" in .*) continue ;; esac
+    [ -d "$d/bin/cache" ] || continue
+    POCKETROCKET_FLUTTER_PREPARE="$d" "$PREFIX/bin/flutter" >>"$PR_LOG" 2>&1 || warn "could not prepare Flutter ${d##*/}"
+    n=$((n + $(flutter_release_wrapper_list "$d" | wc -l)))
+  done
+  ok "$n gen_snapshot wrappers in place"
+}
+
+# flutter_release_wrapper_list [flutter root]: the wrappers the launcher wrote (they carry FLUTTER_RELEASE_MARK), in
+# that version or every version. Anything else at those paths is never listed, so never removed.
+flutter_release_wrapper_list() {
+  local roots=("$FLUTTER_VERSIONS"/*) root w
+  [ -z "${1:-}" ] || roots=("$1")
+  for root in "${roots[@]}"; do
+    for w in "$root"/bin/cache/artifacts/engine/android-*-release/linux-arm64/gen_snapshot \
+      "$root"/bin/cache/artifacts/engine/android-*-profile/linux-arm64/gen_snapshot; do
+      if [ -f "$w" ] && [ ! -L "$w" ] && LC_ALL=C grep -qF -- "$FLUTTER_RELEASE_MARK" "$w" 2>/dev/null; then printf '%s\n' "$w"; fi
+    done
+  done
+}
+
+step_flutter_release_install() {
+  step "Installing the x86_64 emulator"
+  [ -x "$PREFIX/bin/flutter" ] && [ -d "$FLUTTER_VERSIONS" ] || fail "Flutter isn't installed; install Flutter & Dart first"
+  flutter_release_packages
+  step "Setting up release builds"
+  flutter_release_setup
+}
+
+# flutter_release_packages / flutter_release_setup: the two halves of the install; Repair of Flutter runs both when
+# the piece is half there.
+flutter_release_packages() {
+  # shellcheck disable=SC2086
+  [ -z "$(missing_packages $FLUTTER_RELEASE_PACKAGES)" ] || apt_refresh
+  packages_baseline "$FLUTTER_RELEASE_BASELINE_FILE" "$FLUTTER_RELEASE_ADDED_FILE"
+  # shellcheck disable=SC2086
+  apt_install_progress $FLUTTER_RELEASE_PACKAGES
+  packages_record "$FLUTTER_RELEASE_BASELINE_FILE" "$FLUTTER_RELEASE_ADDED_FILE"
+  hash -r 2>/dev/null || true
+  [ -x "$FLUTTER_RELEASE_QEMU" ] || fail "qemu-x86_64 is missing after the install"
+  local v; v="$("$FLUTTER_RELEASE_QEMU" --version 2>&1)" || true
+  ok "${v%%$'\n'*}"
+}
+
+flutter_release_setup() {
+  flutter_release_sysroot
+  install_launcher flutter
+  flutter_release_wrappers
+  info "release and profile APK builds work now; the AOT compile runs under emulation and takes a few minutes"
+}
+
+# flutter_release_partial: some of the piece is here but not all (the emulator or the C library taken away, or an
+# install that stopped after its packages); FlutterTool.releaseProblem reads the same.
+flutter_release_partial() {
+  ! flutter_release_ready || return 1
+  [ -d "$FLUTTER_RELEASE_SYSROOT" ] || [ -f "$FLUTTER_RELEASE_ADDED_FILE" ]
+}
+
+# flutter_release_remove: the wrappers in every version, the C library, and the packages the install added, except
+# what other packages need. Also what Uninstall of Flutter runs.
+flutter_release_remove() {
+  local w
+  while IFS= read -r w; do
+    rm -f "$w"; rmdir "${w%/gen_snapshot}" 2>/dev/null || true
+  done < <(flutter_release_wrapper_list)
+  rm -rf "$FLUTTER_RELEASE_SYSROOT" "$FLUTTER_RELEASE_SYSROOT.new" "$TMPDIR/pocketrocket-flutter-release"
+  rmdir "$PREFIX/opt" 2>/dev/null || true
+  packages_drop_stale "$FLUTTER_RELEASE_BASELINE_FILE" "$FLUTTER_RELEASE_ADDED_FILE"
+  if [ -f "$FLUTTER_RELEASE_BASELINE_FILE" ]; then packages_record "$FLUTTER_RELEASE_BASELINE_FILE" "$FLUTTER_RELEASE_ADDED_FILE"; fi
+  android_purge_added "$FLUTTER_RELEASE_ADDED_FILE"
+  rm -f "$FLUTTER_RELEASE_ADDED_FILE" "$FLUTTER_RELEASE_BASELINE_FILE"
+}
+
+step_flutter_release_remove() {
+  step "Removing release builds"
+  flutter_release_remove
+  if [ -x "$FLUTTER_RELEASE_QEMU" ]; then ok "release builds removed; qemu-x86_64 stays (it was here before, or something else needs it)"
+  else ok "release builds removed"; fi
 }
 
 rust_rustup_ours() { [ -f "$RUST_RUSTUP" ] && grep -qF "$RUST_RUSTUP_MARK" "$RUST_RUSTUP"; }
@@ -2495,6 +2679,7 @@ main_flutter_rust() {
     flutter) TOTAL_STEPS=5 ;;
     flutter-rust) TOTAL_STEPS=6 ;;
     flutter-rust-remove) TOTAL_STEPS=3 ;;
+    flutter-release) TOTAL_STEPS=3 ;;
     rust|rust-remove) TOTAL_STEPS=2; PR_LOG="$PR_HOME/rust.log" ;;
     *) TOTAL_STEPS=2 ;;
   esac
@@ -2513,6 +2698,8 @@ main_flutter_rust() {
       flutter_set_default "$version" ;;
     flutter-remove-version) step_flutter_remove_version "$version" ;;
     flutter-remove) step_flutter_remove ;;
+    flutter-release) locate_glibc_tools; step_flutter_release_install ;;
+    flutter-release-remove) step_flutter_release_remove ;;
     rust) step_rust_install ;;
     rust-remove) step_rust_remove ;;
     flutter-rust-remove) step_flutter_remove; step_rust_remove ;;
@@ -2526,13 +2713,13 @@ main() {
     --only)
       case "${2:-}" in
         claude|dockito|chromium|chromium-remove|android-build|android-build-remove|android-ndk|android-ndk-remove|c-cpp|c-cpp-remove|wrangler|wrangler-remove|git-check|git-update|apt-refresh|clang-check|clang-update) ;;
-        flutter|flutter-default|flutter-remove-version|flutter-remove|rust|rust-remove|flutter-rust|flutter-rust-remove|rust-check|rust-update) ;;
+        flutter|flutter-default|flutter-remove-version|flutter-remove|flutter-release|flutter-release-remove|rust|rust-remove|flutter-rust|flutter-rust-remove|rust-check|rust-update) ;;
         python|python-remove|bun|bun-remove|rust-wasm|rust-wasm-remove|python-check|python-update|bun-check|bun-update) ;;
         go|go-remove|deno|deno-remove|ruby|ruby-remove|php|php-remove|java|java-remove|golang-check|golang-update|deno-check|deno-update|ruby-check|ruby-update|php-check|php-update|openjdk-21-check|openjdk-21-update) ;;
         aws|aws-remove|flyctl|flyctl-remove|vercel|vercel-remove|netlify|netlify-remove|firebase|firebase-remove|awscli-check|awscli-update|flyctl-check|flyctl-update) ;;
         java-17|java-17-remove|java-21|java-21-remove|java-25|java-25-remove|kotlin|kotlin-remove|java-setup) ;;
         vercel-check|vercel-update|netlify-check|netlify-update|firebase-check|firebase-update|nodejs-lts-check|nodejs-lts-update|chromium-check|chromium-update) ;;
-        *) fail "--only takes: vercel-check, vercel-update, netlify-check, netlify-update, firebase-check, firebase-update, nodejs-lts-check, nodejs-lts-update, chromium-check, chromium-update, aws, aws-remove, flyctl, flyctl-remove, vercel, vercel-remove, netlify, netlify-remove, firebase, firebase-remove, awscli-check, awscli-update, flyctl-check, flyctl-update, claude, dockito, chromium, chromium-remove, android-build, android-build-remove, android-ndk, android-ndk-remove, c-cpp, c-cpp-remove, wrangler, wrangler-remove, flutter [version], flutter-default <version>, flutter-remove-version <version>, flutter-remove, rust, rust-remove, flutter-rust, flutter-rust-remove, python, python-remove, bun, bun-remove, rust-wasm, rust-wasm-remove, go, go-remove, deno, deno-remove, ruby, ruby-remove, php, php-remove, java, java-remove, java-17, java-17-remove, java-21, java-21-remove, java-25, java-25-remove, kotlin, kotlin-remove, java-setup, git-check, git-update, rust-check, rust-update, python-check, python-update, bun-check, bun-update, golang-check, golang-update, deno-check, deno-update, ruby-check, ruby-update, php-check, php-update, openjdk-21-check, openjdk-21-update, clang-check, clang-update or apt-refresh" ;;
+        *) fail "--only takes: vercel-check, vercel-update, netlify-check, netlify-update, firebase-check, firebase-update, nodejs-lts-check, nodejs-lts-update, chromium-check, chromium-update, aws, aws-remove, flyctl, flyctl-remove, vercel, vercel-remove, netlify, netlify-remove, firebase, firebase-remove, awscli-check, awscli-update, flyctl-check, flyctl-update, claude, dockito, chromium, chromium-remove, android-build, android-build-remove, android-ndk, android-ndk-remove, c-cpp, c-cpp-remove, wrangler, wrangler-remove, flutter [version], flutter-default <version>, flutter-remove-version <version>, flutter-remove, flutter-release, flutter-release-remove, rust, rust-remove, flutter-rust, flutter-rust-remove, python, python-remove, bun, bun-remove, rust-wasm, rust-wasm-remove, go, go-remove, deno, deno-remove, ruby, ruby-remove, php, php-remove, java, java-remove, java-17, java-17-remove, java-21, java-21-remove, java-25, java-25-remove, kotlin, kotlin-remove, java-setup, git-check, git-update, rust-check, rust-update, python-check, python-update, bun-check, bun-update, golang-check, golang-update, deno-check, deno-update, ruby-check, ruby-update, php-check, php-update, openjdk-21-check, openjdk-21-update, clang-check, clang-update or apt-refresh" ;;
       esac
       case "$2" in
         git-check|rust-check) apt_check "${2%-check}"; return 0 ;;

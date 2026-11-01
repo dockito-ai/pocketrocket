@@ -151,10 +151,22 @@ if [ "${1:-}" = --only ]; then
         [ -z "$next" ] || ln -s "versions/$next" "$fvm_home/default"
       fi
       echo "[done]"; exit 0 ;;
+    # Release builds (decision 108): a fake emulator and C library loader where the app looks.
+    flutter-release)
+      TOTAL=3; step 1 "Checking the device"; step 2 "Installing the x86_64 emulator"; printf '[progress 50] Downloading qemu-user-x86-64 · 1 of 2 MB\n'; sleep "$pace"
+      printf '#!/bin/sh\n' > "$PREFIX/bin/qemu-x86_64"; chmod 755 "$PREFIX/bin/qemu-x86_64"; printf 'qemu-user-x86-64\n' > "$HOME/.pocketrocket/flutter-release.packages"
+      step 3 "Setting up release builds"; sleep "$pace"
+      mkdir -p "$PREFIX/opt/flutter-x64-sysroot/lib64"; : > "$PREFIX/opt/flutter-x64-sysroot/lib64/ld-linux-x86-64.so.2"
+      echo "[ok] 6 gen_snapshot wrappers in place"; echo "[done]"; exit 0 ;;
+    flutter-release-remove)
+      TOTAL=2; step 1 "Checking the device"; step 2 "Removing release builds"; sleep "$pace"
+      rm -rf "$PREFIX/opt/flutter-x64-sysroot" "$PREFIX/bin/qemu-x86_64" "$HOME/.pocketrocket/flutter-release.packages"; echo "[done]"; exit 0 ;;
     flutter-remove|rust-remove|flutter-rust-remove)
       [ "$2" = flutter-rust-remove ] && TOTAL=3 || TOTAL=2
       step 1 "Checking the device"; n=2
-      if [ "$2" != rust-remove ]; then step $n "Removing Flutter, Dart and FVM"; rm -rf "$fvm_home"; n=3; sleep "$pace"; fi
+      if [ "$2" != rust-remove ]; then
+        step $n "Removing Flutter, Dart and FVM"; rm -rf "$fvm_home" "$PREFIX/opt/flutter-x64-sysroot" "$PREFIX/bin/qemu-x86_64" "$HOME/.pocketrocket/flutter-release.packages"; n=3; sleep "$pace"
+      fi
       if [ "$2" != flutter-remove ]; then step $n "Removing Rust"; rm -f "$rust_marker"; sleep "$pace"; fi
       echo "[done]"; exit 0 ;;
     rust-check)
