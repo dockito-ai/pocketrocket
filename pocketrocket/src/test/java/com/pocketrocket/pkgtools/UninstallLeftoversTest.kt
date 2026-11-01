@@ -23,11 +23,18 @@ class UninstallLeftoversTest {
 
     private fun file(relative: String, base: File = home) = File(base, relative).apply { parentFile?.mkdirs(); writeText("x") }
 
-    /** Runs [code] with the script sourced, its PREFIX and HOME in the temp folder and no package installed. */
+    /** Runs [code] with the script sourced, its PREFIX and HOME in the temp folder and no package installed.
+     *  XDG_* is cleared: the script follows it, and GitHub's runner sets XDG_CONFIG_HOME outside this home. */
     private fun shell(code: String): Pair<Int, String> {
         val pb = ProcessBuilder(listOf("bash", "-c", ". \"$1\"; pkg_installed() { return 1; }; PR_LOG=/dev/null; $code", "_", script.path))
             .redirectErrorStream(true)
-        pb.environment().putAll(mapOf("PREFIX" to prefix.path, "HOME" to home.path, "POCKETROCKET_SETUP_SOURCE_ONLY" to "1"))
+        pb.environment().apply {
+            putAll(mapOf("PREFIX" to prefix.path, "HOME" to home.path, "POCKETROCKET_SETUP_SOURCE_ONLY" to "1"))
+            remove("XDG_CONFIG_HOME")
+            remove("XDG_CACHE_HOME")
+            remove("XDG_DATA_HOME")
+            remove("XDG_STATE_HOME")
+        }
         val p = pb.start()
         val out = p.inputStream.bufferedReader().readText()
         return p.waitFor() to out
