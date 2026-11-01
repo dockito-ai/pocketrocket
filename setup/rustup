@@ -1,0 +1,91 @@
+#!/data/data/app.pocket/files/usr/bin/bash
+# PocketRocket's rustup (decision 104), installed by the Rust add-on as $PREFIX/bin/rustup. The real rustup has no
+# Android build and panics there, so Rust on the phone is Termux's package: one stable toolchain whose host is
+# aarch64-linux-android, the target of arm64 APKs. Build tools that drive cargo through rustup (cargokit for Flutter
+# plugins, flutter_rust_bridge) get the answers they expect for that toolchain; any other toolchain or target stops
+# with a message. The other Android targets (cargokit adds x86 and x86_64 to every debug build, for emulators) are
+# accepted and their `cargo build` skipped with a note: APKs built on the phone are arm64 only, and cargokit leaves out
+# a library that wasn't built.
+host=aarch64-linux-android
+others="armv7-linux-androideabi i686-linux-android x86_64-linux-android"
+me="rustup (PocketRocket)"
+
+# installed: the targets Termux's packages put in rustc's sysroot (rust-std-*), host first.
+installed() {
+  local d
+  echo "$host"
+  for d in "$(rustc --print sysroot 2>/dev/null)"/lib/rustlib/*/; do
+    d="$(basename "$d")"; [ "$d" = "$host" ] || [ "$d" = etc ] || [ "$d" = src ] || echo "$d"
+  done
+}
+
+no() { echo "$me: $*. Rust here is Termux's stable toolchain for $host only." >&2; exit 1; }
+
+# toolchain_ok <name>: stable, or stable-<host>; anything else (nightly, a version) isn't here.
+toolchain_ok() { case "$1" in stable|"stable-$host") return 0 ;; esac; return 1; }
+
+# check_toolchain <arguments>: stops when --toolchain names one that isn't here.
+check_toolchain() {
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --toolchain) toolchain_ok "${2:-}" || no "no toolchain ${2:-}"; shift ;;
+      --toolchain=*) toolchain_ok "${1#*=}" || no "no toolchain ${1#*=}" ;;
+    esac
+    shift
+  done
+}
+
+# skip_target <command>: exits 0 with a note when the command is a cargo build for one of the other Android targets.
+skip_target() {
+  local prev="" a t=""
+  [ "${1##*/}" = cargo ] && [ "${2:-}" = build ] || return 0
+  for a in "$@"; do
+    case "$a" in --target=*) t="${a#*=}" ;; *) [ "$prev" = --target ] && t="$a" ;; esac
+    prev="$a"
+  done
+  case " $others " in *" $t "*) echo "$me: skipped the build for $t (APKs here are arm64 only)" >&2; exit 0 ;; esac
+}
+
+case "${1:-}" in
+  --version|-V|-v) echo "rustup 0.0.0 ($me)"; exit 0 ;;
+  show) echo "stable-$host (default)"; rustc --version; exit 0 ;;
+  default) echo "stable-$host (default)"; exit 0 ;;
+  which) [ -n "${2:-}" ] && command -v "$2" && exit 0; no "no ${2:-command} on PATH" ;;
+  toolchain)
+    case "${2:-}" in
+      list) echo "stable-$host (default)"; exit 0 ;;
+      install|add)
+        shift 2
+        for a in "$@"; do case "$a" in -*) ;; *) toolchain_ok "$a" || no "can't install toolchain $a" ;; esac; done
+        exit 0 ;;
+    esac ;;
+  target)
+    case "${2:-}" in
+      list) shift 2; check_toolchain "$@"; installed; exit 0 ;;
+      add|install)
+        shift 2; check_toolchain "$@"
+        while [ $# -gt 0 ]; do
+          case "$1" in
+            --toolchain) shift ;;
+            -*) ;;
+            *)
+              if installed | grep -xF "$1" >/dev/null; then :
+              elif case " $others " in *" $1 "*) true ;; *) false ;; esac; then
+                echo "$me: $1 isn't on this phone; builds for it are skipped (APKs here are arm64 only)" >&2
+              else no "can't add target $1"; fi ;;
+          esac
+          shift
+        done
+        exit 0 ;;
+    esac ;;
+  component)
+    # Termux's rust package has the standard components; rust-src is what build-std (nightly) asks for.
+    case "${2:-}" in list) echo "rustc"; echo "cargo"; echo "rust-std-$host"; exit 0 ;; add) exit 0 ;; esac ;;
+  run)
+    toolchain_ok "${2:-}" || no "no toolchain ${2:-}"
+    shift 2
+    [ $# -gt 0 ] || no "run needs a command"
+    skip_target "$@"
+    exec "$@" ;;
+esac
+no "\`rustup $*\` isn't supported"

@@ -92,6 +92,21 @@ bs_nested() {
   return 1
 }
 
+# bs_in_flutter_build: a running `flutter build` (or run, drive, test) holds a slot for a folder this one is in. The Gradle
+# hook's fallback: a reused daemon can't take on the client's environment on Android (no native integration), so its
+# POCKETROCKET_BUILD_SLOT is the one of the build that started it, and the Gradle a Flutter build starts would take a
+# second slot and wait behind itself.
+bs_in_flutter_build() {
+  local f folder
+  while IFS= read -r f; do
+    case "$(bs_field "$f" command)" in "flutter build "*|"flutter run"*|"flutter drive"*|"flutter test"*) ;; *) continue ;; esac
+    folder="$(bs_field "$f" folder)"
+    [ -n "$folder" ] || continue
+    case "$PWD/" in "$folder"/*) return 0 ;; esac
+  done < <(bs_entries running)
+  return 1
+}
+
 bs_flock() {
   if command -v flock >/dev/null 2>&1; then flock -n "$1"; else /system/bin/flock -n "$1"; fi
 }
@@ -185,7 +200,7 @@ bs_hold() {
   case "$owner" in ''|*[!0-9]*) bs_say "usage: pocketrocket-build-slot hold <pid> <label>"; return 2 ;; esac
   n="$(bs_slots)"
   if [ "$n" = 0 ]; then echo "PR_SLOT off"; return 0; fi
-  if bs_holds "$owner" || bs_nested; then echo "PR_SLOT nested"; return 0; fi
+  if bs_holds "$owner" || bs_nested || bs_in_flutter_build; then echo "PR_SLOT nested"; return 0; fi
   bs_acquire "$owner" "$label" "$n" || return 1
   echo "PR_SLOT held $BS_SLOT"
   cat >/dev/null   # until the hook closes our stdin at the end of the build, or the daemon dies

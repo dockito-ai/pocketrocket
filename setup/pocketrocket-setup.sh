@@ -1270,6 +1270,18 @@ android_ndk_remove_hook() {
   rm -f "$ANDROID_NDK_INIT_SCRIPT"; rmdir "$(dirname "$ANDROID_NDK_INIT_SCRIPT")" 2>/dev/null || true
 }
 
+# android_ndk_package_xml <version>: the package.xml sdkmanager writes beside an NDK it installed (decision 104). Tools
+# that check for an installed NDK that way (cargokit, for Flutter plugins in Rust) would otherwise run sdkmanager to
+# download Google's x86_64 one.
+android_ndk_package_xml() {
+  local v="$1" major minor micro
+  IFS=. read -r major minor micro <<<"$v"
+  printf '%s\n' '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' \
+    '<ns2:repository xmlns:ns2="http://schemas.android.com/repository/android/common/02" xmlns:ns5="http://schemas.android.com/repository/android/generic/02" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">' \
+    "<localPackage path=\"ndk;$v\" obsolete=\"false\"><type-details xsi:type=\"ns5:genericDetailsType\"/><revision><major>$major</major><minor>${minor:-0}</minor><micro>${micro:-0}</micro></revision><display-name>NDK (Side by side) $v, PocketRocket: Termux clang</display-name></localPackage>" \
+    '</ns2:repository>'
+}
+
 # android_ndk_version_folders: one folder per version claiming that revision, the rest links to the shim; and CMake.
 android_ndk_version_folders() {
   local v d f b
@@ -1277,6 +1289,7 @@ android_ndk_version_folders() {
     d="$ANDROID_NDK_DIR/$v"; mkdir -p "$d"
     printf 'Pkg.Desc = PocketRocket: Termux clang behind the NDK layout, not Google NDK %s\nPkg.Revision = %s\n' "$v" "$v" >"$d/source.properties"
     for f in meta build toolchains ndk-build; do ln -sfn "$ANDROID_NDK_SHIM_DIR/$f" "$d/$f"; done
+    android_ndk_package_xml "$v" >"$d/package.xml"
   done
   d="$ANDROID_CMAKE_DIR/$ANDROID_CMAKE_VERSION"; mkdir -p "$d/bin"
   printf 'Pkg.Desc = PocketRocket: Termux CMake\nPkg.Revision = %s\n' "$ANDROID_CMAKE_VERSION" >"$d/source.properties"
@@ -1605,11 +1618,18 @@ FVM_DIR="${PREFIX:-}/opt/fvm"
 # Debug APK builds (decision 100): the exec helper the Flutter tool needs to start gradlew. FlutterTool.EXEC_RELATIVE
 # and the launcher's PR_EXEC_DIR name the same folder.
 FLUTTER_EXEC_DIR="${PREFIX:-}/lib/pocketrocket-flutter-exec"
+# Commands Flutter plugins' build scripts expect and the phone lacks (decision 104): shasum. The launcher puts this folder
+# at the end of PATH (the launcher's PR_BIN_DIR names the same folder).
+FLUTTER_BIN_DIR="${PREFIX:-}/lib/pocketrocket-flutter-bin"
 RUST_PACKAGES="rust"                                    # brings rust-std-aarch64-linux-android with it
 # What the install added, for Uninstall (pkg_tool_purge rust reads these same two names). The app reads "installed"
 # from dpkg, so these are not markers: a `pkg install rust` from a terminal has none and still shows as installed.
 RUST_ADDED_FILE="$PR_HOME/rust.packages"
 RUST_BASELINE_FILE="$PR_HOME/rust.baseline"
+# PocketRocket's rustup (setup/rustup, decision 104): build tools that drive cargo through rustup (cargokit,
+# flutter_rust_bridge) work with Termux's Rust. Recognised by this mark, so a rustup from elsewhere is never touched.
+RUST_RUSTUP="${PREFIX:-}/bin/rustup"
+RUST_RUSTUP_MARK="rustup (PocketRocket)"
 
 # flutter_release <releases_linux.json> [version|stable]: "<version> <commit>" of the newest stable, or of that version
 # (the commit is empty when Flutter's list doesn't have it; the tag is still cloned, without that check).
@@ -1703,6 +1723,8 @@ flutter_launchers() {
   ln -sf flutter "$PREFIX/bin/dart"
   rm -f "$PREFIX/bin/fvm"
   ln -s flutter "$PREFIX/bin/fvm"
+  mkdir -p "$FLUTTER_BIN_DIR"
+  install -m 0755 "$(dirname "${BASH_SOURCE[0]}")/shasum" "$FLUTTER_BIN_DIR/shasum" || fail "could not install shasum for Flutter builds"
 }
 
 step_flutter_helpers() {
@@ -1900,7 +1922,7 @@ step_flutter_remove_version() {
 
 # What uninstalling Flutter removes, besides the packages it added. The one list; the tests read it.
 flutter_remove_paths() {
-  printf '%s\n' "$FLUTTER_HOME" "$FVM_DIR" "$FLUTTER_EXEC_DIR" "$PREFIX/bin/flutter" "$PREFIX/bin/dart" "$PREFIX/bin/fvm" \
+  printf '%s\n' "$FLUTTER_HOME" "$FVM_DIR" "$FLUTTER_EXEC_DIR" "$FLUTTER_BIN_DIR" "$PREFIX/bin/flutter" "$PREFIX/bin/dart" "$PREFIX/bin/fvm" \
     "$HOME/.pub-cache" "$HOME/.dart-tool" "$HOME/.dartServer" "$HOME/.dart" "$HOME/.flutter" "$HOME/.flutter-devtools" \
     "$HOME/.config/flutter" "$HOME/.config/fvm" "$HOME/.fvm"
 }
@@ -1921,6 +1943,14 @@ step_flutter_remove() {
   ok "Flutter removed"
 }
 
+rust_rustup_ours() { [ -f "$RUST_RUSTUP" ] && grep -qF "$RUST_RUSTUP_MARK" "$RUST_RUSTUP"; }
+
+# rust_rustup_install: PocketRocket's rustup, unless another one is there.
+rust_rustup_install() {
+  if [ -e "$RUST_RUSTUP" ] && ! rust_rustup_ours; then info "kept the rustup already in $RUST_RUSTUP"; return 0; fi
+  install -m 0755 "$(dirname "${BASH_SOURCE[0]}")/rustup" "$RUST_RUSTUP" || fail "could not install rustup for Rust build tools"
+}
+
 step_rust_install() {
   step "Installing Rust"
   local out
@@ -1932,6 +1962,7 @@ step_rust_install() {
   out="$(cargo --version 2>&1)" || fail "cargo --version failed: $out"
   out="$(rustc --version 2>&1)" || fail "rustc --version failed: $out"
   packages_record "$RUST_BASELINE_FILE" "$RUST_ADDED_FILE"
+  rust_rustup_install
   ok "$out"
 }
 
@@ -1942,6 +1973,7 @@ step_rust_remove() {
   step "Removing Rust"
   pkg_tool_purge rust-wasm
   pkg_tool_purge rust
+  rust_rustup_ours && rm -f "$RUST_RUSTUP"
   rm -rf "$HOME/.cargo"
   if [ -n "$PKG_TOOL_KEPT" ]; then ok "removed the rest; $PKG_TOOL_KEPT stayed"; else ok "Rust removed"; fi
 }
