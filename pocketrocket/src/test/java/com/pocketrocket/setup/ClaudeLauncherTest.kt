@@ -63,4 +63,11 @@ class ClaudeLauncherTest {
         val out = run(File(prefix, "bin/pocketrocket-bash"), mapOf("PREFIX" to prefix.path), "-c", "true")
         assertEquals("preload=${prefix.path}/lib/libtermux-exec.so args=-c true", out)
     }
+
+    /** Claude's grep and find functions run its glibc binary through CLAUDE_CODE_EXECPATH; with the helper it can't start. */
+    @Test fun pocketRocketBashHidesClaudesBinaryFromGrepAndFind() = fake(withShell = true) { prefix, _ ->
+        script(File(prefix, "bin/bash"), "echo \"execpath=\${CLAUDE_CODE_EXECPATH-unset}\"")
+        val env = mapOf("PREFIX" to prefix.path, "CLAUDE_CODE_EXECPATH" to "/some/claude")
+        assertEquals("execpath=unset", run(File(prefix, "bin/pocketrocket-bash"), env, "-c", "true"))
+    }
 }

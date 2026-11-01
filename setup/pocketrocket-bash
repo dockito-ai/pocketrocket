@@ -11,8 +11,14 @@
 # wrappers the flutter launcher puts around Dart and Flutter's engine tools.
 #
 # Claude Code only takes a CLAUDE_CODE_SHELL whose path contains "bash" or "zsh", hence the name.
+#
+# Claude Code's shell snapshot replaces grep and find with functions that run its own (glibc) binary as ugrep
+# and bfs, found through CLAUDE_CODE_EXECPATH. With the helper in place that binary fails to start ("libc.so:
+# invalid ELF header"), and since bash runs it with `exec -a`, no wrapper can strip the helper and keep the
+# name. Without CLAUDE_CODE_EXECPATH the functions fall back to Termux's own grep and find, which work.
 
 PREFIX="${PREFIX:-/data/data/app.pocket/files/usr}"
 helper="$PREFIX/lib/libtermux-exec.so"
 if [ -z "${LD_PRELOAD:-}" ] && [ -f "$helper" ]; then export LD_PRELOAD="$helper"; fi
+unset CLAUDE_CODE_EXECPATH
 exec "$PREFIX/bin/bash" "$@"
