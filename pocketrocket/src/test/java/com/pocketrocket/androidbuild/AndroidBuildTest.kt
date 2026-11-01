@@ -54,6 +54,10 @@ class AndroidBuildTest {
         val added = file.readText()
         assertEquals(1, Regex("aapt2FromMavenOverride=/p/bin/aapt2").findAll(added).count())
         assertTrue(added.startsWith("org.gradle.parallel=true"))
+        // Memory caps from the phone's RAM (decision 97); this file wins over the project's own.
+        assertTrue(added, Regex("(?m)^org\\.gradle\\.jvmargs=-Xmx(1024|1280|1536|1792|2048)m -XX:MaxMetaspaceSize=512m").containsMatchIn(added))
+        assertTrue(added.contains("\n${AndroidBuildTool.LIMITS_SETTING}2\n"))
+        assertTrue(added.contains("\nkotlin.compiler.execution.strategy=in-process\n"))
         assertEquals(0, shell("android_gradle_props_remove \"$1\"", file.path).first)
         assertEquals("org.gradle.parallel=true\n", file.readText())
     }

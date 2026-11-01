@@ -54,6 +54,8 @@ object PocketRocket {
         thread(name = "pocketrocket-accounts", isDaemon = true) { AccountWiring.refresh() }
         // The claude launcher and its shell from this APK (docs/tool-sweep.md, Phase 0).
         thread(name = "pocketrocket-launchers", isDaemon = true) { com.pocketrocket.setup.Launchers.refreshClaude(context) }
+        // Build slots (decision 97): builds take turns so the phone keeps enough memory.
+        thread(name = "pocketrocket-build-slots", isDaemon = true) { com.pocketrocket.builds.BuildSlots.refresh(context) }
         thread(name = "pocketrocket-storage", isDaemon = true) { SharedStorage.linkIfNeeded(context) }
     }
 }

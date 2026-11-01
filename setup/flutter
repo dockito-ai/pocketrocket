@@ -324,11 +324,28 @@ pr_apk_setup() {
 }
 
 # pr_run <flutter root> <arguments>: the version's bin/flutter or bin/dart, with PR_RUN_ENV in its environment. Every
-# run of the tool starts here, so a build-slot wrapper can go around this one line.
+# run of the tool starts here. Commands that compile run in a build slot (decision 97), taken here and only here, after
+# pr_apk_setup has refused what can't build: `flutter build apk --debug` holds one slot, and the Gradle it starts shares
+# it (POCKETROCKET_BUILD_SLOT, or the parent walk), so nothing waits on itself.
 PR_RUN_ENV=()
 pr_run() {
-  local root="$1"; shift
-  env ${PR_RUN_ENV[@]+"${PR_RUN_ENV[@]}"} "$PR_BASH" "$root/bin/$PR_NAME" "$@"
+  local root="$1" slot=()
+  shift
+  if pr_compiles "$@" && [ -x "$PREFIX/bin/pocketrocket-build-slot" ]; then
+    slot=("$PREFIX/bin/pocketrocket-build-slot" run "$PR_NAME $*" --)
+  fi
+  ${slot[@]+"${slot[@]}"} env ${PR_RUN_ENV[@]+"${PR_RUN_ENV[@]}"} "$PR_BASH" "$root/bin/$PR_NAME" "$@"
+}
+
+# pr_compiles <arguments>: the flutter or dart command builds or analyses code, so it waits for a build slot (decision
+# 97). pub, doctor, --version and the like never wait. Checks (analyze, test) take a slot only while they run.
+pr_compiles() {
+  local a sub=""
+  for a in "$@"; do case "$a" in -*) ;; *) sub="$a"; break ;; esac; done
+  case "$PR_NAME:$sub" in
+    flutter:build|flutter:run|flutter:test|flutter:drive|flutter:analyze|dart:compile|dart:test|dart:analyze) return 0 ;;
+  esac
+  return 1
 }
 
 # pr_flutter <arguments>: flutter or dart, from the pinned or default version.

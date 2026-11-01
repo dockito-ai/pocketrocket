@@ -32,8 +32,9 @@ import com.pocketrocket.ui.theme.PrType
 
 /**
  * What runs beside the conversation (BackgroundTasks.html), from the counts on the status line: running agents and
- * background shells, each shell with Stop, then the shells that ended in this session, dimmed. A shell opens its
- * output ([onOpenShell]), an agent opens full screen ([onOpenAgent]); a running agent has Stop too.
+ * background shells, each shell with Stop, the builds running or waiting on the phone (decision 97), then the shells
+ * that ended in this session, dimmed. A shell opens its output ([onOpenShell]), an agent opens full screen
+ * ([onOpenAgent]); a running agent has Stop too.
  */
 @Composable
 fun BackgroundSheet(
@@ -56,6 +57,7 @@ fun BackgroundSheet(
             if (running.isEmpty()) Text("Nothing running in the background.", style = PrType.body, color = c.textMuted)
             running.forEach { tool -> TaskRow(tool, onOpenShell, onOpenAgent, onStop) }
         }
+        BuildQueueSection(state.folder)
         if (ended.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("FINISHED THIS SESSION", style = PrType.micro, fontWeight = FontWeight.SemiBold, color = c.textMuted)
