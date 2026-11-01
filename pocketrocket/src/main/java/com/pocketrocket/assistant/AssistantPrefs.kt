@@ -17,10 +17,16 @@ import kotlinx.coroutines.launch
 /** What it takes to allow, push or switch to Auto mode on a locked phone (decision 54). */
 enum class LockedPhoneRule(val label: String) { FingerprintOrSpokenYes("Fingerprint or spoken yes"), FingerprintOnly("Fingerprint only") }
 
-/** Every switch of the assistant. Defaults are decision 54's. */
+/**
+ * Rocket is hidden for now (decision 111): no Settings card, so nothing can switch it on. To bring it back, set this true
+ * and take `android:enabled="false"` off AssistantActivity in the manifest.
+ */
+const val ASSISTANT_SHOWN = false
+
+/** Every switch of the assistant. Defaults are decision 54's, except that it starts off (decision 111). */
 data class AssistantSettings(
     /** Off removes the Rocket tab and runs nothing. */
-    val enabled: Boolean = true,
+    val enabled: Boolean = false,
     /** Hey Rocket: off until he switches it on, and it listens only then (decision 62). */
     val wakeWord: Boolean = false,
     /** Speak over the speaker too, not only headphones. */
@@ -55,8 +61,10 @@ object AssistantPrefs {
     private const val ONE_HOUR_MS = 60 * 60_000L
     /**
      * New keys for two changed defaults: 1.0.3 wrote every switch on each change, so its Hey Rocket on and Haiku would
-     * otherwise read as his choice. Hey Rocket starts off (decision 62) and Rocket on Sonnet (decision 61).
+     * otherwise read as his choice. Hey Rocket starts off (decision 62) and Rocket on Sonnet (decision 61). The same goes
+     * for Rocket itself, which now starts off (decision 111).
      */
+    private const val KEY_ENABLED = "assistant_enabled_v2"
     private const val KEY_WAKE_WORD = "assistant_wake_word_v2"
     private const val KEY_MODEL = "assistant_model_v2"
 
@@ -103,7 +111,7 @@ object AssistantPrefs {
         val p = prefs(context)
         val d = AssistantSettings()
         return AssistantSettings(
-            enabled = p.getBoolean("assistant_enabled", d.enabled),
+            enabled = p.getBoolean(KEY_ENABLED, d.enabled),
             wakeWord = p.getBoolean(KEY_WAKE_WORD, d.wakeWord),
             speaker = p.getBoolean("assistant_speaker", d.speaker),
             voice = p.getString("assistant_voice", d.voice),
@@ -116,7 +124,8 @@ object AssistantPrefs {
 
     private fun write(context: Context, s: AssistantSettings) {
         prefs(context).edit()
-            .putBoolean("assistant_enabled", s.enabled)
+            .putBoolean(KEY_ENABLED, s.enabled)
+            .remove("assistant_enabled")
             .putBoolean(KEY_WAKE_WORD, s.wakeWord)
             .remove("assistant_announce_needs_you")
             .remove("assistant_announce_fails")

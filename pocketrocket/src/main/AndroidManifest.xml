@@ -96,9 +96,12 @@
              which is what the power button uses where the phone allows it. Deliberately not a VoiceInteractionService: that
              also makes its recogniser the phone's default speech recognition, and a sideloaded one gains no hotword from it.
              VOICE_COMMAND and VOICE_SEARCH_HANDS_FREE are what Android sends for a long-press on a headset button; no media
-             session is involved, so play and pause stay with the music app. -->
+             session is involved, so play and pause stay with the music app.
+             Disabled while Rocket is hidden (decision 111), so the phone doesn't offer it as an assistant or send it the headset
+             long-press. Comes back with ASSISTANT_SHOWN. -->
         <activity
             android:name="com.pocketrocket.assistant.AssistantActivity"
+            android:enabled="false"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode"
             android:exported="true"
             android:excludeFromRecents="true"

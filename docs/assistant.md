@@ -1,5 +1,7 @@
 # Assistant: plan
 
+**Hidden for now (decision 111).** Rocket is off for everyone and has no way in: no tab, no Settings card, not offered as the phone's assistant. The code stays. To bring it back, set `ASSISTANT_SHOWN` true in `AssistantPrefs.kt` and take `android:enabled="false"` off `AssistantActivity` in the manifest.
+
 Decisions 51 and 52. A voice assistant, called Rocket, that supervises Claude sessions: ask what's happening, hand real work to sessions, start agents, change settings. A waiting session's own permission prompt is answered in that session, not here (decision 59). It is a remote control for the app: you say or type what you want and it uses the app's own actions. All six steps are written on `feature/rocket` (voice in the app, the voice picker, the popup, Android's assistant setting, the earbud long-press, Hey Rocket, allowing by voice, the fingerprint popup, the lock screen fix, the brain, its tools and memory, and settings by voice). Nothing here has been tested on the phone, so the Android and Xiaomi points below are what we expect, to be checked in the final pass (`docs/rocket-final-pass.md`).
 
 Designs: `docs/ux-mockup/rocket/` (`In-*` boards, and the clickable `prototype.html`). The designs' Sessions, Workspaces and Settings boards are not a redesign: those screens stay as they are in the app, and only gain what this plan adds.

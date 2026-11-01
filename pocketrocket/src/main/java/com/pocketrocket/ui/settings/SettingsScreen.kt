@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pocketrocket.assistant.ASSISTANT_SHOWN
 import com.pocketrocket.assistant.AssistantPrefs
 import com.pocketrocket.profiles.ClaudeAccounts
 import com.pocketrocket.settings.ThemeMode
@@ -120,7 +121,7 @@ fun SettingsScreen(
                     onClick = onUpdates,
                 )
             }
-            Section("ROCKET") { AssistantCard(onAssistant) }
+            if (ASSISTANT_SHOWN) Section("ROCKET") { AssistantCard(onAssistant) }
             Section("THIS PHONE") {
                 HealthCard()
                 UsageCard()
