@@ -598,6 +598,27 @@ step_base_packages() {
   fi
   locate_glibc_tools
   ok "base packages ready"
+  node_corepack_enable
+}
+
+# node_corepack_enable: pnpm and yarn at the version each project pins (its packageManager field), through the
+# corepack that comes with Node: `corepack enable` links them into $PREFIX/bin. Runs after Node's install and every
+# Node update, since a new Node brings a new corepack. A pnpm or yarn that isn't corepack's (pkg install pnpm,
+# npm i -g yarn) is left alone, and a failure only warns.
+node_corepack_enable() {
+  local corepack="$PREFIX/bin/corepack" name target names=()
+  [ -e "$corepack" ] || { info "this Node has no corepack, so pnpm and yarn are not set up"; return 0; }
+  for name in pnpm yarn; do
+    target="$(readlink -f "$PREFIX/bin/$name" 2>/dev/null || true)"
+    if [ -e "$PREFIX/bin/$name" ] && [[ "$target" != */corepack/* ]]; then info "keeping the $name already installed"; continue; fi
+    names+=("$name")
+  done
+  [ "${#names[@]}" -gt 0 ] || return 0
+  if log_run "$PREFIX/bin/node" "$corepack" enable --install-directory "$PREFIX/bin" "${names[@]}"; then
+    ok "${names[*]} ready through corepack"
+  else
+    warn "could not enable corepack for ${names[*]}; run corepack enable in a terminal"
+  fi
 }
 
 locate_glibc_tools() {
@@ -1419,6 +1440,7 @@ main_apt_update() {
   TOTAL_STEPS=2; PR_LOG="$PR_HOME/$1.log"
   step "Checking the device"; preflight_checks; ok "Termux on aarch64"
   step_apt_update "$name" "$@"
+  if [ "$1" = nodejs-lts ]; then node_corepack_enable; fi
   # shellcheck disable=SC2086
   ok "$($check 2>&1)"
   printf '[done]\n'
