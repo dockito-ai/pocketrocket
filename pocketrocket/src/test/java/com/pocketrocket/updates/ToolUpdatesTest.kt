@@ -352,4 +352,46 @@ class ToolUpdatesTest {
         assertTrue(old != 0)
         assertTrue(said, said.contains("Wrangler needs Node 22 or newer, found 20"))
     }
+
+    /** Node's corepack and a `node` that records what it runs, for the corepack tests. */
+    private fun corepack() {
+        file(prefix, "lib/node_modules/corepack/dist/corepack.js")
+        file(prefix, "bin/corepack")
+        file(prefix, "bin/node", "#!/bin/sh\nprintf '%s\\n' \"\$*\" >>\"\$HOME/node.calls\"\n").setExecutable(true)
+    }
+
+    private fun nodeCalls() = File(home, "node.calls").takeIf { it.exists() }?.readLines().orEmpty()
+
+    @Test fun aNodeUpdateEnablesCorepackForPnpmAndYarn() {
+        if (!script.exists()) return
+        corepack()
+        aptPackage("nodejs-lts", "24.1.0", "24.2.0")
+        val (exit, out) = shell("$apt\nmain --only nodejs-lts-update")
+        assertEquals(out, 0, exit)
+        assertEquals(listOf("${prefix.path}/bin/corepack enable --install-directory ${prefix.path}/bin pnpm yarn"), nodeCalls())
+        assertTrue(out, out.contains("[ok] pnpm yarn ready through corepack"))
+        assertTrue(out, out.trim().endsWith("[done]"))
+    }
+
+    @Test fun corepackLeavesAPnpmItDidntPutThere() {
+        if (!script.exists()) return
+        corepack()
+        file(prefix, "bin/pnpm", "#!/bin/sh\n")
+        val (exit, out) = shell("preflight_checks; node_corepack_enable")
+        assertEquals(out, 0, exit)
+        assertTrue(out, out.contains("[info] keeping the pnpm already installed"))
+        assertEquals(listOf("${prefix.path}/bin/corepack enable --install-directory ${prefix.path}/bin yarn"), nodeCalls())
+    }
+
+    @Test fun aNodeWithoutCorepackOrAFailedEnableNeverFails() {
+        if (!script.exists()) return
+        val (exit, out) = shell("preflight_checks; node_corepack_enable")
+        assertEquals(out, 0, exit)
+        assertTrue(out, out.contains("this Node has no corepack"))
+        corepack()
+        file(prefix, "bin/node", "#!/bin/sh\nexit 1\n").setExecutable(true)
+        val (failed, said) = shell("preflight_checks; node_corepack_enable")
+        assertEquals(said, 0, failed)
+        assertTrue(said, said.contains("[warn] could not enable corepack for pnpm yarn"))
+    }
 }
