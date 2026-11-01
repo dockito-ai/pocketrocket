@@ -107,6 +107,52 @@ class FlutterDetectionTest {
         assertEquals(listOf("/p/${FlutterTool.FVM_DIR_RELATIVE}", "/h/${FlutterTool.FVM_RELATIVE}/versions", "/h/${FlutterTool.BASELINE_RELATIVE}"), out.take(3))
     }
 
+    @Test fun releaseBuildsShowWhenAddedAndOfferRepairWhenHalfThere() {
+        asInstalled()
+        fun release() = FlutterTool.releaseBuilds(prefix, home)
+        assertEquals(ReleaseBuilds.Off, release())
+        // qemu from a terminal is not this piece, and nothing is missing.
+        file(File(prefix, FlutterTool.RELEASE_QEMU_RELATIVE))
+        assertEquals(ReleaseBuilds.Off, release())
+        assertTrue(presence().complete)
+        // Added: the C library and the install's record.
+        file(File(prefix, FlutterTool.RELEASE_LOADER_RELATIVE))
+        file(File(home, FlutterTool.RELEASE_RECORD_RELATIVE))
+        assertEquals(ReleaseBuilds.Installed, release())
+        assertTrue(presence().complete)
+        // The emulator taken away (pkg uninstall qemu-user-x86-64): Repair.
+        File(prefix, FlutterTool.RELEASE_QEMU_RELATIVE).delete()
+        assertEquals(ReleaseBuilds.Missing, release())
+        assertEquals("Release builds missing", presence().problem)
+        assertTrue(FlutterTool.repairsOnlyReleaseBuilds(presence().problem))
+        // Or the C library gone while qemu stays.
+        file(File(prefix, FlutterTool.RELEASE_QEMU_RELATIVE))
+        File(prefix, FlutterTool.RELEASE_SYSROOT_RELATIVE).deleteRecursively()
+        assertEquals(ReleaseBuilds.Missing, release())
+        // Repair of more than Release builds runs Flutter's install.
+        File(home, "fvm").deleteRecursively()
+        assertEquals("Flutter SDK, Release builds missing", presence().problem)
+        assertFalse(FlutterTool.repairsOnlyReleaseBuilds(presence().problem))
+        assertFalse(FlutterTool.repairsOnlyReleaseBuilds(null))
+    }
+
+    @Test fun theScriptTheLauncherAndTheAppPlaceReleaseBuildsAlike() {
+        if (!script.exists()) return
+        fun read(file: String, code: String): List<String> {
+            val p = ProcessBuilder(listOf("bash", "-c", "HOME=/h PREFIX=/p $code", "_", file)).start()
+            return p.inputStream.bufferedReader().readText().lines().filter { it.isNotEmpty() }.also { p.waitFor() }
+        }
+        val want = listOf("/p/${FlutterTool.RELEASE_QEMU_RELATIVE}", "/p/${FlutterTool.RELEASE_SYSROOT_RELATIVE}")
+        assertEquals(
+            want + "/h/${FlutterTool.RELEASE_RECORD_RELATIVE}",
+            read(script.path, "POCKETROCKET_SETUP_SOURCE_ONLY=1 . \"$1\"; printf '%s\\n' \"\$FLUTTER_RELEASE_QEMU\" \"\$FLUTTER_RELEASE_SYSROOT\" \"\$FLUTTER_RELEASE_ADDED_FILE\""),
+        )
+        assertEquals(want, read("../setup/flutter", "POCKETROCKET_FLUTTER_SOURCE_ONLY=1 . \"$1\"; printf '%s\\n' \"\$PR_QEMU\" \"\$PR_X64_SYSROOT\""))
+        // The setup script finds the launcher's wrappers by its mark.
+        val marks = read(script.path, "POCKETROCKET_SETUP_SOURCE_ONLY=1 . \"$1\"; printf '%s\\n' \"\$FLUTTER_RELEASE_MARK\"; POCKETROCKET_FLUTTER_SOURCE_ONLY=1 . ../setup/flutter; printf '%s\\n' \"\$PR_AOT_MARK\"")
+        assertTrue(marks.toString(), marks[1].startsWith(marks[0]))
+    }
+
     /** A baseline left by an install from before the record deleted it must not count later packages as the tool's. */
     @Test fun aStaleBaselineIsDropped() {
         if (!script.exists()) return
