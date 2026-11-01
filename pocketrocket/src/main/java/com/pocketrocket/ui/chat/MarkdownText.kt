@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Just enough Markdown for Claude's replies: code fences, bullets, quotes, headings, **bold**,
+ * Just enough Markdown for Claude's replies: code fences, bullets, quotes, headings, pipe tables, **bold**,
  * `inline code` and links (`[label](url)` or a bare http(s) URL; tapping one opens the browser).
  * Anything else shows as plain text, which is fine for a chat.
  */
@@ -66,6 +66,7 @@ fun MarkdownText(text: String, modifier: Modifier = Modifier, color: Color = PrT
                 }
                 is MarkdownBlocks.Block.Heading -> Text(inline(block.text, spans), style = body.copy(fontSize = 15.sp), fontWeight = FontWeight.SemiBold, color = c.text)
                 is MarkdownBlocks.Block.Paragraph -> Text(inline(block.text, spans), style = body, color = color)
+                is MarkdownBlocks.Block.Table -> MarkdownTable(block.table, spans, color)
             }
         }
     }
@@ -108,6 +109,7 @@ object MarkdownBlocks {
         data class Bullet(val text: String) : Block
         data class Quote(val text: String) : Block
         data class Code(val text: String) : Block
+        data class Table(val table: MarkdownTableBlock) : Block
     }
 
     fun parse(text: String): List<Block> {
@@ -120,9 +122,21 @@ object MarkdownBlocks {
             paragraph.clear()
         }
 
-        text.lines().forEach { line ->
+        val lines = text.lines()
+        var i = 0
+        while (i < lines.size) {
+            val line = lines[i++]
             val trimmed = line.trimStart()
+            val header = if (code == null && '|' in trimmed) MarkdownTableBlock.cells(trimmed) else null
+            val align = header?.let { lines.getOrNull(i)?.let { next -> MarkdownTableBlock.separator(next, it.size) } }
             when {
+                header != null && align != null -> {
+                    flush()
+                    i++
+                    val rows = mutableListOf<List<String>>()
+                    while (i < lines.size && lines[i].isNotBlank() && '|' in lines[i]) rows += MarkdownTableBlock.cells(lines[i++])
+                    blocks += Block.Table(MarkdownTableBlock(header, align, rows))
+                }
                 trimmed.startsWith("```") -> code = if (code == null) {
                     flush(); StringBuilder()
                 } else {
