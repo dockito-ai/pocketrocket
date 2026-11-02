@@ -11,9 +11,10 @@ class AssistantSettingsTest {
 
     private val accounts = AccountList(listOf(ClaudeAccountEntry("main", "personal"), ClaudeAccountEntry("work", "work")), "main")
 
-    @Test fun defaultsAreOnButHeyRocketIsOffAndTheBrainIsSonnet() {
+    @Test fun startsOffWithHeyRocketOffAndTheBrainOnSonnet() {
         val d = AssistantSettings()
-        assertTrue(d.enabled)
+        // Decision 110: hidden and off.
+        assertFalse(d.enabled)
         // Decision 62: off until he switches it on. Decision 61: Sonnet.
         assertFalse(d.wakeWord)
         assertEquals("sonnet", d.model)

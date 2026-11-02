@@ -38,7 +38,7 @@ internal object PermissionChecks {
         if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             HealthItem("Microphone", Ok, "Allowed for dictation")
         } else {
-            HealthItem("Microphone", NeedsAttention, "Not allowed. Dictation and Rocket’s voice won’t work", HealthFix.Request(Manifest.permission.RECORD_AUDIO))
+            HealthItem("Microphone", NeedsAttention, "Not allowed. Dictation won’t work", HealthFix.Request(Manifest.permission.RECORD_AUDIO))
         }
 
     /** Asks Android for storage access; once given, the app links ~/storage itself (no terminal command). */

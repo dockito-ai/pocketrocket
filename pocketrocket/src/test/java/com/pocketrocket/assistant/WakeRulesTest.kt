@@ -8,7 +8,7 @@ import java.io.File
 
 class WakeRulesTest {
 
-    private val on = AssistantSettings(wakeWord = true)
+    private val on = AssistantSettings(enabled = true, wakeWord = true)
 
     private fun run(s: AssistantSettings = on, installed: Boolean = true, mic: Boolean = true) =
         WakeRules.shouldRun(s, installed, mic, now = 1_000)
@@ -16,7 +16,7 @@ class WakeRulesTest {
     @Test fun listensOnlyWhileSwitchedOn() {
         // Decision 62: no sessions-or-charging rule; switched on, it listens, and nothing else starts it.
         assertTrue(run())
-        assertFalse(run(AssistantSettings()))
+        assertFalse(run(on.copy(wakeWord = false)))
     }
 
     @Test fun anySwitchOffStopsIt() {
@@ -64,7 +64,7 @@ class WakeRulesTest {
 
     @Test fun saysWhyItIsntListening() {
         assertEquals("On, paused by Quiet", view(s = on.copy(quietUntil = 2_000)).note)
-        assertEquals("Off", view(s = AssistantSettings()).note)
+        assertEquals("Off", view(s = on.copy(wakeWord = false)).note)
         assertFalse(view(allowed = false).on)
         assertFalse(view(problem = true).on)
         assertEquals("Downloading 50%", view(install = WakeInstall.Downloading(5, 10)).note)
