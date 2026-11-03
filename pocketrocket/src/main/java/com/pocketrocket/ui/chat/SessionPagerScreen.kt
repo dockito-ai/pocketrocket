@@ -184,7 +184,12 @@ private fun TopBar(session: Session, onBack: () -> Unit) {
             }
         }
         Box(
-            Modifier.size(44.dp).clip(RoundedCornerShape(22.dp)).clickable(role = Role.Button, onClickLabel = "Open in terminal") { Termux.openTerminal(context) },
+            Modifier.size(44.dp).clip(RoundedCornerShape(22.dp)).clickable(role = Role.Button, onClickLabel = "Open in terminal") {
+                // A new shell in this session's folder, with the workspace's accounts (as Workspace and Files do).
+                val dir = File(state.folder)
+                if (state.folder.isNotEmpty() && dir.isDirectory) Termux.openTerminalIn(context, dir, folderName(state.folder))
+                else Termux.openTerminal(context)
+            },
             contentAlignment = Alignment.Center,
         ) {
             Icon(ChatIcons.Terminal, contentDescription = "Open in terminal", tint = c.textSoft, modifier = Modifier.size(20.dp))
