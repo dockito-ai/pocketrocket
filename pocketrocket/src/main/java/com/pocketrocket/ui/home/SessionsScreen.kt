@@ -4,6 +4,7 @@ import com.pocketrocket.ui.theme.PrTheme
 import com.pocketrocket.ui.theme.status
 import com.pocketrocket.ui.theme.statusEdge
 import com.pocketrocket.ui.theme.statusFill
+import android.content.pm.ApplicationInfo
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -80,6 +81,7 @@ private data class SessionGroup(val id: String, val label: String, val path: Str
 @Composable
 fun SessionsScreen(navigate: (String) -> Unit, onOpenTerminal: () -> Unit) {
     val context = LocalContext.current
+    val debuggable = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
     val c = PrTheme.colors
     val sessions by SessionManager.sessions.collectAsState()
     val workspaces by Workspaces.state.collectAsState()
@@ -173,7 +175,8 @@ fun SessionsScreen(navigate: (String) -> Unit, onOpenTerminal: () -> Unit) {
         }
         if (states.isNotEmpty()) NewSessionFab(
             onClick = { navigate(Routes.newSession(if (tab == "all") "" else groups.firstOrNull { it.id == tab }?.workspace?.path.orEmpty())) },
-            onLongClick = { DemoConversation.entries.forEach(SessionManager::startDemo) },
+            // Debug builds only: a long-press starts the scripted demo sessions agents verify the UI with.
+            onLongClick = if (debuggable) { { DemoConversation.entries.forEach(SessionManager::startDemo) } } else null,
             modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 20.dp),
         )
     }
@@ -287,7 +290,7 @@ private fun UnseenDot() = Box(Modifier.size(8.dp).background(PrTheme.colors.acce
 /** The orange "+ New session" button over the list. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun NewSessionFab(onClick: () -> Unit, onLongClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun NewSessionFab(onClick: () -> Unit, onLongClick: (() -> Unit)?, modifier: Modifier = Modifier) {
     val c = PrTheme.colors
     Row(
         modifier.clip(RoundedCornerShape(16.dp)).background(c.accent).combinedClickable(onClick = onClick, onLongClick = onLongClick)
