@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  actions: write # to delete old debug APKs
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
@@ -48,6 +49,17 @@ jobs:
           path: app/build/outputs/apk/debug/termux-app_apt-android-7-debug_arm64-v8a.apk
           if-no-files-found: error
           retention-days: 7
+
+      # Keep only the last 3 debug APKs: artifacts count against the Actions storage allowance even on a public repo.
+      - name: Delete older debug APKs
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api --paginate "repos/$REPO/actions/artifacts?name=pocketrocket-debug-arm64&per_page=100" \
+            -q '.artifacts[] | select(.expired|not) | .id' | tail -n +4 |
+            xargs -r -I{} gh api -X DELETE "repos/$REPO/actions/artifacts/{}"
 
       - name: Upload test reports
         if: failure()
